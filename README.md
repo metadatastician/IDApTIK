@@ -33,6 +33,8 @@ This is the fourth incarnation of the project. The lineage:
 | 3 | idaptik | AffineScript / PixiJS |
 | 4 | **IDAprUSTIK** | **Rust** / **Elixir** |
 
+Rust owns gameplay truth; Elixir owns multiplayer/session life.
+
 ## How it plays
 
 Underneath the platforming sits a grounded network simulation, so the hacker is solving a real, legible network rather than pressing a "hack" button.
