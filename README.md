@@ -29,7 +29,7 @@ This is the fourth incarnation of the project. The lineage:
 | # | Codebase | Stack |
 |---|----------|-------|
 | 1 | IDApTIK | TypeScript / Excalibur |
-| 2 | IDApTIK | ReScript / PixiJS |
+| 2 | IDApixiTIK | AffineScript / PixiJS |
 | 3 | idaptik | AffineScript / PixiJS |
 | 4 | **IDApTIK** | **Rust** / **Elixir** |
 
