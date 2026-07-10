@@ -28,8 +28,14 @@ impl Trace {
     /// many machines the hacker is bouncing through. Each extra hop divides the
     /// rate, so pivoting through intermediate boxes buys time — the classic
     /// bounce-to-slow-the-trace mechanic. Bouncing never speeds the trace up.
+    ///
+    /// Bouncing *slows* the trace but never *freezes* it: any active intrusion
+    /// (`base > 0`) advances the trace by at least 1, however many hops it is
+    /// bounced through. Only genuine inactivity (`base == 0`) yields no progress
+    /// — otherwise a hacker could pivot through enough machines to divide the
+    /// integer rate down to 0 and stall the trace indefinitely.
     pub fn advance(&mut self, base: u32, hops: u32) {
-        let rate = base / hops.max(1);
+        let rate = if base == 0 { 0 } else { (base / hops.max(1)).max(1) };
         self.progress = self.progress.saturating_add(rate).min(self.threshold);
     }
 
@@ -92,5 +98,28 @@ mod tests {
         }
         assert!(bounced.progress() < direct.progress());
         assert!((bounced.fraction() - 0.10).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn bouncing_slows_but_never_freezes_the_trace() {
+        // base < hops would integer-divide the rate to 0 — a hacker must not be
+        // able to pivot through enough machines to stall the trace outright.
+        let mut t = Trace::new(100);
+        for _ in 0..100 {
+            t.advance(3, 16); // 3/16 == 0 under plain integer division
+        }
+        assert_eq!(t.progress(), 100, "active intrusion must keep advancing");
+        assert!(t.traced());
+    }
+
+    #[test]
+    fn inactivity_makes_no_progress() {
+        // No activity (base == 0) is the only thing that yields no progress.
+        let mut t = Trace::new(100);
+        for _ in 0..100 {
+            t.advance(0, 1);
+        }
+        assert_eq!(t.progress(), 0);
+        assert!(!t.traced());
     }
 }
