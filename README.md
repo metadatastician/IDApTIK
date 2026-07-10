@@ -4,7 +4,7 @@
 
 ### *If you have to ask, you're already compromised.*
 
-**Invisible Door: Actionpointrun Uplink ShadowTrauma, Inc. Kickers**
+**Invisible Door: Action Point Trauma Inc. Kickers/**
 
 An asymmetric two-player infiltration game. One of you goes in. The other keeps you alive from a screen. Neither of you is fully in control, and that is the point.
 
