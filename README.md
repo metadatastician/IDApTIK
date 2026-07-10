@@ -14,7 +14,7 @@ An asymmetric two-player infiltration game. One of you goes in. The other keeps 
 
 ## What this is
 
-IDAprUSTIK is a game about infiltration, deception, and trust, usually misplaced.
+IDApTIK is a game about infiltration, deception, and trust, usually misplaced.
 
 One player is the **infiltrator**: moving through the world, dodging obstacles, bypassing security, staying unseen. The other is the **hacker**: watching remotely, opening doors, timing elevators, rewiring electronics, cutting the lights, and generally trying to keep the infiltrator breathing.
 
@@ -63,19 +63,39 @@ Development runs in vehicle-named phases, smallest viable thing first:
 
 ## Tech
 
-- **Language:** Rust.
+The Rust era's stack is being pinned as decisions are made, and each decision is recorded as an ADR under [`docs/adr/`](docs/adr/) rather than asserted here and quietly contradicted later.
 
-The wider stack (rendering, multiplayer transport, persistence) is being settled as part of this rewrite and is intentionally not pinned here yet. Architecture decisions for the Rust era will be recorded as ADRs under `docs/` as they are made, rather than asserted up front and quietly contradicted later.
+- **Gameplay truth:** Rust — an engine-agnostic core, with **Bevy** and **Fyrox** as evaluation frontends over it ([ADR-0003](docs/adr/0003-engine-strategy.md)).
+- **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
+- **FFI / ABI edges:** **Zig** (C ABI, cross-compilation) and **Idris2** (modelling the ABI contracts) ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
+- **Config:** **Nickel** (typed configuration).
+- **Toolchains:** pinned in `mise.toml` + `rust-toolchain.toml`; `just` runs tasks. Provision with `just setup` (or `just bootstrap` for a fast, prebuilt-only bring-up), and check with `just doctor`.
+
+Still open: the renderer choice between Bevy and Fyrox (settled at the end of Envelope), persistence, and the Rust↔Elixir wire format.
+
+## Layout
+
+```
+crates/idaptik-core     engine-agnostic gameplay truth — the network sim, no rendering
+crates/idaptik-ffi      C-ABI surface for Zig/Idris2 consumers (ADR-0001)
+crates/idaptik-bevy     Bevy rendering frontend        (evaluation, ADR-0003)
+crates/idaptik-fyrox    Fyrox rendering frontend       (evaluation, ADR-0003)
+server/                    Elixir: Bandit + Phoenix Channels (ADR-0002)
+config/                    Nickel — typed, schema-checked game/network config
+docs/adr/                  architecture decision records
+```
+
+`just` runs the common tasks (`just doctor`, `just test`, `just run-bevy`, `just server`, `just config-check`); toolchains are pinned in `mise.toml` + `rust-toolchain.toml`.
 
 ## Licensing
 
-IDAprUSTIK is layered, and each layer is licensed for what it is. The whole project is open and is built to stay open.
+IDApTIK is layered, and each layer is licensed for what it is. The whole project is open and is built to stay open.
 
 | Layer | License |
 |-------|---------|
 | **Engine & code** | [AGPL-3.0-or-later](https://www.gnu.org/licenses/agpl-3.0.html) |
 | **Game content** (art, levels, narrative, character designs, audio) | [CC-BY-SA-4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
-| **Names & marks** (IDAprUSTIK, IDApTIK, Moletaire) | Trademark, all rights reserved |
+| **Names & marks** (IDApTIK, IDApTIK, Moletaire) | Trademark, all rights reserved |
 
 The engine is strong copyleft: anyone who builds on it, including as a hosted service, must share their entire derivative source. The content is free culture: you may use, modify, and even sell derivatives, provided you attribute and keep them under the same share-alike terms.
 
