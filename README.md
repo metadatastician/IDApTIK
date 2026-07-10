@@ -31,7 +31,7 @@ This is the fourth incarnation of the project. The lineage:
 | 1 | IDApTIK | TypeScript / Excalibur |
 | 2 | IDApixiTIK | ReScript / PixiJS |
 | 3 | idaptik | AffineScript / PixiJS |
-| 4 | **IDAprUSTIK** | **Rust** / **Elixir** |
+| 4 | **IDApTIK** | **Rust** / **Elixir** |
 
 Rust owns gameplay truth; Elixir owns multiplayer/session life.
 
