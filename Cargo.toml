@@ -1,0 +1,26 @@
+# IDApTIK Cargo workspace.
+#
+# Layout follows ADR-0003: gameplay truth lives in an engine-agnostic `core`
+# crate; `bevy` and `fyrox` are thin, interchangeable rendering frontends over
+# it; `ffi` is the C-ABI surface that Zig/Idris2 bind to (ADR-0001).
+[workspace]
+resolver = "2"
+members = [
+    "crates/idaptik-core",
+    "crates/idaptik-ffi",
+    "crates/idaptik-bevy",
+    "crates/idaptik-fyrox",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+authors = ["IDApTIK contributors"]
+repository = "https://github.com/JoshuaJewell/IDApTIK"
+
+[workspace.dependencies]
+idaptik-core = { path = "crates/idaptik-core" }
+serde = { version = "1", features = ["derive"] }
+bevy = "0.19"
+fyrox = "1.0"

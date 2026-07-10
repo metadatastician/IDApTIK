@@ -1,0 +1,15 @@
+[package]
+name = "idaptik-ffi"
+description = "C-ABI surface over idaptik-core, for FFI consumers (Zig bridge, Idris2 ABI models)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+# cdylib + staticlib for FFI consumers; rlib so Rust tests/other crates can use it too.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+idaptik-core = { workspace = true }

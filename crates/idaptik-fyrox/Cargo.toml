@@ -1,0 +1,12 @@
+[package]
+name = "idaptik-fyrox"
+description = "Fyrox rendering frontend for IDApTIK (evaluation; see ADR-0003)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+idaptik-core = { workspace = true }
+fyrox = { workspace = true }

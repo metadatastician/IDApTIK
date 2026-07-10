@@ -1,0 +1,36 @@
+# Toolchain pins for IDApTIK, managed by mise (https://mise.jdx.dev).
+#
+# mise is used instead of asdf: same `.tool-versions` semantics, but a fast Rust
+# binary, PATH-based activation (no shim hop), and registry backends (aqua, cargo,
+# asdf) that install tools like Zig and Just without hunting for a bespoke plugin.
+# It stays asdf-compatible, so it also matches the convention opsm uses.
+# Rationale + the "opsm later" plan: docs/adr/0001-toolchain-and-runtime-management.md
+#
+# Versions mirror the opsm estate where they overlap, so the two projects agree.
+#   $ mise install     # install everything pinned below
+#   $ just doctor      # verify what is present
+
+[tools]
+# --- BEAM: multiplayer / session layer (Elixir owns multiplayer, Rust owns truth)
+erlang = "28.3.1"
+elixir = "1.19.5-otp-28"
+
+# --- Systems / FFI + config + task runner
+zig    = "0.14.0"    # C ABI + cross-compilation for FFI/APIs (see ADR-0001)
+just   = "1.46.0"    # task runner (this repo's justfile)
+# Nickel has no bare registry shortname; build the CLI from crates.io (reliable
+# everywhere Rust is present, which is always here). For a prebuilt binary
+# instead, swap to: "aqua:nickel-lang/nickel" = "1.16.0"
+"cargo:nickel-lang-cli" = "1.16.0"  # typed config for game/level/network
+
+# --- Idris2 is intentionally NOT auto-installed here.
+# It bootstraps through Chez Scheme + GMP (no clean prebuilt), so a bare
+# `mise install` would fail on machines without Chez. Provision it on demand with
+# `just install-idris2` (uses idris2-pack), matching how opsm handles it via guix.
+# Uncomment only if Chez Scheme is already present on the machine:
+# "asdf:asdf-community/asdf-idris2" = "0.8.0"
+
+[env]
+# Fuller backtraces while the project is young. Linker choice (lld/mold) for fast
+# Bevy/Fyrox builds is a per-machine .cargo/config.toml concern, not pinned here.
+RUST_BACKTRACE = "1"
