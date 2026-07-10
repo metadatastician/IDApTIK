@@ -4,7 +4,7 @@
 
 ### *If you have to ask, you're already compromised.*
 
-**Invisible Door: Actionpointrun Uplink ShadowTrauma, Inc. Kickers**
+**Invisible Door: Action Point Trauma Inc. Kickers**
 
 An asymmetric two-player infiltration game. One of you goes in. The other keeps you alive from a screen. Neither of you is fully in control, and that is the point.
 
@@ -29,7 +29,7 @@ This is the fourth incarnation of the project. The lineage:
 | # | Codebase | Stack |
 |---|----------|-------|
 | 1 | IDApTIK | TypeScript / Excalibur |
-| 2 | IDApTIK | ReScript / PixiJS |
+| 2 | IDApixiTIK | AffineScript / PixiJS |
 | 3 | idaptik | AffineScript / PixiJS |
 | 4 | **IDApTIK** | **Rust** / **Elixir** |
 
