@@ -1,6 +1,6 @@
 <div align="center">
 
-# IDAprUSTIK
+# IDApTIK
 
 ### *If you have to ask, you're already compromised.*
 
