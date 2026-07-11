@@ -21,10 +21,7 @@ fn main() -> AppExit {
 /// Placeholder bring-up: prove the core is wired in by logging the loaded
 /// network. Real scenes/entities replace this as the Envelope milestone fills in.
 fn report_network(net: Res<GameNetwork>) {
-    info!(
-        "IDApTIK/bevy: loaded network with {} devices",
-        net.0.len()
-    );
+    info!("IDApTIK/bevy: loaded network with {} devices", net.0.len());
     for device in net.0.devices() {
         info!("  {} [{}] {:?}", device.name, device.ip, device.kind);
     }

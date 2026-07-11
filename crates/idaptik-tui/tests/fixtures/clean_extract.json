@@ -1,0 +1,13 @@
+{
+  "seed": 123456,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 400,
+  "commands": [
+    { "at": 0, "hold": ["right"] },
+    { "at": 30, "test": { "hook": "force_crisis" } },
+    { "at": 60, "press": ["camera"] },
+    { "at": 120, "press": ["lights"] },
+    { "at": 200, "test": { "hook": "force_extract", "method": "service_exit" } }
+  ]
+}

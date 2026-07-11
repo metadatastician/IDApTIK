@@ -5,13 +5,26 @@
 //! clock they race. It has **no rendering dependency** — Bevy and Fyrox are
 //! frontends over this (ADR-0003), and the Elixir session layer coordinates it
 //! (ADR-0002). Keep game logic here, not in a frontend.
+//!
+//! The [`scenario`] module ports the "Envelope 001 – Ghost Lobby" prototype as a
+//! deterministic, event-sourced, definition-as-data scenario (ADR-0004): content
+//! is a serde [`ScenarioDefinition`], the simulation consumes typed [`Command`]s
+//! and emits typed [`Event`]s, and every run is reproducible byte-for-byte from
+//! `(definition, config, seed, command stream)`.
+#![forbid(unsafe_code)]
 
 pub mod device;
 pub mod network;
+pub mod scenario;
 pub mod trace;
 
 pub use device::{Device, DeviceId, DeviceKind, SecurityLevel};
 pub use network::{Network, Zone};
+pub use scenario::{
+    Buttons, Command, Debrief, DifficultyId, Event, GHOST_LOBBY_JSON, GhostLobbySim, LogLine,
+    Mulberry32, RunConfig, RuntimeSnapshot, ScenarioDefinition, ScenarioExport, TickInput,
+    ValidationError, ghost_lobby,
+};
 pub use trace::{Alert, Trace};
 
 use std::net::Ipv4Addr;
