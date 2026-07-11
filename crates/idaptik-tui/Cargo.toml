@@ -1,0 +1,23 @@
+[package]
+name = "idaptik-tui"
+description = "Ratatui/crossterm evaluation frontend and headless verifier over idaptik-core's Ghost Lobby scenario."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+idaptik-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = "2"
+
+[[bin]]
+name = "idaptik-tui"
+path = "src/main.rs"

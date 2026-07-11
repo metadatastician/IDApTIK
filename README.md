@@ -76,8 +76,9 @@ Still open: the renderer choice between Bevy and Fyrox (settled at the end of En
 ## Layout
 
 ```
-crates/idaptik-core     engine-agnostic gameplay truth — the network sim, no rendering
+crates/idaptik-core     engine-agnostic gameplay truth — the network sim + Ghost Lobby scenario, no rendering
 crates/idaptik-ffi      C-ABI surface for Zig/Idris2 consumers (ADR-0001)
+crates/idaptik-tui      ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)
 crates/idaptik-bevy     Bevy rendering frontend        (evaluation, ADR-0003)
 crates/idaptik-fyrox    Fyrox rendering frontend       (evaluation, ADR-0003)
 server/                    Elixir: Bandit + Phoenix Channels (ADR-0002)
