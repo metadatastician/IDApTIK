@@ -26,8 +26,8 @@ serde = { version = "1", features = ["derive"] }
 # `float_roundtrip` guarantees bit-exact f64 JSON round-trips (snapshots/exports).
 serde_json = { version = "1", features = ["float_roundtrip"] }
 libm = "0.2"
-ratatui = "0.29"
-crossterm = "0.28"
+ratatui = "0.30"
+crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
 bevy = "0.19"
 fyrox = "1.0"
