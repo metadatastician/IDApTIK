@@ -113,6 +113,15 @@ mod tests {
     }
 
     #[test]
+    fn zero_hops_does_not_divide_by_zero() {
+        // `hops` should never be 0, but if a caller passes it the guard must
+        // treat it as a direct (unbounced) intrusion rather than panicking.
+        let mut t = Trace::new(100);
+        t.advance(5, 0); // hops.max(1) -> divide by 1, no panic
+        assert_eq!(t.progress(), 5); // same as advance(5, 1)
+    }
+
+    #[test]
     fn inactivity_makes_no_progress() {
         // No activity (base == 0) is the only thing that yields no progress.
         let mut t = Trace::new(100);
