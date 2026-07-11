@@ -1,0 +1,330 @@
+//! Typed events — the event-sourced spine of the scenario.
+//!
+//! Every `logEvent` and state transition in the prototype becomes a typed
+//! [`Event`]. The ordered `Vec<Event>` a run produces is the canonical
+//! deterministic artifact. Human log lines are a pure *view*: [`log_view`] maps
+//! an event to an optional [`LogLine`]. Structural / telemetry events return
+//! `None` (they still exist in the event stream, they just aren't rendered).
+//!
+//! Log text uses this crate's own deterministic formatter (fixed decimals via
+//! Rust formatting), **not** JS `toFixed` — the goldens are ours.
+
+use crate::scenario::common::{
+    Channel, ChuteMethod, CrisisReason, DenyReason, ExtractMethod, FailReason, ObjectKind,
+    ObjectiveStatus, Outcome, Phase, ReportedTarget, Severity,
+};
+use crate::scenario::ids::{DoorId, RoomId};
+use crate::scenario::tuning::{ActionKind, DifficultyId};
+use serde::{Deserialize, Serialize};
+
+/// A typed simulation event.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "event")]
+pub enum Event {
+    /// The run began.
+    RunStarted {
+        seed: u32,
+        difficulty: DifficultyId,
+        reduced_motion: bool,
+    },
+    /// Hacker channel: the seed readout.
+    SeedAnnounced { seed: u32 },
+    /// Structural: a phase transition.
+    PhaseChanged {
+        from: Phase,
+        to: Phase,
+        reason: Option<CrisisReason>,
+    },
+    /// The floor tipped into crisis.
+    CrisisBegan { reason: CrisisReason },
+    /// Telemetry: an uplink action was performed (ledger/stats).
+    UplinkAction { kind: ActionKind },
+    /// Camera ping activated.
+    CameraPinged { laundry_view: bool },
+    /// A door hold was routed.
+    DoorRouted { door: DoorId, delay: f64 },
+    /// The robot vacuum route was accepted.
+    VacuumRouted,
+    /// The lights were flickered.
+    LightsFlickered { third_use: bool },
+    /// An uplink action was denied.
+    UplinkDenied {
+        kind: ActionKind,
+        reason: DenyReason,
+    },
+    /// A door hold became active.
+    DoorHoldActive { door: DoorId, duration: f64 },
+    /// The contact note was secured.
+    NoteSecured { seen: bool },
+    /// The note peel was seen by Billy (latches note exposure).
+    NoteExposed,
+    /// The USB was taken (device lockdown).
+    UsbTaken { seen: bool },
+    /// The USB was thrown as a decoy.
+    UsbThrown,
+    /// The USB self-wiped, leaving a trace.
+    UsbSelfWiped,
+    /// Billy grabbed the note.
+    BillyTookNote,
+    /// Billy grabbed the USB.
+    BillyTookUsb,
+    /// The laundry chute was revealed.
+    ChuteRevealed { method: ChuteMethod },
+    /// The vacuum began to lag out of control.
+    VacuumLagWarned,
+    /// The vacuum fell down the chute.
+    VacuumFell,
+    /// A camera flagged the infiltrator.
+    CameraFlag { room: RoomId },
+    /// The support envelope is fraying.
+    SupportFraying,
+    /// A pickpocket during lights-out succeeded.
+    PickpocketSucceeded,
+    /// Structural: Billy changed FSM mode.
+    BillyStateChanged {
+        from: crate::scenario::common::BillyMode,
+        to: crate::scenario::common::BillyMode,
+    },
+    /// Billy formed a belief (announce-once).
+    BillyBeliefFormed { belief: ObjectKind },
+    /// Billy badged through a door.
+    BillyBadgedDoor { door: DoorId },
+    /// Billy called his boss.
+    BossCalled { reported: ReportedTarget },
+    /// The one-shot rescue fired.
+    RescueUsed,
+    /// Structural: the objective ledger changed.
+    ObjectivesUpdated {
+        note: ObjectiveStatus,
+        misdirect: ObjectiveStatus,
+        exit: ObjectiveStatus,
+    },
+    /// The infiltrator extracted.
+    Extracted { method: ExtractMethod },
+    /// The mission failed.
+    MissionFailed { reason: FailReason },
+    /// Structural: the run ended (the debrief is the payload).
+    RunEnded { outcome: Outcome },
+    /// Session: paused.
+    Paused,
+    /// Session: resumed.
+    Resumed,
+    /// Session: restarted.
+    Restarted { seed: u32 },
+    /// Frontend-only prompt (excluded from the canonical determinism diff).
+    ContextHint { text: String },
+    /// Frontend-only tutorial cue (excluded from the canonical determinism diff).
+    TutorialCue { text: String, seconds: f64 },
+}
+
+/// A rendered log line — a *view* over an [`Event`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LogLine {
+    pub tick: u64,
+    pub t: f64,
+    pub text: String,
+    pub severity: Severity,
+    pub channel: Channel,
+}
+
+/// Format a timestamp as `MM:SS` (own deterministic formatter).
+pub fn format_time(t: f64) -> String {
+    let total = if t.is_finite() && t >= 0.0 {
+        t.floor() as u64
+    } else {
+        0
+    };
+    format!("{:02}:{:02}", total / 60, total % 60)
+}
+
+/// One-decimal fixed formatter (deterministic; not JS `toFixed`).
+fn dec1(x: f64) -> String {
+    format!("{x:.1}")
+}
+
+/// Map an event to an optional rendered log line. Structural, telemetry, and
+/// frontend-only events (and the vacuum chute reveal, covered by [`Event::VacuumFell`])
+/// return `None`.
+pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
+    let line = |text: String, severity: Severity, channel: Channel| {
+        Some(LogLine {
+            tick,
+            t,
+            text,
+            severity,
+            channel,
+        })
+    };
+    use Channel::{Log, Prompt, Tutorial};
+    use Severity::{Bad, Billy, Good, Hacker, Info, Warn};
+
+    match e {
+        Event::RunStarted { .. } => line(
+            "You are in the dark kitchen. Search fast. The note is boring, the USB shiny, the chute silly.".into(),
+            Info,
+            Log,
+        ),
+        Event::SeedAnnounced { seed } => line(
+            format!("Run seed {seed:08X}. Billy's arrival estimate is deliberately imprecise."),
+            Hacker,
+            Log,
+        ),
+        Event::CrisisBegan { reason } => {
+            let text = match reason {
+                CrisisReason::Usb => "Billy: \"They pulled the drive. Lock the floor.\"".into(),
+                CrisisReason::Timer => "Billy: \"I'm back early. Something's off in here.\"".into(),
+                CrisisReason::Test => "Billy: \"Someone tripped the alarm. Moving in.\"".into(),
+            };
+            line(text, Billy, Log)
+        }
+        Event::CameraPinged { laundry_view } => line(
+            "Camera ping — a clean estimate for a few seconds.".into(),
+            if *laundry_view { Warn } else { Hacker },
+            Log,
+        ),
+        Event::DoorRouted { door, delay } => line(
+            format!("Routing a hold to {door} in {}s.", dec1(*delay)),
+            Hacker,
+            Log,
+        ),
+        Event::VacuumRouted => line("Robot vacuum route accepted.".into(), Hacker, Log),
+        Event::LightsFlickered { third_use } => line(
+            "Hacker flickers the lights.".into(),
+            if *third_use { Warn } else { Hacker },
+            Log,
+        ),
+        Event::UplinkDenied { kind, reason } => {
+            let why = match reason {
+                DenyReason::Cooldown => "on cooldown",
+                DenyReason::Bandwidth => "not enough bandwidth",
+                DenyReason::VacuumFallen => "vacuum already gone",
+            };
+            line(
+                format!("Uplink {kind:?} denied — {why}."),
+                if matches!(reason, DenyReason::VacuumFallen) {
+                    Bad
+                } else {
+                    Warn
+                },
+                Log,
+            )
+        }
+        Event::DoorHoldActive { door, duration } => line(
+            format!("{door} hold active for {} seconds.", dec1(*duration)),
+            Hacker,
+            Log,
+        ),
+        Event::NoteSecured { seen } => {
+            if *seen {
+                line("Contact note peeled — in Billy's line of sight.".into(), Bad, Log)
+            } else {
+                line("Contact lead secured, quietly.".into(), Good, Log)
+            }
+        }
+        Event::UsbTaken { .. } => line("DEVICE LOCKDOWN — the drive begins to wipe.".into(), Warn, Log),
+        Event::UsbThrown => line("USB thrown — a shiny decoy skitters away.".into(), Good, Log),
+        Event::UsbSelfWiped => line("The drive finished wiping. A trace is left behind.".into(), Bad, Log),
+        Event::BillyTookNote => line("Billy pockets the note.".into(), Bad, Log),
+        Event::BillyTookUsb => line("Billy grabs the shiny drive instead.".into(), Good, Log),
+        Event::ChuteRevealed { method } => match method {
+            ChuteMethod::Physical => line("Laundry chute found — a way down.".into(), Good, Log),
+            ChuteMethod::Vacuum => None,
+        },
+        Event::VacuumLagWarned => line("Vacuum control is lagging.".into(), Warn, Log),
+        Event::VacuumFell => line("The robot vacuum vanishes down a hidden chute.".into(), Good, Log),
+        Event::CameraFlag { room } => line(format!("Camera flag in {room}."), Bad, Log),
+        Event::SupportFraying => line("Support is fraying.".into(), Warn, Log),
+        Event::PickpocketSucceeded => line("Lifted the note from Billy's pocket in the dark.".into(), Good, Log),
+        Event::BillyBeliefFormed { belief } => {
+            let text = match belief {
+                ObjectKind::Note => "Billy: \"They were after paperwork. The note.\"".into(),
+                ObjectKind::Usb => "Billy: \"They went straight for that little drive.\"".into(),
+            };
+            line(text, Billy, Log)
+        }
+        Event::BillyBadgedDoor { door } => line(format!("Billy badges through {door}."), Billy, Log),
+        Event::BossCalled { reported } => {
+            let text = match reported {
+                ReportedTarget::Note => "Billy: \"Boss, they took a note off the board.\"".into(),
+                ReportedTarget::Usb => "Billy: \"Boss, they went for that little drive.\"".into(),
+                ReportedTarget::Intruder => "Billy: \"Boss, there's someone on the floor.\"".into(),
+            };
+            line(text, Billy, Log)
+        }
+        Event::RescueUsed => line("Hacker burns bandwidth to yank you clear.".into(), Hacker, Log),
+        Event::Extracted { method } => {
+            let text = match method {
+                ExtractMethod::ServiceExit => "Clear of the service exit.".into(),
+                ExtractMethod::LaundryChute => "Down the laundry chute and gone.".into(),
+            };
+            line(text, Good, Log)
+        }
+        Event::MissionFailed { reason } => {
+            let text = match reason {
+                FailReason::Caught => "Caught on the floor.".into(),
+                FailReason::Partition => "Support partitioned — you are on your own, and it shows.".into(),
+                FailReason::Lockdown => "Building lockdown. The floor is sealed.".into(),
+            };
+            line(text, Bad, Log)
+        }
+        Event::ContextHint { text } => line(text.clone(), Info, Prompt),
+        Event::TutorialCue { text, .. } => line(text.clone(), Info, Tutorial),
+
+        // Structural / telemetry / session — present in the event stream, but
+        // not rendered as log lines.
+        Event::PhaseChanged { .. }
+        | Event::UplinkAction { .. }
+        | Event::NoteExposed
+        | Event::BillyStateChanged { .. }
+        | Event::ObjectivesUpdated { .. }
+        | Event::RunEnded { .. }
+        | Event::Paused
+        | Event::Resumed
+        | Event::Restarted { .. } => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_time_is_mm_ss() {
+        assert_eq!(format_time(0.0), "00:00");
+        assert_eq!(format_time(65.4), "01:05");
+        assert_eq!(format_time(-3.0), "00:00");
+    }
+
+    #[test]
+    fn structural_events_have_no_log_line() {
+        assert!(log_view(&Event::NoteExposed, 0, 0.0).is_none());
+        assert!(
+            log_view(
+                &Event::UplinkAction {
+                    kind: ActionKind::Door
+                },
+                1,
+                0.0
+            )
+            .is_none()
+        );
+        assert!(
+            log_view(
+                &Event::ChuteRevealed {
+                    method: ChuteMethod::Vacuum
+                },
+                1,
+                0.0
+            )
+            .is_none()
+        );
+    }
+
+    #[test]
+    fn logged_events_carry_tick_and_time() {
+        let l = log_view(&Event::SeedAnnounced { seed: 0x1E240 }, 42, 1.5).unwrap();
+        assert_eq!(l.tick, 42);
+        assert_eq!(l.channel, Channel::Log);
+        assert!(l.text.contains("0001E240"));
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "seed": 123456,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 200,
+  "commands": [
+    { "at": 10, "test": { "hook": "force_fail", "reason": "caught" } }
+  ]
+}

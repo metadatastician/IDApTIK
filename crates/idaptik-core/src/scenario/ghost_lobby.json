@@ -1,0 +1,538 @@
+{
+  "format": "idaptik-ghost-lobby-v1",
+  "scenario_id": "envelope-001-ghost-lobby",
+  "name": "Envelope 001 — Ghost Lobby",
+  "floor_id": 0,
+  "world": {
+    "floor": 585.0,
+    "room_offset": 14.0,
+    "width": 1260.0
+  },
+  "rooms": [
+    {
+      "id": "kitchen",
+      "name": "KITCHEN / BREAK ROOM",
+      "x": 20.0,
+      "w": 250.0,
+      "support": 1.0,
+      "ping_support_bonus": 0.0,
+      "sight_multiplier": 1.0,
+      "lit": false
+    },
+    {
+      "id": "hall",
+      "name": "HALLWAY",
+      "x": 270.0,
+      "w": 240.0,
+      "support": 0.84,
+      "ping_support_bonus": 0.16,
+      "sight_multiplier": 1.0,
+      "lit": false
+    },
+    {
+      "id": "office",
+      "name": "LIT OFFICE / USB TRAP",
+      "x": 510.0,
+      "w": 285.0,
+      "support": 0.34,
+      "ping_support_bonus": 0.3,
+      "sight_multiplier": 1.15,
+      "lit": true
+    },
+    {
+      "id": "laundry",
+      "name": "LAUNDRY / WARDROBE",
+      "x": 795.0,
+      "w": 245.0,
+      "support": 0.5,
+      "ping_support_bonus": 0.05,
+      "sight_multiplier": 1.0,
+      "lit": false
+    },
+    {
+      "id": "exit",
+      "name": "SERVICE EXIT",
+      "x": 1040.0,
+      "w": 220.0,
+      "support": 0.69,
+      "ping_support_bonus": 0.12,
+      "sight_multiplier": 1.0,
+      "lit": false
+    }
+  ],
+  "doors": [
+    {
+      "id": "D1",
+      "x": 270.0,
+      "label": "KITCHEN/HALL"
+    },
+    {
+      "id": "D2",
+      "x": 510.0,
+      "label": "HALL/OFFICE"
+    },
+    {
+      "id": "D3",
+      "x": 795.0,
+      "label": "OFFICE/LAUNDRY"
+    },
+    {
+      "id": "D4",
+      "x": 1040.0,
+      "label": "SERVICE EXIT"
+    }
+  ],
+  "hide_spots": [
+    {
+      "id": "counter",
+      "room": "kitchen",
+      "x": 205.0,
+      "radius": 58.0,
+      "label": "prep counter shadow"
+    },
+    {
+      "id": "copier",
+      "room": "hall",
+      "x": 404.0,
+      "radius": 50.0,
+      "label": "copier recess"
+    },
+    {
+      "id": "desk",
+      "room": "office",
+      "x": 655.0,
+      "radius": 62.0,
+      "label": "office desk"
+    },
+    {
+      "id": "wardrobe",
+      "room": "laundry",
+      "x": 885.0,
+      "radius": 58.0,
+      "label": "wardrobe"
+    },
+    {
+      "id": "crate",
+      "room": "exit",
+      "x": 1125.0,
+      "radius": 50.0,
+      "label": "delivery crate"
+    }
+  ],
+  "cameras": [
+    {
+      "id": "cam-hall",
+      "room": "hall",
+      "x": 330.0,
+      "range": [
+        292.0,
+        495.0
+      ],
+      "phase": 0.2,
+      "stale": false
+    },
+    {
+      "id": "cam-office",
+      "room": "office",
+      "x": 565.0,
+      "range": [
+        530.0,
+        782.0
+      ],
+      "phase": 1.3,
+      "stale": false
+    },
+    {
+      "id": "cam-laundry",
+      "room": "laundry",
+      "x": 830.0,
+      "range": [
+        812.0,
+        1015.0
+      ],
+      "phase": 2.1,
+      "stale": true
+    }
+  ],
+  "props": {
+    "note": {
+      "x": 92.0,
+      "y": 282.0
+    },
+    "usb": {
+      "x": 622.0,
+      "y": 569.0
+    },
+    "chute": {
+      "x": 946.0,
+      "y": 495.0
+    },
+    "vacuum": {
+      "x": 592.0,
+      "y": 568.0
+    }
+  },
+  "player": {
+    "spawn_x": 72.0,
+    "spawn_y": 531.0,
+    "w": 28.0,
+    "h": 54.0
+  },
+  "billy": {
+    "spawn_x": -90.0,
+    "spawn_y": 521.0,
+    "w": 36.0,
+    "h": 64.0
+  },
+  "objectives": [
+    {
+      "id": "note",
+      "kind": "Note",
+      "label": "Secure the contact note",
+      "room": "kitchen"
+    },
+    {
+      "id": "misdirect",
+      "kind": "Misdirect",
+      "label": "Convince Billy it was the drive",
+      "room": "office"
+    },
+    {
+      "id": "exit",
+      "kind": "Exit",
+      "label": "Reach the service exit or laundry chute",
+      "room": "exit"
+    }
+  ],
+  "actions": {
+    "Camera": {
+      "cost": 18.0,
+      "cooldown": 4.2,
+      "alert_gain": 2.4
+    },
+    "Door": {
+      "cost": 17.0,
+      "cooldown": 1.0,
+      "alert_gain": 3.2
+    },
+    "Vacuum": {
+      "cost": 25.0,
+      "cooldown": 8.0,
+      "alert_gain": 4.2
+    },
+    "Lights": {
+      "cost": 15.0,
+      "cooldown": 5.0,
+      "alert_gain": 8.5
+    }
+  },
+  "difficulty": {
+    "Story": {
+      "label": "STORY",
+      "arrival": [
+        24.0,
+        31.0
+      ],
+      "player_speed": 172.0,
+      "sprint": 250.0,
+      "billy_speed": 77.0,
+      "billy_sight": 210.0,
+      "support_limit": 7.2,
+      "bandwidth_regen": 8.0,
+      "badge_delay": 1.65,
+      "usb_timer": 14.0,
+      "camera_lock": 1.05,
+      "alert_gain": 0.78,
+      "score_mult": 0.85,
+      "rescue": true
+    },
+    "Standard": {
+      "label": "STANDARD",
+      "arrival": [
+        19.0,
+        26.0
+      ],
+      "player_speed": 166.0,
+      "sprint": 242.0,
+      "billy_speed": 91.0,
+      "billy_sight": 245.0,
+      "support_limit": 5.2,
+      "bandwidth_regen": 6.1,
+      "badge_delay": 1.32,
+      "usb_timer": 11.0,
+      "camera_lock": 0.78,
+      "alert_gain": 1.0,
+      "score_mult": 1.0,
+      "rescue": true
+    },
+    "Operator": {
+      "label": "OPERATOR",
+      "arrival": [
+        15.0,
+        21.0
+      ],
+      "player_speed": 162.0,
+      "sprint": 235.0,
+      "billy_speed": 106.0,
+      "billy_sight": 280.0,
+      "support_limit": 3.8,
+      "bandwidth_regen": 4.5,
+      "badge_delay": 1.02,
+      "usb_timer": 8.5,
+      "camera_lock": 0.58,
+      "alert_gain": 1.2,
+      "score_mult": 1.25,
+      "rescue": false
+    }
+  },
+  "tuning": {
+    "geometry": {
+      "floor": 585.0,
+      "room_offset": 14.0,
+      "player_w": 28.0,
+      "player_h": 54.0,
+      "billy_w": 36.0,
+      "billy_h": 64.0,
+      "collision_radius": 30.0,
+      "world_width": 1260.0
+    },
+    "movement": {
+      "gravity": 1080.0,
+      "jump_vy": -430.0,
+      "accel_drive": 980.0,
+      "accel_brake": 1250.0,
+      "crouch_speed": 0.46,
+      "stam_drain": 24.0,
+      "stam_regen": 17.0,
+      "stam_regen_crouch": 11.0,
+      "sprint_min_stam": 2.0,
+      "hide_max_vx": 92.0,
+      "crouch_cam_vx": 80.0,
+      "moving_vx": 65.0,
+      "clamp_lo": 26.0,
+      "clamp_hi": 1250.0,
+      "land_vy": 190.0
+    },
+    "noise": {
+      "jump": 0.7,
+      "land": 0.8,
+      "decay": 1.1,
+      "sprint_base": 0.68,
+      "sprint_k": 0.3,
+      "walk_k": 0.24,
+      "crouch": 0.08,
+      "move_min_vx": 15.0
+    },
+    "fsm": {
+      "start_x": -90.0,
+      "crisis_x": 26.0,
+      "enter_speed": 0.72,
+      "shock_t": 1.15,
+      "assess_speed": 0.55,
+      "patrol_lo": 130.0,
+      "patrol_hi": 355.0,
+      "patrol_pivot": 220.0,
+      "invest_speed": 0.82,
+      "secure_speed": 0.92,
+      "grab_dist": 31.0,
+      "guard_speed": 0.45,
+      "guard_t_note": 1.9,
+      "guard_t_usb": 1.7,
+      "call_t": 1.9,
+      "pursue_speed": 1.2,
+      "pursue_trigger": 115.0,
+      "pursue_giveup_ago": 3.2,
+      "pursue_giveup_dist": 20.0,
+      "accel": 520.0,
+      "clamp_lo": 25.0,
+      "clamp_hi": 1230.0,
+      "badge_open": 1.55,
+      "snack_reach": 12.0,
+      "alert_boost_div": 260.0,
+      "lights_boost_k": 0.035,
+      "vac_distract": 245.0,
+      "sight_back": 0.34,
+      "sight_crouch": 0.62,
+      "sight_office": 1.15,
+      "sight_alert": 1.12,
+      "sight_alert_hi": 65.0,
+      "invest_noise": 0.45,
+      "invest_dist": 260.0
+    },
+    "belief": {
+      "threshold": 48.0,
+      "misdirect_threshold": 72.0,
+      "moving_vx": 65.0,
+      "pi_seen": 4.0,
+      "pi_sprint": 12.0,
+      "note_near": 105.0,
+      "usb_near": 112.0,
+      "note_urg_sprint": 20.0,
+      "note_urg_move": 10.0,
+      "note_urg_still": 4.0,
+      "usb_urg_sprint": 17.0,
+      "usb_urg_move": 8.0,
+      "usb_urg_still": 3.0,
+      "note_carry": 13.0,
+      "usb_carry": 12.0,
+      "prog_gate": 0.12,
+      "pi_decay": 0.9,
+      "note_decay": 0.25,
+      "usb_decay": 0.2,
+      "peel_interest": 36.0,
+      "secure_note_seen": 72.0,
+      "take_usb_seen": 74.0,
+      "take_usb_unseen": 28.0,
+      "camera_player_int": 30.0
+    },
+    "support": {
+      "ping_hall": 0.16,
+      "ping_office": 0.3,
+      "ping_laundry": 0.05,
+      "ping_exit": 0.12,
+      "lowbw_x": 18.0,
+      "lowbw_pen": 0.12,
+      "alert_pen": 0.0022,
+      "hidden": 0.06,
+      "flicker": 0.04,
+      "clamp_min": 0.05,
+      "approach": 1.15,
+      "iso_gate": 0.4,
+      "iso_pressure_div": 130.0,
+      "fray_frac": 0.5,
+      "iso_decay": 1.35,
+      "iso_decay_hidden": 2.2,
+      "ping_dur": 3.4
+    },
+    "bandwidth": {
+      "regen_a": 0.55,
+      "regen_b": 0.75,
+      "alert_decay_quiet": 0.45,
+      "alert_decay_crisis": 0.18,
+      "lockdown": 100.0
+    },
+    "action": {
+      "lights_dur": 1.45,
+      "lights_dur_rm": 0.7,
+      "lights_stun": 1.05,
+      "route_duration": 3.2,
+      "throttle_cdbw": 1.2,
+      "throttle_fray": 4.2,
+      "throttle_badge": 8.0,
+      "call_alert": 12.0
+    },
+    "camera": {
+      "sweep_w": 0.75,
+      "sweep_a": 25.0,
+      "lockout": 5.5,
+      "alert": 14.0,
+      "decay_unseen": 1.4,
+      "decay_off": 2.2
+    },
+    "usb": {
+      "throw_vx": 330.0,
+      "throw_vy": -170.0,
+      "throw_off": 34.0,
+      "held_off": 15.0,
+      "grav": 780.0,
+      "drag": 0.985,
+      "floor": 574.0,
+      "bounce": -0.24,
+      "friction": 0.72,
+      "rest_vx": 14.0,
+      "rest_vy": 18.0,
+      "clamp_lo": 35.0,
+      "clamp_hi": 1235.0,
+      "wipe_alert": 27.0,
+      "throw_alert": 5.0
+    },
+    "vacuum": {
+      "lag_x": 795.0,
+      "ctrl_loss": 0.42,
+      "ctrl_min": 0.22,
+      "lag_warn": 0.72,
+      "ctrl_gain": 0.18,
+      "speed": 72.0,
+      "move_min": 0.26,
+      "target": 958.0,
+      "fall_off": 8.0
+    },
+    "interaction": {
+      "note_dist": 58.0,
+      "note_hold": 0.85,
+      "usb_dist": 50.0,
+      "chute_enter": 62.0,
+      "chute_search_off": 18.0,
+      "chute_search_dist": 70.0,
+      "chute_hold": 1.55,
+      "pickpocket_dist": 57.0,
+      "pickpocket_hold": 0.72,
+      "exit_prompt_x": 1215.0,
+      "exit_x": 1242.0
+    },
+    "rescue": {
+      "support_min": 0.68,
+      "bw_min": 20.0,
+      "bw_cost": 20.0,
+      "stun": 1.6,
+      "grace": 1.8,
+      "displace": 58.0
+    }
+  },
+  "scoring": {
+    "base": 700.0,
+    "note": 650.0,
+    "note_lost": -260.0,
+    "note_none": -80.0,
+    "misdir": 330.0,
+    "misdir_leak": -180.0,
+    "noboss": 150.0,
+    "boss": -140.0,
+    "nocam": 120.0,
+    "cam_each": -65.0,
+    "iso_ok": 100.0,
+    "iso_snap": -90.0,
+    "iso_snap_frac": 0.55,
+    "chute": 110.0,
+    "usbtrace": -170.0,
+    "rescue": -80.0,
+    "time_base": 220.0,
+    "time_k": 1.7,
+    "alert_k": 2.7,
+    "fail_act": 28.0,
+    "fail_note": 420.0,
+    "fail_base": 120.0,
+    "fail_usb": 180.0,
+    "fail_alert_k": 2.0,
+    "grades": {
+      "s": 1850.0,
+      "a": 1450.0,
+      "b": 1050.0,
+      "c": 700.0,
+      "fail_c": 500.0
+    }
+  },
+  "spawn": {
+    "note_x": [
+      92.0,
+      78.0
+    ],
+    "usb_x": [
+      622.0,
+      112.0
+    ],
+    "stale_pulse": [
+      2.5,
+      3.5
+    ],
+    "snack_x": [
+      165.0,
+      68.0
+    ],
+    "door_delay": [
+      0.22,
+      0.5
+    ],
+    "operator_door_penalty": 0.45
+  }
+}

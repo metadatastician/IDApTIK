@@ -56,8 +56,26 @@ run-bevy:
 run-fyrox:
     cargo run -p idaptik-fyrox
 
+# Run the Ghost Lobby terminal frontend (ratatui/crossterm, ADR-0004).
+run-tui:
+    cargo run -p idaptik-tui
+
+# Run a headless script and print the event-log + debrief + snapshot JSON.
+headless SCRIPT:
+    cargo run -q -p idaptik-tui -- --headless --script {{SCRIPT}}
+
+# Verify a script replays deterministically (PASS/FAIL + exit code).
+replay FILE:
+    cargo run -q -p idaptik-tui -- --replay {{FILE}}
+
 test:
     cargo test --workspace
+
+# The Ghost Lobby scenario gate: core + tui + ffi (does NOT build bevy/fyrox).
+test-ghost:
+    cargo test -p idaptik-core -p idaptik-tui -p idaptik-ffi
+    cargo clippy -p idaptik-core -p idaptik-tui --all-targets -- -D warnings
+    cargo fmt --all -- --check
 
 fmt:
     cargo fmt --all

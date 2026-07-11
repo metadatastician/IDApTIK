@@ -35,7 +35,11 @@ impl Trace {
     /// — otherwise a hacker could pivot through enough machines to divide the
     /// integer rate down to 0 and stall the trace indefinitely.
     pub fn advance(&mut self, base: u32, hops: u32) {
-        let rate = if base == 0 { 0 } else { (base / hops.max(1)).max(1) };
+        let rate = if base == 0 {
+            0
+        } else {
+            (base / hops.max(1)).max(1)
+        };
         self.progress = self.progress.saturating_add(rate).min(self.threshold);
     }
 

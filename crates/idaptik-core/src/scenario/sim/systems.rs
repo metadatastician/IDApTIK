@@ -1,0 +1,1005 @@
+//! The twelve simulation systems, in the fixed pipeline order. Each is an
+//! `impl GhostLobbySim` method the tick loop calls in sequence. The order is
+//! load-bearing (belief reads the player's NEW position and Billy's OLD one;
+//! Billy moves only in `system_billy`; collisions see Billy's NEW position).
+
+use super::GhostLobbySim;
+use crate::scenario::command::{Button, Edge, TickInput};
+use crate::scenario::common::{
+    BillyMode, ChuteMethod, CrisisReason, ExtractMethod, ObjectKind, ObjectiveStatus, Phase,
+    ReportedTarget,
+};
+use crate::scenario::constants as c;
+use crate::scenario::event::Event;
+use crate::scenario::ids::RoomId;
+use crate::scenario::mathf::{TICK_DT, approach, clamp, dist, powf, sin};
+
+impl GhostLobbySim {
+    // 1. TIMERS ------------------------------------------------------------
+    pub(super) fn system_timers(&mut self) {
+        let dt = TICK_DT;
+        let s = &mut self.state;
+        s.camera_ping = (s.camera_ping - dt).max(0.0);
+        s.lights_flicker = (s.lights_flicker - dt).max(0.0);
+        s.camera_lockout = (s.camera_lockout - dt).max(0.0);
+        s.player.caught_grace = (s.player.caught_grace - dt).max(0.0);
+        for a in s.actions.values_mut() {
+            a.cd = (a.cd - dt).max(0.0);
+        }
+        let mut hold_events: Vec<Event> = Vec::new();
+        for door in &mut s.doors {
+            door.open = (door.open - dt).max(0.0);
+            if door.pending > 0.0 {
+                door.pending -= dt;
+                if door.pending <= 0.0 {
+                    door.open = door.route_duration;
+                    hold_events.push(Event::DoorHoldActive {
+                        door: door.id.clone(),
+                        duration: door.route_duration,
+                    });
+                }
+            }
+        }
+        let regen_factor = c::BW_REGEN_A + s.support * c::BW_REGEN_B;
+        s.bandwidth = clamp(
+            s.bandwidth + self.preset.bandwidth_regen * regen_factor * dt,
+            0.0,
+            100.0,
+        );
+        let decay = if s.phase == Phase::Quiet {
+            c::ALERT_DECAY_QUIET
+        } else {
+            c::ALERT_DECAY_CRISIS
+        };
+        s.alert = clamp(s.alert - decay * dt, 0.0, 100.0);
+        s.max_alert = s.max_alert.max(s.alert);
+        self.events.append(&mut hold_events);
+    }
+
+    // 2. PLAYER ------------------------------------------------------------
+    pub(super) fn system_player(&mut self, input: &TickInput) {
+        let dt = TICK_DT;
+        let old_x = self.state.player.x;
+        let left = input.buttons.has(Button::Left);
+        let right = input.buttons.has(Button::Right);
+        let crouch = input.buttons.has(Button::Crouch);
+        let sprint_wanted = input.buttons.has(Button::Sprint)
+            && self.state.player.stamina > c::SPRINT_MIN_STAM
+            && !crouch;
+        let dir = (right as i32 - left as i32) as f64;
+        self.state.player.crouching = crouch;
+        self.state.player.sprinting = sprint_wanted && dir != 0.0;
+
+        if self.state.player.sprinting {
+            self.state.player.stamina = (self.state.player.stamina - c::STAM_DRAIN * dt).max(0.0);
+            self.state.stats.sprints += dt;
+        } else {
+            let regen = if crouch {
+                c::STAM_REGEN_CROUCH
+            } else {
+                c::STAM_REGEN
+            };
+            self.state.player.stamina = (self.state.player.stamina + regen * dt).min(100.0);
+        }
+
+        let base = if self.state.player.sprinting {
+            self.preset.sprint
+        } else {
+            self.preset.player_speed
+        };
+        let speed = base * if crouch { c::CROUCH_SPEED } else { 1.0 };
+        let target_vx = dir * speed;
+        let accel = if dir != 0.0 {
+            c::ACCEL_DRIVE
+        } else {
+            c::ACCEL_BRAKE
+        };
+        self.state.player.vx = approach(self.state.player.vx, target_vx, accel * dt);
+        if dir != 0.0 {
+            self.state.player.facing = dir;
+        }
+
+        if input.edges.contains(&Edge::JumpUp) && self.state.player.grounded && !crouch {
+            self.state.player.vy = c::JUMP_VY;
+            self.state.player.grounded = false;
+            self.state.player.noise = self.state.player.noise.max(c::NOISE_JUMP);
+            self.state.stats.jumps += 1;
+        }
+
+        self.state.player.vy += c::GRAVITY * dt;
+        self.state.player.x += self.state.player.vx * dt;
+        self.state.player.y += self.state.player.vy * dt;
+        let h = self.def.player.h;
+        if self.state.player.y + h >= c::FLOOR {
+            if !self.state.player.grounded && self.state.player.vy > c::LAND_VY {
+                self.state.player.noise = self.state.player.noise.max(c::NOISE_LAND);
+            }
+            self.state.player.y = c::FLOOR - h;
+            self.state.player.vy = 0.0;
+            self.state.player.grounded = true;
+        }
+
+        self.state.player.x = clamp(self.state.player.x, c::PLAYER_CLAMP_LO, c::PLAYER_CLAMP_HI);
+        let (nx, blocked) = Self::constrain_by_doors(
+            &self.state.doors,
+            old_x,
+            self.state.player.x,
+            self.def.player.w,
+        );
+        self.state.player.x = nx;
+        if blocked {
+            self.state.player.vx = 0.0;
+        }
+
+        // hidden
+        let cx = self.state.player.x + self.def.player.w / 2.0;
+        let room_id = Self::room_id_at(&self.def, self.state.player.x).map(|s| s.to_owned());
+        let spot = self.def.hide_spots.iter().position(|hspot| {
+            dist(cx, hspot.x) <= hspot.radius && room_id.as_deref() == Some(hspot.room.as_str())
+        });
+        self.state.player.hide_spot = spot;
+        self.state.player.hidden = crouch
+            && spot.is_some()
+            && self.state.player.vx.abs() < c::HIDE_MAX_VX
+            && self.state.player.grounded;
+        if self.state.player.hidden {
+            self.state.stats.hidden_seconds += dt;
+        }
+
+        // noise (all contributions max()'d, then a single decay)
+        let movement_noise = self.state.player.vx.abs() / self.preset.sprint;
+        if self.state.player.sprinting {
+            self.state.player.noise = self
+                .state
+                .player
+                .noise
+                .max(c::NOISE_SPRINT_BASE + movement_noise * c::NOISE_SPRINT_K);
+        } else if self.state.player.vx.abs() > c::NOISE_MOVE_MIN_VX {
+            let n = if crouch {
+                c::NOISE_CROUCH
+            } else {
+                c::NOISE_WALK_K * movement_noise
+            };
+            self.state.player.noise = self.state.player.noise.max(n);
+        }
+        self.state.player.noise = (self.state.player.noise - c::NOISE_DECAY * dt).max(0.0);
+    }
+
+    // 3. INTERACTIONS ------------------------------------------------------
+    pub(super) fn system_interactions(&mut self, input: &TickInput) {
+        let dt = TICK_DT;
+        let pw = self.def.player.w;
+        let cx = self.state.player.x + pw / 2.0;
+        let interact_held = input.buttons.has(Button::Interact);
+        let interact_pressed = input.edges.contains(&Edge::InteractPress);
+        let jump_pressed = input.edges.contains(&Edge::JumpUp);
+        let throw = input.edges.contains(&Edge::Throw);
+        let room = Self::room_id_at(&self.def, self.state.player.x).map(|s| s.to_owned());
+        let room = room.as_deref();
+        let mut active = false;
+
+        // note peel
+        if !active
+            && !self.state.note.held
+            && !self.state.note.billy_has
+            && dist(cx, self.state.note.x) < c::NOTE_DIST
+            && room == Some("kitchen")
+        {
+            active = true;
+            if interact_held {
+                self.state.note.progress += dt;
+                self.state.player.vx *= 0.72;
+                if self.state.phase == Phase::Crisis && self.can_billy_see_player() {
+                    self.state.billy.note_interest = clamp(
+                        self.state.billy.note_interest + c::PEEL_INTEREST * dt,
+                        0.0,
+                        100.0,
+                    );
+                    if !self.state.note.exposed {
+                        self.state.note.exposed = true;
+                        self.events.push(Event::NoteExposed);
+                    }
+                    self.state.stats.note_exposed = true;
+                }
+                if self.state.note.progress >= c::NOTE_HOLD {
+                    self.secure_note();
+                }
+            } else {
+                self.state.note.progress = (self.state.note.progress - 1.5 * dt).max(0.0);
+            }
+        }
+
+        // usb take
+        if !active
+            && !self.state.usb.held
+            && !self.state.usb.billy_has
+            && dist(cx, self.state.usb.x) < c::USB_DIST
+            && room == Some("office")
+        {
+            active = true;
+            if interact_pressed {
+                self.take_usb();
+            }
+        }
+
+        // chute enter
+        if !active
+            && self.state.chute.revealed
+            && dist(cx, self.state.chute.x) < c::CHUTE_ENTER
+            && room == Some("laundry")
+        {
+            active = true;
+            if interact_pressed || jump_pressed {
+                self.extract(ExtractMethod::LaundryChute);
+                return;
+            }
+        }
+
+        // chute search
+        if !active
+            && !self.state.chute.revealed
+            && dist(cx, self.state.chute.x - c::CHUTE_SEARCH_OFF) < c::CHUTE_SEARCH_DIST
+            && room == Some("laundry")
+        {
+            active = true;
+            if interact_held {
+                self.state.chute.progress += dt;
+                self.state.player.vx *= 0.68;
+                if self.state.chute.progress >= c::CHUTE_HOLD {
+                    self.reveal_chute(ChuteMethod::Physical);
+                }
+            } else {
+                self.state.chute.progress = (self.state.chute.progress - 1.2 * dt).max(0.0);
+            }
+        }
+
+        // pickpocket during lights-out
+        let billy_center = self.state.billy.x + self.def.billy.w / 2.0;
+        if !active
+            && self.state.note.billy_has
+            && dist(cx, billy_center) < c::PICKPOCKET_DIST
+            && self.state.lights_flicker > 0.0
+        {
+            // Pickpocket is the last priority; `active` is not read afterwards.
+            if interact_held {
+                self.state.player.interaction_progress += dt;
+                if self.state.player.interaction_progress >= c::PICKPOCKET_HOLD {
+                    self.state.note.billy_has = false;
+                    self.state.billy.has_note = false;
+                    self.state.player.has_note = true;
+                    self.state.note.held = true;
+                    self.state.billy.player_interest = 100.0;
+                    self.state.player.interaction_progress = 0.0;
+                    self.set_billy_mode(BillyMode::Pursue);
+                    self.events.push(Event::PickpocketSucceeded);
+                }
+            } else {
+                self.state.player.interaction_progress = 0.0;
+            }
+        } else {
+            self.state.player.interaction_progress = 0.0;
+        }
+
+        // service-exit extraction (x > EXIT_PROMPT_X shows the prompt; x >= EXIT_X extracts)
+        if room == Some("exit")
+            && self.state.player.x > c::EXIT_PROMPT_X
+            && self.state.player.x >= c::EXIT_X
+        {
+            self.extract(ExtractMethod::ServiceExit);
+            return;
+        }
+
+        // throw
+        if self.state.player.has_usb && throw {
+            self.throw_usb();
+        }
+    }
+
+    fn secure_note(&mut self) {
+        if self.state.note.held || self.state.note.billy_has {
+            return;
+        }
+        self.state.note.held = true;
+        self.state.player.has_note = true;
+        self.state.note.progress = c::NOTE_HOLD;
+        let seen = self.state.phase == Phase::Crisis && self.can_billy_see_player();
+        if seen {
+            self.state.billy.note_interest = clamp(
+                self.state.billy.note_interest + c::SECURE_NOTE_SEEN,
+                0.0,
+                100.0,
+            );
+            if !self.state.note.exposed {
+                self.state.note.exposed = true;
+                self.events.push(Event::NoteExposed);
+            }
+            self.state.stats.note_exposed = true;
+        }
+        self.events.push(Event::NoteSecured { seen });
+    }
+
+    fn take_usb(&mut self) {
+        if self.state.usb.held || self.state.usb.billy_has {
+            return;
+        }
+        self.state.usb.held = true;
+        self.state.usb.on_floor = false;
+        self.state.player.has_usb = true;
+        self.state.usb.timer = self.preset.usb_timer;
+        let seen = self.state.phase == Phase::Crisis && self.can_billy_see_player();
+        let gain = if seen {
+            c::TAKE_USB_SEEN
+        } else {
+            c::TAKE_USB_UNSEEN
+        };
+        self.state.billy.usb_interest = clamp(self.state.billy.usb_interest + gain, 0.0, 100.0);
+        self.events.push(Event::UsbTaken { seen });
+        if self.state.phase == Phase::Quiet {
+            self.begin_crisis(CrisisReason::Usb);
+        }
+    }
+
+    fn throw_usb(&mut self) {
+        if !self.state.player.has_usb {
+            return;
+        }
+        let facing = self.state.player.facing;
+        let px = self.state.player.x;
+        let py = self.state.player.y;
+        let pw = self.def.player.w;
+        self.state.player.has_usb = false;
+        self.state.usb.held = false;
+        self.state.usb.thrown = true;
+        self.state.usb.billy_has = false;
+        self.state.usb.x = px + pw / 2.0 + facing * c::USB_THROW_OFF;
+        self.state.usb.y = py + 18.0;
+        self.state.usb.vx = facing * c::USB_THROW_VX;
+        self.state.usb.vy = c::USB_THROW_VY;
+        self.state.billy.usb_interest = 100.0;
+        self.state.billy.target = Some(ObjectKind::Usb);
+        self.state.billy.belief = Some(ObjectKind::Usb);
+        if !matches!(
+            self.state.billy.mode,
+            BillyMode::CallBoss | BillyMode::Pursue
+        ) {
+            self.set_billy_mode(BillyMode::Secure);
+        }
+        self.state.alert = clamp(
+            self.state.alert + c::USB_THROW_ALERT * self.preset.alert_gain,
+            0.0,
+            100.0,
+        );
+        self.events.push(Event::UsbThrown);
+    }
+
+    fn reveal_chute(&mut self, method: ChuteMethod) {
+        if self.state.chute.revealed {
+            return;
+        }
+        self.state.chute.revealed = true;
+        self.state.chute.progress = c::CHUTE_HOLD;
+        self.state.stats.chute_revealed_by = Some(method);
+        self.events.push(Event::ChuteRevealed { method });
+    }
+
+    // 4. USB ---------------------------------------------------------------
+    pub(super) fn system_usb(&mut self) {
+        let dt = TICK_DT;
+        if self.state.usb.held {
+            self.state.usb.x = self.state.player.x
+                + self.def.player.w / 2.0
+                + self.state.player.facing * c::USB_HELD_OFF;
+            self.state.usb.y = self.state.player.y + 19.0;
+        }
+        if self.state.usb.thrown && !self.state.usb.billy_has {
+            self.state.usb.vy += c::USB_GRAV * dt;
+            self.state.usb.x += self.state.usb.vx * dt;
+            self.state.usb.y += self.state.usb.vy * dt;
+            self.state.usb.vx *= powf(c::USB_DRAG, dt * 60.0);
+            if self.state.usb.y >= c::USB_FLOOR {
+                self.state.usb.y = c::USB_FLOOR;
+                self.state.usb.vy *= c::USB_BOUNCE;
+                self.state.usb.vx *= c::USB_FRICTION;
+                if self.state.usb.vx.abs() < c::USB_REST_VX
+                    && self.state.usb.vy.abs() < c::USB_REST_VY
+                {
+                    self.state.usb.vx = 0.0;
+                    self.state.usb.vy = 0.0;
+                    self.state.usb.on_floor = true;
+                }
+            }
+            self.state.usb.x = clamp(self.state.usb.x, c::USB_CLAMP_LO, c::USB_CLAMP_HI);
+        }
+        if (self.state.usb.held || self.state.usb.thrown)
+            && !self.state.usb.wiped
+            && !self.state.usb.billy_has
+            && self.state.usb.timer > 0.0
+        {
+            self.state.usb.timer = (self.state.usb.timer - dt).max(0.0);
+            if self.state.usb.timer <= 0.0 {
+                self.state.usb.wiped = true;
+                self.state.stats.usb_trace = true;
+                self.state.alert = clamp(
+                    self.state.alert + c::USB_WIPE_ALERT * self.preset.alert_gain,
+                    0.0,
+                    100.0,
+                );
+                self.events.push(Event::UsbSelfWiped);
+            }
+        }
+    }
+
+    // 5. VACUUM ------------------------------------------------------------
+    pub(super) fn system_vacuum(&mut self) {
+        let dt = TICK_DT;
+        if !self.state.vacuum.active || self.state.vacuum.fallen {
+            return;
+        }
+        if self.state.vacuum.x > c::VAC_LAG_X {
+            self.state.vacuum.control =
+                (self.state.vacuum.control - c::VAC_CTRL_LOSS * dt).max(c::VAC_CTRL_MIN);
+            if !self.state.vacuum.lag_warned && self.state.vacuum.control < c::VAC_LAG_WARN {
+                self.state.vacuum.lag_warned = true;
+                self.events.push(Event::VacuumLagWarned);
+            }
+        } else {
+            self.state.vacuum.control =
+                (self.state.vacuum.control + c::VAC_CTRL_GAIN * dt).min(1.0);
+        }
+        self.state.vacuum.x += c::VAC_SPEED * self.state.vacuum.control.max(c::VAC_MOVE_MIN) * dt;
+        if self.state.phase == Phase::Crisis
+            && self.state.billy.belief.is_none()
+            && dist(self.state.billy.x, self.state.vacuum.x) < c::VAC_DISTRACT
+        {
+            self.state.billy.last_known_x = self.state.vacuum.x;
+            if !matches!(
+                self.state.billy.mode,
+                BillyMode::Pursue | BillyMode::Secure | BillyMode::Guard | BillyMode::CallBoss
+            ) {
+                self.set_billy_mode(BillyMode::Investigate);
+            }
+        }
+        if self.state.vacuum.x >= self.state.chute.x - c::VAC_FALL_OFF {
+            self.state.vacuum.active = false;
+            self.state.vacuum.fallen = true;
+            self.reveal_chute(ChuteMethod::Vacuum);
+            self.events.push(Event::VacuumFell);
+        }
+    }
+
+    // 6. CAMERAS -----------------------------------------------------------
+    pub(super) fn system_cameras(&mut self) {
+        let dt = TICK_DT;
+        if self.state.camera_lockout > 0.0 || self.state.lights_flicker > 0.0 {
+            self.state.camera_detection =
+                (self.state.camera_detection - c::CAM_DECAY_OFF * dt).max(0.0);
+            return;
+        }
+        let ridx = Self::room_index_at(&self.def, self.state.player.x);
+        let room_id = self.def.rooms.get(ridx).map(|r| r.id.clone());
+        let cx = self.state.player.x + self.def.player.w / 2.0;
+        let t = self.state.t;
+        let hidden = self.state.player.hidden;
+        let crouch = self.state.player.crouching;
+        let vx = self.state.player.vx;
+        let cur = room_id.as_ref();
+        let seen = self.def.cameras.iter().any(|cam| {
+            if cur != Some(&cam.room) || cam.stale {
+                return false;
+            }
+            let sweep = sin(t * c::CAM_SWEEP_W + cam.phase) * c::CAM_SWEEP_A;
+            let lo = cam.range.0 + sweep.min(0.0);
+            let hi = cam.range.1 + sweep.max(0.0);
+            cx >= lo && cx <= hi && !hidden && !(crouch && vx.abs() < c::CROUCH_CAM_VX)
+        });
+        if seen {
+            self.state.camera_detection += dt;
+            if self.state.camera_detection >= self.preset.camera_lock {
+                self.state.camera_detection = 0.0;
+                self.state.camera_lockout = c::CAM_LOCKOUT;
+                self.state.camera_seen_count += 1;
+                self.state.stats.camera_detections += 1;
+                self.state.alert = clamp(
+                    self.state.alert + c::CAM_ALERT * self.preset.alert_gain,
+                    0.0,
+                    100.0,
+                );
+                self.state.billy.last_known_x = self.state.player.x;
+                self.state.billy.player_interest = clamp(
+                    self.state.billy.player_interest + c::CAMERA_PLAYER_INT,
+                    0.0,
+                    100.0,
+                );
+                if self.state.phase == Phase::Crisis
+                    && !matches!(
+                        self.state.billy.mode,
+                        BillyMode::Secure | BillyMode::Guard | BillyMode::CallBoss
+                    )
+                {
+                    self.set_billy_mode(BillyMode::Investigate);
+                }
+                let room = room_id.unwrap_or_else(|| RoomId::from(""));
+                self.events.push(Event::CameraFlag { room });
+            }
+        } else {
+            self.state.camera_detection =
+                (self.state.camera_detection - c::CAM_DECAY_UNSEEN * dt).max(0.0);
+        }
+    }
+
+    // 7. SUPPORT -----------------------------------------------------------
+    pub(super) fn system_support(&mut self) {
+        let dt = TICK_DT;
+        let ridx = Self::room_index_at(&self.def, self.state.player.x);
+        let (base, ping_bonus) = self
+            .def
+            .rooms
+            .get(ridx)
+            .map(|r| (r.support, r.ping_support_bonus))
+            .unwrap_or((c::SUPPORT_CLAMP_MIN, 0.0));
+        let mut target = base;
+        if self.state.camera_ping > 0.0 {
+            target += ping_bonus;
+        }
+        if self.state.bandwidth < c::SUPPORT_LOWBW_X {
+            target -= c::SUPPORT_LOWBW_PEN;
+        }
+        target -= self.state.alert * c::SUPPORT_ALERT_PEN;
+        if self.state.player.hidden {
+            target += c::SUPPORT_HIDDEN;
+        }
+        if self.state.lights_flicker > 0.0 {
+            target += c::SUPPORT_FLICKER;
+        }
+        target = clamp(target, c::SUPPORT_CLAMP_MIN, 1.0);
+        self.state.support = approach(self.state.support, target, c::SUPPORT_APPROACH * dt);
+
+        if self.state.phase == Phase::Crisis
+            && self.state.support < c::ISO_GATE
+            && !self.state.player.hidden
+        {
+            let pressure = 1.0 + self.state.alert / c::ISO_PRESSURE_DIV;
+            self.state.isolation += dt * pressure;
+            self.state.stats.support_broken_time += dt;
+            let limit = self.preset.support_limit;
+            if self.state.isolation > limit * c::FRAY_FRAC {
+                let t = self.state.t;
+                if t - self.state.throttles.support_fray >= c::THROTTLE_FRAY {
+                    self.state.throttles.support_fray = t;
+                    self.events.push(Event::SupportFraying);
+                }
+            }
+            if self.state.isolation >= limit {
+                self.state.stats.max_isolation =
+                    self.state.stats.max_isolation.max(self.state.isolation);
+                self.fail_mission(crate::scenario::common::FailReason::Partition);
+                return;
+            }
+        } else {
+            let decay = if self.state.player.hidden {
+                c::ISO_DECAY_HIDDEN
+            } else {
+                c::ISO_DECAY
+            };
+            self.state.isolation = (self.state.isolation - decay * dt).max(0.0);
+        }
+        self.state.stats.max_isolation = self.state.stats.max_isolation.max(self.state.isolation);
+    }
+
+    // 8. BEHAVIOUR (belief) ------------------------------------------------
+    pub(super) fn system_behaviour(&mut self) {
+        let dt = TICK_DT;
+        if self.state.phase != Phase::Crisis || self.state.billy.mode == BillyMode::Offsite {
+            return;
+        }
+        let sees = self.can_billy_see_player();
+        let pcx = self.state.player.x + self.def.player.w / 2.0;
+        let moving = self.state.player.vx.abs() > c::MOVING_VX;
+        let sprinting = self.state.player.sprinting;
+        if sees {
+            self.state.billy.last_known_x = self.state.player.x;
+            self.state.billy.last_seen_ago = 0.0;
+            let pi = if sprinting { c::PI_SPRINT } else { c::PI_SEEN };
+            self.state.billy.player_interest =
+                clamp(self.state.billy.player_interest + pi * dt, 0.0, 100.0);
+            if dist(pcx, self.state.note.x) < c::NOTE_NEAR
+                || self.state.player.has_note
+                || self.state.note.progress > c::PROG_GATE
+            {
+                let urg = if sprinting {
+                    c::NOTE_URG_SPRINT
+                } else if moving {
+                    c::NOTE_URG_MOVE
+                } else {
+                    c::NOTE_URG_STILL
+                };
+                let carry = if self.state.player.has_note {
+                    c::NOTE_CARRY * dt
+                } else {
+                    0.0
+                };
+                self.state.billy.note_interest = clamp(
+                    self.state.billy.note_interest + urg * dt + carry,
+                    0.0,
+                    100.0,
+                );
+            }
+            if dist(pcx, self.state.usb.x) < c::USB_NEAR || self.state.player.has_usb {
+                let urg = if sprinting {
+                    c::USB_URG_SPRINT
+                } else if moving {
+                    c::USB_URG_MOVE
+                } else {
+                    c::USB_URG_STILL
+                };
+                let carry = if self.state.player.has_usb {
+                    c::USB_CARRY * dt
+                } else {
+                    0.0
+                };
+                self.state.billy.usb_interest =
+                    clamp(self.state.billy.usb_interest + urg * dt + carry, 0.0, 100.0);
+            }
+        } else {
+            self.state.billy.last_seen_ago += dt;
+            self.state.billy.player_interest =
+                (self.state.billy.player_interest - c::PI_DECAY * dt).max(0.0);
+            if !self.state.note.exposed && !self.state.player.has_note {
+                self.state.billy.note_interest =
+                    (self.state.billy.note_interest - c::NOTE_DECAY * dt).max(0.0);
+            }
+            if !self.state.usb.thrown && !self.state.player.has_usb {
+                self.state.billy.usb_interest =
+                    (self.state.billy.usb_interest - c::USB_DECAY * dt).max(0.0);
+            }
+        }
+
+        let max_obj = self
+            .state
+            .billy
+            .note_interest
+            .max(self.state.billy.usb_interest);
+        let belief = if max_obj >= c::BELIEF_THRESHOLD {
+            Some(
+                if self.state.billy.note_interest >= self.state.billy.usb_interest {
+                    ObjectKind::Note
+                } else {
+                    ObjectKind::Usb
+                },
+            )
+        } else {
+            None
+        };
+        self.state.billy.belief = belief;
+        if let Some(b) = belief
+            && self.state.billy.belief_announced != Some(b)
+        {
+            self.state.billy.belief_announced = Some(b);
+            self.events.push(Event::BillyBeliefFormed { belief: b });
+        }
+    }
+
+    // 9. BILLY (FSM) -------------------------------------------------------
+    pub(super) fn system_billy(&mut self) {
+        let dt = TICK_DT;
+        if self.state.phase != Phase::Crisis {
+            return;
+        }
+        if self.state.billy.stun > 0.0 {
+            self.state.billy.stun = (self.state.billy.stun - dt).max(0.0);
+            return;
+        }
+        let sees = self.can_billy_see_player();
+        if sees {
+            self.state.billy.last_known_x = self.state.player.x;
+            self.state.billy.last_seen_ago = 0.0;
+        }
+
+        // entering / shock return before any transition
+        match self.state.billy.mode {
+            BillyMode::Entering => {
+                let snack = self.state.billy.snack_x;
+                self.move_billy_toward(snack, self.preset.billy_speed * c::ENTER_SPEED);
+                if dist(self.state.billy.x, snack) < c::SNACK_REACH {
+                    self.set_billy_mode(BillyMode::Shock);
+                    self.state.billy.state_timer = c::SHOCK_T;
+                    self.state.billy.vx = 0.0;
+                }
+                return;
+            }
+            BillyMode::Shock => {
+                self.state.billy.state_timer -= dt;
+                if self.state.billy.state_timer <= 0.0 {
+                    self.set_billy_mode(BillyMode::Assess);
+                    self.state.billy.patrol_target = 320.0;
+                }
+                return;
+            }
+            _ => {}
+        }
+
+        // pre-switch fall-through
+        if self.state.billy.belief.is_some()
+            && !self.state.billy.has_note
+            && !self.state.billy.has_usb
+            && !matches!(
+                self.state.billy.mode,
+                BillyMode::Secure | BillyMode::Guard | BillyMode::CallBoss
+            )
+        {
+            self.state.billy.target = self.state.billy.belief;
+            self.set_billy_mode(BillyMode::Secure);
+        }
+        if sees
+            && dist(self.state.billy.x, self.state.player.x) < c::PURSUE_TRIGGER
+            && !matches!(
+                self.state.billy.mode,
+                BillyMode::Guard | BillyMode::CallBoss
+            )
+        {
+            self.set_billy_mode(BillyMode::Pursue);
+        }
+
+        // exclusive chain on the MUTATED mode
+        match self.state.billy.mode {
+            BillyMode::Assess => self.billy_assess(sees),
+            BillyMode::Investigate => self.billy_investigate(sees),
+            BillyMode::Secure => self.billy_secure(),
+            BillyMode::Guard => self.billy_guard(sees),
+            BillyMode::CallBoss => self.billy_call_boss(sees),
+            BillyMode::Pursue => self.billy_pursue(sees),
+            _ => {}
+        }
+    }
+
+    fn billy_assess(&mut self, sees: bool) {
+        if self.state.billy.belief.is_some() {
+            self.state.billy.target = self.state.billy.belief;
+            self.set_billy_mode(BillyMode::Secure);
+            return;
+        }
+        let noise_invest = self.state.player.noise > c::NOISE_INVEST_NOISE
+            && dist(self.state.billy.x, self.state.player.x) < c::NOISE_INVEST_DIST;
+        if sees || noise_invest {
+            self.state.billy.last_known_x = self.state.player.x;
+            self.set_billy_mode(if sees {
+                BillyMode::Pursue
+            } else {
+                BillyMode::Investigate
+            });
+            return;
+        }
+        let target = self.state.billy.patrol_target;
+        self.move_billy_toward(target, self.preset.billy_speed * c::ASSESS_SPEED);
+        if dist(self.state.billy.x, self.state.billy.patrol_target) < 10.0 {
+            self.state.billy.patrol_target = if self.state.billy.patrol_target < c::PATROL_PIVOT {
+                c::PATROL_HI
+            } else {
+                c::PATROL_LO
+            };
+        }
+    }
+
+    fn billy_investigate(&mut self, sees: bool) {
+        let target = self.state.billy.last_known_x;
+        self.move_billy_toward(target, self.preset.billy_speed * c::INVEST_SPEED);
+        if sees {
+            self.set_billy_mode(BillyMode::Pursue);
+            return;
+        }
+        if dist(self.state.billy.x, self.state.billy.last_known_x) < 15.0 {
+            self.set_billy_mode(BillyMode::Assess);
+            self.state.billy.patrol_target = if self.state.billy.x < 280.0 {
+                c::PATROL_HI
+            } else {
+                c::PATROL_LO
+            };
+        }
+    }
+
+    fn billy_secure(&mut self) {
+        let target = self.state.billy.target.or(self.state.billy.belief);
+        let mut tx = self.state.billy.x;
+        match target {
+            Some(ObjectKind::Note) => {
+                if self.state.player.has_note {
+                    self.set_billy_mode(BillyMode::Pursue);
+                    return;
+                }
+                tx = self.state.note.x;
+            }
+            Some(ObjectKind::Usb) => {
+                if self.state.player.has_usb {
+                    self.set_billy_mode(BillyMode::Pursue);
+                    return;
+                }
+                tx = self.state.usb.x;
+            }
+            None => {}
+        }
+        self.move_billy_toward(tx, self.preset.billy_speed * c::SECURE_SPEED);
+        if dist(self.state.billy.x + self.def.billy.w / 2.0, tx) < c::GRAB_DIST {
+            match target {
+                Some(ObjectKind::Note) if !self.state.note.held && !self.state.note.billy_has => {
+                    self.state.note.billy_has = true;
+                    self.state.billy.has_note = true;
+                    self.state.billy.guard_timer = c::GUARD_T_NOTE;
+                    self.state.billy.reported_target = Some(ReportedTarget::Note);
+                    self.set_billy_mode(BillyMode::Guard);
+                    self.events.push(Event::BillyTookNote);
+                }
+                Some(ObjectKind::Usb) if !self.state.usb.held && !self.state.usb.billy_has => {
+                    self.state.usb.billy_has = true;
+                    self.state.billy.has_usb = true;
+                    self.state.usb.thrown = false;
+                    self.state.usb.vx = 0.0;
+                    self.state.usb.vy = 0.0;
+                    self.state.billy.guard_timer = c::GUARD_T_USB;
+                    self.state.billy.reported_target = Some(ReportedTarget::Usb);
+                    self.set_billy_mode(BillyMode::Guard);
+                    self.events.push(Event::BillyTookUsb);
+                }
+                _ => self.set_billy_mode(BillyMode::Pursue),
+            }
+        }
+    }
+
+    fn billy_guard(&mut self, sees: bool) {
+        self.state.billy.guard_timer -= TICK_DT;
+        if sees && dist(self.state.billy.x, self.state.player.x) < 95.0 {
+            self.set_billy_mode(BillyMode::Pursue);
+            return;
+        }
+        let guard_x = if self.state.billy.has_note {
+            self.state.note.x
+        } else if self.state.billy.has_usb {
+            self.state.usb.x
+        } else {
+            self.state.billy.x
+        };
+        if dist(self.state.billy.x, guard_x) > 35.0 {
+            self.move_billy_toward(guard_x, self.preset.billy_speed * c::GUARD_SPEED);
+        }
+        if self.state.billy.guard_timer <= 0.0 && !self.state.billy.called {
+            self.set_billy_mode(BillyMode::CallBoss);
+            self.state.billy.call_timer = c::CALL_T;
+        } else if self.state.billy.called {
+            self.set_billy_mode(BillyMode::Pursue);
+        }
+    }
+
+    fn billy_call_boss(&mut self, sees: bool) {
+        self.state.billy.call_timer -= TICK_DT;
+        if sees && dist(self.state.billy.x, self.state.player.x) < 72.0 {
+            self.set_billy_mode(BillyMode::Pursue);
+            return;
+        }
+        if self.state.billy.call_timer <= 0.0 {
+            self.state.billy.called = true;
+            self.state.stats.boss_called = true;
+            if self.state.billy.reported_target.is_none() {
+                self.state.billy.reported_target = Some(match self.state.billy.belief {
+                    Some(ObjectKind::Note) => ReportedTarget::Note,
+                    Some(ObjectKind::Usb) => ReportedTarget::Usb,
+                    None => ReportedTarget::Intruder,
+                });
+            }
+            let reported = self
+                .state
+                .billy
+                .reported_target
+                .unwrap_or(ReportedTarget::Intruder);
+            self.state.billy.last_known_x = self.state.player.x;
+            self.state.alert = clamp(
+                self.state.alert + c::CALL_ALERT * self.preset.alert_gain,
+                0.0,
+                100.0,
+            );
+            self.events.push(Event::BossCalled { reported });
+            self.set_billy_mode(BillyMode::Pursue);
+        }
+    }
+
+    fn billy_pursue(&mut self, sees: bool) {
+        let target_x = if sees {
+            self.state.player.x
+        } else {
+            self.state.billy.last_known_x
+        };
+        let alert_boost = 1.0
+            + self.state.alert / c::ALERT_BOOST_DIV
+            + (f64::from(self.state.lights_uses) - 2.0).max(0.0) * c::LIGHTS_BOOST_K;
+        self.move_billy_toward(
+            target_x,
+            self.preset.billy_speed * c::PURSUE_SPEED * alert_boost,
+        );
+        if !sees
+            && self.state.billy.last_seen_ago > c::PURSUE_GIVEUP_AGO
+            && dist(self.state.billy.x, target_x) < c::PURSUE_GIVEUP_DIST
+        {
+            let next = if self.state.billy.belief.is_some() {
+                BillyMode::Secure
+            } else {
+                BillyMode::Assess
+            };
+            self.set_billy_mode(next);
+        }
+    }
+
+    // 10. COLLISIONS -------------------------------------------------------
+    pub(super) fn system_collisions(&mut self) {
+        if self.state.phase != Phase::Crisis || self.state.ended {
+            return;
+        }
+        if self.state.player.hidden
+            || self.state.lights_flicker > 0.0
+            || self.state.billy.stun > 0.0
+            || self.state.player.caught_grace > 0.0
+        {
+            return;
+        }
+        let pc = self.state.player.x + self.def.player.w / 2.0;
+        let bc = self.state.billy.x + self.def.billy.w / 2.0;
+        let same_room = Self::room_index_at(&self.def, self.state.player.x)
+            == Self::room_index_at(&self.def, self.state.billy.x);
+        if !((pc - bc).abs() < c::COLLISION_RADIUS && same_room) {
+            return;
+        }
+        if self.preset.rescue
+            && !self.state.stats.rescue_used
+            && self.state.support >= c::RESCUE_SUPPORT_MIN
+            && self.state.bandwidth >= c::RESCUE_BW_MIN
+        {
+            self.state.stats.rescue_used = true;
+            self.state.bandwidth -= c::RESCUE_BW_COST;
+            self.state.billy.stun = c::RESCUE_STUN;
+            self.state.player.caught_grace = c::RESCUE_GRACE;
+            self.state.player.x += if self.state.player.x < self.state.billy.x {
+                -c::RESCUE_DISPLACE
+            } else {
+                c::RESCUE_DISPLACE
+            };
+            self.state.player.x = clamp(self.state.player.x, 28.0, 1230.0);
+            self.events.push(Event::RescueUsed);
+        } else {
+            self.fail_mission(crate::scenario::common::FailReason::Caught);
+        }
+    }
+
+    // 11. OBJECTIVES -------------------------------------------------------
+    pub(super) fn system_objectives(&mut self) {
+        let note = if self.state.player.has_note {
+            ObjectiveStatus::Done
+        } else if self.state.note.billy_has {
+            ObjectiveStatus::Failed
+        } else {
+            ObjectiveStatus::Open
+        };
+        let misled = self.state.billy.has_usb
+            || self.state.billy.reported_target == Some(ReportedTarget::Usb)
+            || self.state.billy.usb_interest >= c::MISDIRECT_THRESHOLD;
+        let misdirect = if misled {
+            ObjectiveStatus::Done
+        } else if self.state.billy.reported_target == Some(ReportedTarget::Note) {
+            ObjectiveStatus::Failed
+        } else {
+            ObjectiveStatus::Open
+        };
+        let exit = if self.state.ended && self.state.stats.extraction.is_some() {
+            ObjectiveStatus::Done
+        } else if self.state.phase == Phase::Crisis {
+            ObjectiveStatus::Available
+        } else {
+            ObjectiveStatus::Locked
+        };
+        let ledger = (note, misdirect, exit);
+        if ledger != self.state.objective_ledger {
+            self.state.objective_ledger = ledger;
+            self.events.push(Event::ObjectivesUpdated {
+                note,
+                misdirect,
+                exit,
+            });
+        }
+    }
+}
