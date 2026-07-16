@@ -244,7 +244,8 @@
       "camera_lock": 1.05,
       "alert_gain": 0.78,
       "score_mult": 0.85,
-      "rescue": true
+      "rescue": true,
+      "trace_threshold": 900
     },
     "Standard": {
       "label": "STANDARD",
@@ -263,7 +264,8 @@
       "camera_lock": 0.78,
       "alert_gain": 1.0,
       "score_mult": 1.0,
-      "rescue": true
+      "rescue": true,
+      "trace_threshold": 600
     },
     "Operator": {
       "label": "OPERATOR",
@@ -282,7 +284,8 @@
       "camera_lock": 0.58,
       "alert_gain": 1.2,
       "score_mult": 1.25,
-      "rescue": false
+      "rescue": false,
+      "trace_threshold": 400
     }
   },
   "tuning": {
@@ -395,6 +398,7 @@
       "alert_pen": 0.0022,
       "hidden": 0.06,
       "flicker": 0.04,
+      "hop_pen": 0.07,
       "clamp_min": 0.05,
       "approach": 1.15,
       "iso_gate": 0.4,

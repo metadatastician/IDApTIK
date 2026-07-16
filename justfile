@@ -101,4 +101,15 @@ server-test:
 # --- Config (Nickel) -----------------------------------------------------------
 
 config-check:
-    @if command -v nickel >/dev/null 2>&1; then nickel export config/default.ncl >/dev/null && echo "config/default.ncl: ok (schema applied)"; else echo "nickel not installed — run: just setup"; fi
+    @if command -v nickel >/dev/null 2>&1; then nickel export config/default.ncl >/dev/null && nickel export config/grounded_slice.ncl >/dev/null && nickel export config/ghost_lobby_floor.ncl >/dev/null && echo "config: ok (schema applied)"; else echo "nickel not installed: run 'just setup'"; fi
+
+# Re-export the Nickel graphs and rewrite the committed goldens they embed. The
+# exports are read at compile time, so each regeneration is its own cargo run:
+# the derived floor graph is rebuilt last, from the freshly embedded backbone.
+config-regen:
+    nickel export config/grounded_slice.ncl --format json > /tmp/grounded_slice_raw.json
+    nickel export config/ghost_lobby_floor.ncl --format json > /tmp/ghost_lobby_floor_raw.json
+    cargo test -p idaptik-core regenerate_slice_json -- --ignored
+    cargo test -p idaptik-core regenerate_ghost_lobby_floor_json -- --ignored
+    cargo test -p idaptik-core regenerate_floor_graph_json -- --ignored
+    @echo "config: goldens regenerated"

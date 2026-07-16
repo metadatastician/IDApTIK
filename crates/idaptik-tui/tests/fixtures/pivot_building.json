@@ -1,0 +1,10 @@
+{
+  "seed": 123456,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 300,
+  "commands": [
+    { "at": 1, "press": ["pivot"] },
+    { "at": 2, "press": ["door"] }
+  ]
+}

@@ -9,6 +9,7 @@
 //! Log text uses this crate's own deterministic formatter (fixed decimals via
 //! Rust formatting), **not** JS `toFixed` — the goldens are ours.
 
+use crate::netsim::session::SessionError;
 use crate::scenario::common::{
     Channel, ChuteMethod, CrisisReason, DenyReason, ExtractMethod, FailReason, ObjectKind,
     ObjectiveStatus, Outcome, Phase, ReportedTarget, Severity,
@@ -39,6 +40,13 @@ pub enum Event {
     CrisisBegan { reason: CrisisReason },
     /// Telemetry: an uplink action was performed (ledger/stats).
     UplinkAction { kind: ActionKind },
+    /// The hacker pivoted onto a foothold; `hops` is the depth they now stand at.
+    PivotOpened { host: String, hops: u32 },
+    /// A pivot was refused. The reason is the whole of its use: it is what tells
+    /// the player the upstream line is walked one hop at a time.
+    PivotDenied { host: String, reason: SessionError },
+    /// The hacker backed out of a pivot; `hops` is the depth they came back to.
+    PivotClosed { hops: u32 },
     /// Camera ping activated.
     CameraPinged { laundry_view: bool },
     /// A door hold was routed.
@@ -78,6 +86,8 @@ pub enum Event {
     CameraFlag { room: RoomId },
     /// The support envelope is fraying.
     SupportFraying,
+    /// A power cut cascaded, felling `nodes` devices downstream of it.
+    PowerLost { nodes: usize },
     /// A pickpocket during lights-out succeeded.
     PickpocketSucceeded,
     /// Structural: Billy changed FSM mode.
@@ -187,6 +197,26 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
             Hacker,
             Log,
         ),
+        Event::PivotOpened { host, hops } => line(
+            format!("Pivoted onto {host}. You are {hops} deep; the trace is bounced that far."),
+            Hacker,
+            Log,
+        ),
+        Event::PivotDenied { host, reason } => {
+            let why = match reason {
+                SessionError::Unresolved => "no such host",
+                SessionError::NoRoute => "no route from where you are standing",
+                SessionError::NotPivotable => "nothing there to stand on",
+                SessionError::NoSuchNode => "no such machine",
+                SessionError::AlreadyThere => "already standing on it",
+            };
+            line(format!("Pivot to {host} refused - {why}."), Warn, Log)
+        }
+        Event::PivotClosed { hops } => line(
+            format!("Backed out. You are {hops} deep."),
+            Hacker,
+            Log,
+        ),
         Event::VacuumRouted => line("Robot vacuum route accepted.".into(), Hacker, Log),
         Event::LightsFlickered { third_use } => line(
             "Hacker flickers the lights.".into(),
@@ -198,10 +228,12 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
                 DenyReason::Cooldown => "on cooldown",
                 DenyReason::Bandwidth => "not enough bandwidth",
                 DenyReason::VacuumFallen => "vacuum already gone",
+                DenyReason::NoRoute => "no route to target",
             };
             line(
-                format!("Uplink {kind:?} denied — {why}."),
-                if matches!(reason, DenyReason::VacuumFallen) {
+                format!("Uplink {kind:?} denied - {why}."),
+                // A cooldown or a thin pipe is a wait; no route at all is a wall.
+                if matches!(reason, DenyReason::VacuumFallen | DenyReason::NoRoute) {
                     Bad
                 } else {
                     Warn
@@ -234,6 +266,10 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
         Event::VacuumFell => line("The robot vacuum vanishes down a hidden chute.".into(), Good, Log),
         Event::CameraFlag { room } => line(format!("Camera flag in {room}."), Bad, Log),
         Event::SupportFraying => line("Support is fraying.".into(), Warn, Log),
+        Event::PowerLost { nodes } => {
+            let noun = if *nodes == 1 { "device" } else { "devices" };
+            line(format!("GRID: {nodes} {noun} lost power."), Warn, Log)
+        }
         Event::PickpocketSucceeded => line("Lifted the note from Billy's pocket in the dark.".into(), Good, Log),
         Event::BillyBeliefFormed { belief } => {
             let text = match belief {
@@ -264,6 +300,7 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
                 FailReason::Caught => "Caught on the floor.".into(),
                 FailReason::Partition => "Support partitioned — you are on your own, and it shows.".into(),
                 FailReason::Lockdown => "Building lockdown. The floor is sealed.".into(),
+                FailReason::Traced => "Trace complete. They have the address it came from.".into(),
             };
             line(text, Bad, Log)
         }
@@ -318,6 +355,15 @@ mod tests {
             )
             .is_none()
         );
+    }
+
+    #[test]
+    fn a_power_cascade_reads_as_a_grid_report() {
+        let many = log_view(&Event::PowerLost { nodes: 4 }, 0, 0.0).unwrap();
+        assert_eq!(many.text, "GRID: 4 devices lost power.");
+        assert_eq!(many.severity, Severity::Warn);
+        let one = log_view(&Event::PowerLost { nodes: 1 }, 0, 0.0).unwrap();
+        assert_eq!(one.text, "GRID: 1 device lost power.");
     }
 
     #[test]

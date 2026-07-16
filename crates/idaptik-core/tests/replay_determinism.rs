@@ -7,6 +7,12 @@ use idaptik_core::scenario::event::Event;
 
 /// A moderately busy scripted stream exercising movement, uplinks and crisis.
 fn scripted(r: &mut Runner) {
+    // The uplinks below are route-gated, so pivot in first; without this the
+    // stream would still be deterministic, but deterministically denied, and the
+    // landed actions would drop out of the replay it means to pin.
+    r.sim
+        .hacker_pivot("bridge.local")
+        .expect("the van can reach the maintenance bridge");
     // Walk right for a bit.
     for t in 0..600u64 {
         let mut cmds = vec![Command::SetButton {

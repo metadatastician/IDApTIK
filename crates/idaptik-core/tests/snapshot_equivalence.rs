@@ -19,6 +19,13 @@ fn step_stream(t: u64) -> Vec<Command> {
             kind: idaptik_core::scenario::ActionKind::Camera,
         });
     }
+    // An uplink on the far side of the snapshot: the hacker's pivot lives in the
+    // runtime state, so this only lands if the session survived the round trip.
+    if t == 200 {
+        cmds.push(Command::Uplink {
+            kind: idaptik_core::scenario::ActionKind::Lights,
+        });
+    }
     cmds
 }
 
@@ -26,12 +33,19 @@ fn step_stream(t: u64) -> Vec<Command> {
 fn snapshot_restore_continues_identically() {
     // Uninterrupted reference run of 300 ticks.
     let mut reference = Runner::standard();
+    reference
+        .sim
+        .hacker_pivot("bridge.local")
+        .expect("the van can reach the maintenance bridge");
     for t in 0..300u64 {
         reference.step(&step_stream(t));
     }
 
     // Interrupted run: 150 ticks, snapshot, restore, 150 more.
     let mut a = Runner::standard();
+    a.sim
+        .hacker_pivot("bridge.local")
+        .expect("the van can reach the maintenance bridge");
     for t in 0..150u64 {
         a.step(&step_stream(t));
     }

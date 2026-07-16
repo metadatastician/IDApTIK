@@ -1,0 +1,12 @@
+{
+  "seed": 123456,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 20,
+  "commands": [
+    { "at": 1, "press": ["grid"] },
+    { "at": 2, "press": ["isp"] },
+    { "at": 3, "press": ["grid"] },
+    { "at": 4, "press": ["x"] }
+  ]
+}

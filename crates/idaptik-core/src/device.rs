@@ -8,8 +8,9 @@ use std::net::Ipv4Addr;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct DeviceId(pub u32);
 
-/// The kind of device on the network. Mirrors the taxonomy from IDApTIK's
-/// `DeviceTypes` (Laptop, Router, Server, IoT camera, Terminal, PowerStation, UPS).
+/// The kind of device on the network. The original taxonomy (Laptop, Router,
+/// Server, IoT camera, Terminal, PowerStation, UPS) plus a Firewall and the
+/// physical-function devices the hacker actuates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DeviceKind {
     Laptop,
@@ -19,6 +20,14 @@ pub enum DeviceKind {
     Terminal,
     PowerStation,
     Ups,
+    Firewall,
+    SmartDoor,
+    Camera,
+    Lock,
+    Elevator,
+    Light,
+    Sensor,
+    Substation,
 }
 
 /// How hard a device is to compromise. Ordered from easiest to hardest, so

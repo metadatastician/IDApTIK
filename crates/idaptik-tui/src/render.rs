@@ -22,7 +22,7 @@ pub fn draw(frame: &mut Frame, sim: &GhostLobbySim, log: &[LogLine], hint: Optio
             Constraint::Length(6), // meters
             Constraint::Length(6), // belief + objectives
             Constraint::Min(4),    // log
-            Constraint::Length(1), // key hints
+            Constraint::Length(4), // key hints: body / uplink / session / hint
         ])
         .split(area);
 
@@ -91,10 +91,17 @@ fn draw_strip(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
 
 fn draw_meters(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
     let s = sim.state();
+    // The row keeps the height it always had: the gauges give up their spare
+    // three lines to the uplink readout beneath them rather than the log giving
+    // up any of its own.
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Length(3)])
+        .split(area);
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(25); 4])
-        .split(area);
+        .constraints([Constraint::Percentage(20); 5])
+        .split(rows[0]);
     gauge(frame, cols[0], "support", s.support, Color::Green);
     gauge(
         frame,
@@ -106,6 +113,38 @@ fn draw_meters(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
     gauge(frame, cols[2], "alert", s.alert / 100.0, Color::Red);
     let iso = (s.isolation / sim_support_limit(sim)).clamp(0.0, 1.0);
     gauge(frame, cols[3], "isolation", iso, Color::Magenta);
+    // Already a fraction of its own threshold, which is a per-difficulty knob:
+    // dividing it by anything here would be dividing it twice.
+    gauge(
+        frame,
+        cols[4],
+        "trace",
+        f64::from(s.agents.hacker.trace_fraction()),
+        Color::Yellow,
+    );
+    draw_uplink(frame, rows[1], sim);
+}
+
+/// Where the hacker is playing from, how deep they have reached, and how much of
+/// the floor answers them there. Cold from the van that last number is what says
+/// why every uplink is being refused, so it is the readout the pivot keys exist
+/// to move.
+fn draw_uplink(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
+    let hacker = &sim.state().agents.hacker;
+    let text = format!(
+        "vantage {:?}     pivot depth {}     nodes reachable {}",
+        hacker.vantage().kind,
+        hacker.hops(),
+        hacker.reachable(sim.graph()).len(),
+    );
+    frame.render_widget(
+        Paragraph::new(text).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("HACKER UPLINK"),
+        ),
+        area,
+    );
 }
 
 fn sim_support_limit(sim: &GhostLobbySim) -> f64 {
@@ -199,13 +238,26 @@ fn draw_log(frame: &mut Frame, area: Rect, log: &[LogLine]) {
     frame.render_widget(list, area);
 }
 
+/// The key hints, one line per audience: the body, the uplink, the session.
+///
+/// One line per audience rather than one line for all of them, because the pivot
+/// verbs pushed the old single line past 150 columns and a `Paragraph` truncates
+/// at its width without a word of complaint: on an 80-column terminal every key
+/// from the pivots rightwards simply vanished. Split this way each line clears 80
+/// on its own, so nothing is cut and no binding is broken across a wrap. The hint
+/// takes a line of its own for the same reason: appended, it used to shove the
+/// bindings off the right edge the moment a player asked for help.
 fn draw_footer(frame: &mut Frame, area: Rect, hint: Option<&str>) {
-    let text = match hint {
-        Some(h) => format!("A/D move · Shift sprint · W jump · S hide · E interact · Q throw · 1-4 uplink · P pause · R restart · H hint · Esc quit   —   {h}"),
-        None => "A/D move · Shift sprint · W jump · S hide · E interact · Q throw · 1-4 uplink · P pause · R restart · H hint · Esc quit".to_owned(),
-    };
+    let lines = vec![
+        Line::from("BODY     A/D move | Shift sprint | W jump | S hide | E interact | Q throw"),
+        Line::from("UPLINK   1-4 actions | p bridge | P isp | g grid | x back"),
+        Line::from("SESSION  Tab pause | R restart | H hint | Esc quit"),
+        Line::from(hint.unwrap_or_default().to_owned()),
+    ];
     frame.render_widget(
-        Paragraph::new(text).style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: true })
+            .style(Style::default().fg(Color::DarkGray)),
         area,
     );
 }
@@ -244,4 +296,143 @@ fn draw_result_overlay(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
         Paragraph::new(lines).wrap(Wrap { trim: true }).block(block),
         rect,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use idaptik_core::RunConfig;
+    use idaptik_core::scenario::command::{Command, PivotTarget, TickInput};
+    use idaptik_core::scenario::ghost_lobby;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+
+    /// The whole frame, rendered to text at `width` columns.
+    fn screen_at(sim: &GhostLobbySim, width: u16, hint: Option<&str>) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(width, 40)).expect("a test backend");
+        terminal
+            .draw(|f| draw(f, sim, &[], hint))
+            .expect("the frame draws");
+        terminal.backend().to_string()
+    }
+
+    /// The whole frame, rendered to text at a comfortable terminal size.
+    fn screen(sim: &GhostLobbySim) -> String {
+        screen_at(sim, 130, None)
+    }
+
+    fn sim() -> GhostLobbySim {
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        sim
+    }
+
+    /// Fire `cmds` as immediates on one tick.
+    fn immediate(sim: &mut GhostLobbySim, cmds: Vec<Command>) {
+        sim.tick(&TickInput {
+            immediates: cmds,
+            ..Default::default()
+        });
+    }
+
+    /// The reachable count the uplink panel is showing.
+    fn reachable_shown(screen: &str) -> usize {
+        let line = screen
+            .lines()
+            .find(|l| l.contains("nodes reachable"))
+            .expect("the uplink panel names its reachable count");
+        line.split("nodes reachable")
+            .nth(1)
+            .and_then(|rest| rest.split_whitespace().next())
+            .and_then(|n| n.parse().ok())
+            .expect("and that count is a number")
+    }
+
+    #[test]
+    fn the_panel_names_every_series_it_draws() {
+        // The gauges are titled, not lettered: a bar labelled "T" is not a readout.
+        let s = screen(&sim());
+        for series in ["support", "bandwidth", "alert", "isolation", "trace"] {
+            assert!(s.contains(series), "the panel must label {series}: {s}");
+        }
+        assert!(s.contains("HACKER UPLINK"));
+    }
+
+    #[test]
+    fn the_uplink_panel_follows_the_hacker_in_and_back_out() {
+        // The readout is the only thing on screen that explains why an uplink was
+        // refused, so it must actually move when the hacker does.
+        let mut sim = sim();
+        let cold = screen(&sim);
+        assert!(cold.contains("pivot depth 0"), "{cold}");
+        let cold_reach = reachable_shown(&cold);
+
+        immediate(
+            &mut sim,
+            vec![Command::Pivot {
+                target: PivotTarget::Bridge,
+            }],
+        );
+        let deep = screen(&sim);
+        assert!(deep.contains("pivot depth 1"), "{deep}");
+        assert!(
+            reachable_shown(&deep) > cold_reach,
+            "pivoting must open the floor: {cold_reach} -> {}",
+            reachable_shown(&deep)
+        );
+
+        immediate(&mut sim, vec![Command::Unpivot]);
+        let home = screen(&sim);
+        assert!(home.contains("pivot depth 0"), "{home}");
+        assert_eq!(
+            reachable_shown(&home),
+            cold_reach,
+            "backing out must hand back exactly the reach the pivot bought"
+        );
+    }
+
+    #[test]
+    fn the_footer_teaches_the_pivot_keys() {
+        // Every one of them: a player who is never told `g` exists cannot walk the
+        // upstream line, however well the sim models it.
+        let s = screen(&sim());
+        for hint in ["p bridge", "P isp", "g grid", "x back", "Tab pause"] {
+            assert!(s.contains(hint), "the footer must teach {hint}: {s}");
+        }
+    }
+
+    #[test]
+    fn the_footer_survives_a_narrow_terminal() {
+        // The regression this guards is the one the pivot keys caused: they pushed
+        // the old single-line footer past 150 columns, and a `Paragraph` truncates
+        // silently. Wrapped, every key must still be legible at 80 columns -- and
+        // `Esc quit`, the rightmost of them, is the canary.
+        let s = screen_at(&sim(), 80, None);
+        for hint in [
+            "p bridge",
+            "P isp",
+            "g grid",
+            "x back",
+            "Tab pause",
+            "R restart",
+            "Esc quit",
+        ] {
+            assert!(s.contains(hint), "{hint} was cut off at 80 columns: {s}");
+        }
+    }
+
+    #[test]
+    fn a_hint_does_not_evict_the_key_bindings() {
+        // The hint used to be glued onto the end of the same line it now sits
+        // beneath, which pushed the bindings off the right edge the moment a
+        // player asked for help.
+        let s = screen_at(
+            &sim(),
+            80,
+            Some("The real lead is the boring kitchen note."),
+        );
+        assert!(s.contains("boring kitchen note"), "the hint shows: {s}");
+        assert!(s.contains("p bridge"), "and the bindings survive it: {s}");
+    }
 }

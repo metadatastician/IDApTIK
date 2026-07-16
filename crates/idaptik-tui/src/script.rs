@@ -5,7 +5,7 @@
 //! edge/uplink commands on a single tick, and `test` injects a Force* hook.
 
 use idaptik_core::scenario::ActionKind;
-use idaptik_core::scenario::command::{Button, Buttons, Command, Edge, TickInput};
+use idaptik_core::scenario::command::{Button, Buttons, Command, Edge, PivotTarget, TickInput};
 use idaptik_core::scenario::common::{ExtractMethod, FailReason};
 use serde::{Deserialize, Serialize};
 
@@ -82,6 +82,21 @@ fn press_command(name: &str) -> Option<Command> {
         "lights" | "4" => Some(Command::Uplink {
             kind: ActionKind::Lights,
         }),
+        // The pivots. A script name is lower-cased before it is matched, so the
+        // keyboard's case distinction between `p` and `P` cannot survive here;
+        // each foothold is spelt out by name instead.
+        "pivot" | "bridge" | "p" => Some(Command::Pivot {
+            target: PivotTarget::Bridge,
+        }),
+        "isp" | "ops" => Some(Command::Pivot {
+            target: PivotTarget::IspOps,
+        }),
+        // Not "jump": that is already the `w` key, and the grid's jump host is not
+        // a thing the body does.
+        "grid" | "g" => Some(Command::Pivot {
+            target: PivotTarget::GridJump,
+        }),
+        "unpivot" | "x" => Some(Command::Unpivot),
         _ => None,
     }
 }
@@ -102,6 +117,7 @@ fn fail_reason(name: &str) -> FailReason {
     match name.trim().to_ascii_lowercase().as_str() {
         "partition" => FailReason::Partition,
         "lockdown" => FailReason::Lockdown,
+        "traced" => FailReason::Traced,
         _ => FailReason::Caught,
     }
 }

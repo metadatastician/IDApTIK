@@ -1,0 +1,431 @@
+{
+  "segments": [
+    {
+      "id": "perimeter-wifi",
+      "range": "Perimeter",
+      "category": "Iot",
+      "subnet": "10.20.9.",
+      "can_access": [
+        "bms",
+        "isp"
+      ],
+      "location": null
+    },
+    {
+      "id": "bms",
+      "range": "Perimeter",
+      "category": "Management",
+      "subnet": "10.20.5.",
+      "can_access": [
+        "auto-kitchen",
+        "auto-hall",
+        "auto-office",
+        "auto-laundry",
+        "auto-exit",
+        "security",
+        "perimeter-wifi"
+      ],
+      "location": null
+    },
+    {
+      "id": "auto-kitchen",
+      "range": "LocalLan",
+      "category": "Iot",
+      "subnet": "10.20.10.",
+      "can_access": [
+        "bms"
+      ],
+      "location": "kitchen"
+    },
+    {
+      "id": "auto-hall",
+      "range": "LocalLan",
+      "category": "Iot",
+      "subnet": "10.20.11.",
+      "can_access": [
+        "bms"
+      ],
+      "location": "hall"
+    },
+    {
+      "id": "auto-office",
+      "range": "LocalLan",
+      "category": "Iot",
+      "subnet": "10.20.12.",
+      "can_access": [
+        "bms"
+      ],
+      "location": "office"
+    },
+    {
+      "id": "auto-laundry",
+      "range": "LocalLan",
+      "category": "Iot",
+      "subnet": "10.20.13.",
+      "can_access": [
+        "bms"
+      ],
+      "location": "laundry"
+    },
+    {
+      "id": "auto-exit",
+      "range": "LocalLan",
+      "category": "Iot",
+      "subnet": "10.20.14.",
+      "can_access": [
+        "bms"
+      ],
+      "location": "exit"
+    },
+    {
+      "id": "security",
+      "range": "LocalLan",
+      "category": "Iot",
+      "subnet": "10.20.4.",
+      "can_access": [
+        "bms"
+      ],
+      "location": null
+    },
+    {
+      "id": "isp",
+      "range": "WideArea",
+      "category": "Isp",
+      "subnet": "100.64.0.",
+      "can_access": [
+        "utility-dmz"
+      ],
+      "location": null
+    },
+    {
+      "id": "utility-dmz",
+      "range": "WideArea",
+      "category": "Dmz",
+      "subnet": "10.10.0.",
+      "can_access": [
+        "utility"
+      ],
+      "location": null
+    },
+    {
+      "id": "utility",
+      "range": "WideArea",
+      "category": "Scada",
+      "subnet": "10.10.1.",
+      "can_access": [],
+      "location": null
+    }
+  ],
+  "nodes": [
+    {
+      "id": "substation",
+      "name": "GRID SUBSTATION",
+      "ip": "10.10.1.5",
+      "segment": "utility",
+      "kind": "Substation",
+      "security": "Strong",
+      "actuation": "CutPower",
+      "deps": []
+    },
+    {
+      "id": "isp-gw",
+      "name": "ISP GATEWAY",
+      "ip": "100.64.0.1",
+      "segment": "isp",
+      "kind": "Router",
+      "security": "Medium",
+      "actuation": null,
+      "deps": []
+    },
+    {
+      "id": "isp-ops",
+      "name": "ISP OPS HOST",
+      "ip": "100.64.0.9",
+      "segment": "isp",
+      "kind": "Server",
+      "security": "Strong",
+      "actuation": null,
+      "deps": []
+    },
+    {
+      "id": "grid-jump",
+      "name": "GRID JUMP HOST",
+      "ip": "10.10.0.9",
+      "segment": "utility-dmz",
+      "kind": "Server",
+      "security": "Strong",
+      "actuation": null,
+      "deps": []
+    },
+    {
+      "id": "ap-lobby",
+      "name": "LOBBY WIFI AP",
+      "ip": "10.20.9.1",
+      "segment": "perimeter-wifi",
+      "kind": "Router",
+      "security": "Weak",
+      "actuation": null,
+      "deps": []
+    },
+    {
+      "id": "bms-bridge",
+      "name": "MAINT BRIDGE",
+      "ip": "10.20.5.2",
+      "segment": "bms",
+      "kind": "Server",
+      "security": "Medium",
+      "actuation": null,
+      "deps": []
+    },
+    {
+      "id": "feed",
+      "name": "BUILDING FEED",
+      "ip": "10.20.5.3",
+      "segment": "bms",
+      "kind": "PowerStation",
+      "security": "Medium",
+      "actuation": null,
+      "deps": [
+        {
+          "on": "substation"
+        }
+      ]
+    },
+    {
+      "id": "door-d1",
+      "name": "KITCHEN/HALL DOOR",
+      "ip": "10.20.11.11",
+      "segment": "auto-hall",
+      "kind": "SmartDoor",
+      "security": "Weak",
+      "actuation": "HoldDoor",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "door-d2",
+      "name": "HALL/OFFICE DOOR",
+      "ip": "10.20.12.11",
+      "segment": "auto-office",
+      "kind": "SmartDoor",
+      "security": "Weak",
+      "actuation": "HoldDoor",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "door-d3",
+      "name": "OFFICE/LAUNDRY DOOR",
+      "ip": "10.20.13.11",
+      "segment": "auto-laundry",
+      "kind": "SmartDoor",
+      "security": "Weak",
+      "actuation": "HoldDoor",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "door-d4",
+      "name": "SERVICE EXIT DOOR",
+      "ip": "10.20.14.11",
+      "segment": "auto-exit",
+      "kind": "SmartDoor",
+      "security": "Weak",
+      "actuation": "HoldDoor",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "light-kitchen",
+      "name": "KITCHEN LIGHTS",
+      "ip": "10.20.10.20",
+      "segment": "auto-kitchen",
+      "kind": "Light",
+      "security": "Weak",
+      "actuation": "KillLights",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "light-hall",
+      "name": "HALL LIGHTS",
+      "ip": "10.20.11.20",
+      "segment": "auto-hall",
+      "kind": "Light",
+      "security": "Weak",
+      "actuation": "KillLights",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "light-office",
+      "name": "OFFICE LIGHTS",
+      "ip": "10.20.12.20",
+      "segment": "auto-office",
+      "kind": "Light",
+      "security": "Weak",
+      "actuation": "KillLights",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "light-laundry",
+      "name": "LAUNDRY LIGHTS",
+      "ip": "10.20.13.20",
+      "segment": "auto-laundry",
+      "kind": "Light",
+      "security": "Weak",
+      "actuation": "KillLights",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "light-exit",
+      "name": "EXIT LIGHTS",
+      "ip": "10.20.14.20",
+      "segment": "auto-exit",
+      "kind": "Light",
+      "security": "Weak",
+      "actuation": "KillLights",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "cam-0",
+      "name": "HALL CAMERA",
+      "ip": "10.20.4.30",
+      "segment": "security",
+      "kind": "Camera",
+      "security": "Weak",
+      "actuation": "LoopCamera",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "cam-1",
+      "name": "OFFICE CAMERA",
+      "ip": "10.20.4.31",
+      "segment": "security",
+      "kind": "Camera",
+      "security": "Weak",
+      "actuation": "LoopCamera",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "cam-2",
+      "name": "LAUNDRY CAMERA",
+      "ip": "10.20.4.32",
+      "segment": "security",
+      "kind": "Camera",
+      "security": "Weak",
+      "actuation": "LoopCamera",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    },
+    {
+      "id": "vac-0",
+      "name": "ROBOT VACUUM",
+      "ip": "10.20.11.40",
+      "segment": "auto-hall",
+      "kind": "Sensor",
+      "security": "Weak",
+      "actuation": "RunVacuum",
+      "deps": [
+        {
+          "on": "feed"
+        }
+      ]
+    }
+  ],
+  "dns": [
+    {
+      "host": "bridge.local",
+      "ip": "10.20.5.2"
+    },
+    {
+      "host": "ap.local",
+      "ip": "10.20.9.1"
+    },
+    {
+      "host": "ops.isp.net",
+      "ip": "100.64.0.9"
+    },
+    {
+      "host": "jump.grid.local",
+      "ip": "10.10.0.9"
+    },
+    {
+      "host": "substation.grid.local",
+      "ip": "10.10.1.5"
+    }
+  ],
+  "vantages": [
+    {
+      "kind": "Van",
+      "entry_ip": "10.20.9.1",
+      "physical_risk": 40
+    },
+    {
+      "kind": "Inside",
+      "entry_ip": "10.20.10.2",
+      "physical_risk": 85
+    },
+    {
+      "kind": "Inside",
+      "entry_ip": "10.20.11.2",
+      "physical_risk": 85
+    },
+    {
+      "kind": "Inside",
+      "entry_ip": "10.20.12.2",
+      "physical_risk": 85
+    },
+    {
+      "kind": "Inside",
+      "entry_ip": "10.20.13.2",
+      "physical_risk": 85
+    },
+    {
+      "kind": "Inside",
+      "entry_ip": "10.20.14.2",
+      "physical_risk": 85
+    }
+  ]
+}

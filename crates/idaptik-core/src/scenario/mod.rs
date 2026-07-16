@@ -18,23 +18,25 @@
 //! surfaces are added in the next stage; this stage lays the deterministic
 //! foundation (RNG, constants, definition, commands, events).
 
+pub mod agents;
 pub mod command;
 pub mod common;
 pub mod constants;
 pub mod definition;
 pub mod event;
+pub mod floor_graph;
 pub mod ghost_lobby;
 pub mod ids;
 pub mod mathf;
 pub mod outcome;
 pub mod rng;
-pub mod seams;
 pub mod sim;
 pub mod snapshot;
 pub mod state;
 pub mod tuning;
 
-pub use command::{Button, Buttons, Command, Edge, RunConfig, TickInput, fold};
+pub use agents::Agents;
+pub use command::{Button, Buttons, Command, Edge, PivotTarget, RunConfig, TickInput, fold};
 pub use common::BillyMode;
 pub use common::{
     Channel, ChuteMethod, CrisisReason, DenyReason, ExtractMethod, FailReason, Grade, ObjectKind,
@@ -46,12 +48,15 @@ pub use definition::{
     ValidationReport, WorldDef,
 };
 pub use event::{Event, LogLine, format_time, log_view};
+pub use floor_graph::{
+    FLOOR_GRAPH_JSON, VACUUM_NODE_ID, camera_node_id, door_node_id, floor_graph, inside_vantage,
+    light_node_id, pivot_host, van_vantage,
+};
 pub use ghost_lobby::{GHOST_LOBBY_JSON, ghost_lobby};
 pub use ids::{CameraId, DoorId, HideSpotId, IdIndex, ObjectiveId, RoomId};
 pub use mathf::TICK_DT;
 pub use outcome::{Debrief, ScoreBreakdown, Tag, debrief_text, grade_for};
 pub use rng::{InitRoll, Mulberry32, roll_init};
-pub use seams::{network_view, trace_from_alert};
 pub use sim::GhostLobbySim;
 pub use snapshot::{
     DebriefExport, DefinitionExport, RuntimeSnapshot, SNAPSHOT_FORMAT, ScenarioExport,

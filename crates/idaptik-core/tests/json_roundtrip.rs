@@ -63,6 +63,7 @@ fn tuning_is_projected_from_constants() {
     // support / bandwidth
     assert_eq!(t.support.approach, c::SUPPORT_APPROACH);
     assert_eq!(t.support.iso_pressure_div, c::ISO_PRESSURE_DIV);
+    assert_eq!(t.support.hop_pen, c::SUPPORT_HOP_PEN);
     assert_eq!(t.bandwidth.alert_decay_crisis, c::ALERT_DECAY_CRISIS);
     assert_eq!(t.bandwidth.lockdown, c::LOCKDOWN);
 

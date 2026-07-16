@@ -102,6 +102,7 @@ pub fn debrief_text(reason: Outcome, has_note: bool, misled: bool) -> String {
         Outcome::Partition => "The infiltrator stayed outside the uplink's reliable envelope until the building separated the team physically. Support is a spatial resource; a remote partner cannot help everywhere at once.".to_owned(),
         Outcome::Caught => "Billy did not defeat a super-agent. He reached an exposed person after the support relationship had no remaining response. The clean revision is better timing, better hiding, or a deliberate decoy — not more aggression.".to_owned(),
         Outcome::Lockdown => "Repeated interventions and detections accumulated into a building-wide opinion. The hacker's actions worked locally, but their side effects became the dominant system. Use fewer, better-timed interventions.".to_owned(),
+        Outcome::Traced => "The trace is what reaching in costs, and this run paid it in full. Every touch off a segment you already own moves it, and bouncing through a foothold divides that rate rather than stopping it. The clean revision is fewer remote hacks, more work from the segment under your own feet, and a deeper bounce before the expensive ones.".to_owned(),
         Outcome::Extracted => {
             if has_note && misled {
                 "The team leaves with the real intelligence while Billy preserves the wrong explanation. The outcome is clean not because nothing went wrong, but because the errors were directed.".to_owned()

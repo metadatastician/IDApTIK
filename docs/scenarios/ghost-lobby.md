@@ -236,4 +236,4 @@ A script is a sparse, tick-indexed timeline:
 `press` fires edge/uplink commands on that tick (`jump`, `interact`, `throw`,
 `camera`/`door`/`vacuum`/`lights`); `test` injects a Force* hook
 (`force_crisis`, `force_extract` with `method` `service_exit`|`laundry_chute`,
-`force_fail` with `reason` `caught`|`partition`|`lockdown`).
+`force_fail` with `reason` `caught`|`partition`|`lockdown`|`traced`).

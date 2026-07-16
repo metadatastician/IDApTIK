@@ -137,6 +137,7 @@ fn tuning() -> TuningConstants {
             alert_pen: c::SUPPORT_ALERT_PEN,
             hidden: c::SUPPORT_HIDDEN,
             flicker: c::SUPPORT_FLICKER,
+            hop_pen: c::SUPPORT_HOP_PEN,
             clamp_min: c::SUPPORT_CLAMP_MIN,
             approach: c::SUPPORT_APPROACH,
             iso_gate: c::ISO_GATE,
@@ -315,6 +316,7 @@ fn difficulty() -> BTreeMap<DifficultyId, DifficultyPreset> {
                 alert_gain: c::STORY_ALERT_GAIN,
                 score_mult: c::STORY_SCORE_MULT,
                 rescue: c::STORY_RESCUE,
+                trace_threshold: c::STORY_TRACE_THRESHOLD,
             },
         ),
         (
@@ -334,6 +336,7 @@ fn difficulty() -> BTreeMap<DifficultyId, DifficultyPreset> {
                 alert_gain: c::STANDARD_ALERT_GAIN,
                 score_mult: c::STANDARD_SCORE_MULT,
                 rescue: c::STANDARD_RESCUE,
+                trace_threshold: c::STANDARD_TRACE_THRESHOLD,
             },
         ),
         (
@@ -353,6 +356,7 @@ fn difficulty() -> BTreeMap<DifficultyId, DifficultyPreset> {
                 alert_gain: c::OPERATOR_ALERT_GAIN,
                 score_mult: c::OPERATOR_SCORE_MULT,
                 rescue: c::OPERATOR_RESCUE,
+                trace_threshold: c::OPERATOR_TRACE_THRESHOLD,
             },
         ),
     ])

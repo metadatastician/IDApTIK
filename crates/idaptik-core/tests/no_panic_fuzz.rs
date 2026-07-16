@@ -69,6 +69,10 @@ proptest! {
         let cfg = RunConfig::standard();
         let mut sim = GhostLobbySim::new(ghost_lobby(), cfg, seed).expect("valid def");
         let _ = sim.drain_events();
+        // Pivot in first, or every uplink in the stream is denied on route and the
+        // fuzz never reaches the effects it exists to shake. The graph derives from
+        // the definition alone, so this lands on every seed.
+        sim.hacker_pivot("bridge.local").expect("the van can reach the maintenance bridge");
         let mut held = Buttons::default();
         let mut last_phase = phase_rank(sim.state().phase);
         for i in 0..3600u64 {

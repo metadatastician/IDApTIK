@@ -136,6 +136,10 @@ pub const SUPPORT_LOWBW_PEN: f64 = 0.12;
 pub const SUPPORT_ALERT_PEN: f64 = 0.0022;
 pub const SUPPORT_HIDDEN: f64 = 0.06;
 pub const SUPPORT_FLICKER: f64 = 0.04;
+// What each pivot the hacker stands on costs the link. Acting close is safe;
+// reaching far frays it. The bridge route is one hop, the upstream substation
+// route two, and that depth is the only thing that tells the two lines apart.
+pub const SUPPORT_HOP_PEN: f64 = 0.07;
 pub const SUPPORT_CLAMP_MIN: f64 = 0.05;
 pub const SUPPORT_APPROACH: f64 = 1.15;
 pub const ISO_GATE: f64 = 0.4;
@@ -180,6 +184,10 @@ pub const CALL_ALERT: f64 = 12.0;
 // ---------------------------------------------------------------------------
 pub const CAM_SWEEP_W: f64 = 0.75;
 pub const CAM_SWEEP_A: f64 = 25.0;
+/// Seconds of looped footage a hacked camera replays. Not a prototype value: the
+/// prototype had no camera-loop hack. Chosen to outlast [`PING_DUR`] so that
+/// holding a camera is meaningfully longer-lived than the intel ping it grants.
+pub const CAM_LOOP_DUR: f64 = 4.0;
 pub const CAM_LOCKOUT: f64 = 5.5;
 pub const CAM_ALERT: f64 = 14.0;
 pub const CAM_DECAY_UNSEEN: f64 = 1.4;
@@ -336,6 +344,8 @@ pub const STORY_CAMERA_LOCK: f64 = 1.05;
 pub const STORY_ALERT_GAIN: f64 = 0.78;
 pub const STORY_SCORE_MULT: f64 = 0.85;
 pub const STORY_RESCUE: bool = true;
+/// Trace score at which a session is traced. Higher is more forgiving.
+pub const STORY_TRACE_THRESHOLD: u32 = 900;
 
 pub const STANDARD_ARRIVAL: (f64, f64) = (19.0, 26.0);
 pub const STANDARD_PLAYER_SPEED: f64 = 166.0;
@@ -350,6 +360,7 @@ pub const STANDARD_CAMERA_LOCK: f64 = 0.78;
 pub const STANDARD_ALERT_GAIN: f64 = 1.0;
 pub const STANDARD_SCORE_MULT: f64 = 1.0;
 pub const STANDARD_RESCUE: bool = true;
+pub const STANDARD_TRACE_THRESHOLD: u32 = 600;
 
 pub const OPERATOR_ARRIVAL: (f64, f64) = (15.0, 21.0);
 pub const OPERATOR_PLAYER_SPEED: f64 = 162.0;
@@ -364,3 +375,4 @@ pub const OPERATOR_CAMERA_LOCK: f64 = 0.58;
 pub const OPERATOR_ALERT_GAIN: f64 = 1.2;
 pub const OPERATOR_SCORE_MULT: f64 = 1.25;
 pub const OPERATOR_RESCUE: bool = false;
+pub const OPERATOR_TRACE_THRESHOLD: u32 = 400;
