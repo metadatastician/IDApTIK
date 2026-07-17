@@ -22,6 +22,15 @@
     | doc "How far a segment sits from the target."
     = [| 'WideArea, 'Perimeter, 'LocalLan |],
 
+  Actuation
+    | doc "What actuating a node does to the world."
+    = [| 'HoldDoor, 'DisengageLock, 'LoopCamera, 'DisableCamera, 'CallElevator,
+         'KillLights, 'CutPower, 'MuteSensor, 'RunVacuum |],
+
+  VantageKind
+    | doc "Where an agent physically plays from."
+    = [| 'Base, 'InternetCafe, 'Van, 'Inside |],
+
   Device = {
     name | String,
     ip | String,
@@ -58,7 +67,7 @@
       segment | String,
       kind | DeviceKind,
       security | SecurityLevel,
-      actuation | String | optional,
+      actuation | Actuation | optional,
       deps | Array { on | String } | default = [],
     },
 
@@ -68,7 +77,7 @@
 
   Vantage
     | doc "Where the hacker physically is: an entry node and a physical-discovery risk."
-    = { kind | String, entry_ip | String, physical_risk | Number },
+    = { kind | VantageKind, entry_ip | String, physical_risk | Number },
 
   GroundedGraph
     | doc "The whole grounded network as data."

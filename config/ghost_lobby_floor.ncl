@@ -14,7 +14,7 @@ let schema = import "schema.ncl" in
     { id = "utility", range = 'WideArea, category = 'Scada, subnet = "10.10.1.", can_access = [] },
   ],
   nodes = [
-    { id = "substation", name = "GRID SUBSTATION", ip = "10.10.1.5", segment = "utility", kind = 'Substation, security = 'Strong, actuation = "CutPower" },
+    { id = "substation", name = "GRID SUBSTATION", ip = "10.10.1.5", segment = "utility", kind = 'Substation, security = 'Strong, actuation = 'CutPower },
     { id = "isp-gw", name = "ISP GATEWAY", ip = "100.64.0.1", segment = "isp", kind = 'Router, security = 'Medium },
     { id = "isp-ops", name = "ISP OPS HOST", ip = "100.64.0.9", segment = "isp", kind = 'Server, security = 'Strong },
     { id = "grid-jump", name = "GRID JUMP HOST", ip = "10.10.0.9", segment = "utility-dmz", kind = 'Server, security = 'Strong },
@@ -30,6 +30,6 @@ let schema = import "schema.ncl" in
     { host = "substation.grid.local", ip = "10.10.1.5" },
   ],
   vantages = [
-    { kind = "Van", entry_ip = "10.20.9.1", physical_risk = 40 },
+    { kind = 'Van, entry_ip = "10.20.9.1", physical_risk = 40 },
   ],
 } | schema.GroundedGraph

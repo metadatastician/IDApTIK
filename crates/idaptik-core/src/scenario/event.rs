@@ -210,7 +210,7 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
                 SessionError::NoSuchNode => "no such machine",
                 SessionError::AlreadyThere => "already standing on it",
             };
-            line(format!("Pivot to {host} refused - {why}."), Warn, Log)
+            line(format!("Pivot to {host} refused — {why}."), Warn, Log)
         }
         Event::PivotClosed { hops } => line(
             format!("Backed out. You are {hops} deep."),
@@ -231,7 +231,7 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
                 DenyReason::NoRoute => "no route to target",
             };
             line(
-                format!("Uplink {kind:?} denied - {why}."),
+                format!("Uplink {kind:?} denied — {why}."),
                 // A cooldown or a thin pipe is a wait; no route at all is a wall.
                 if matches!(reason, DenyReason::VacuumFallen | DenyReason::NoRoute) {
                     Bad
