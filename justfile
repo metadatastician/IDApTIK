@@ -77,6 +77,11 @@ test-ghost:
     cargo clippy -p idaptik-core -p idaptik-tui --all-targets -- -D warnings
     cargo fmt --all -- --check
 
+# Regenerate the C header for the FFI crate (needs the cbindgen CLI:
+# `cargo install cbindgen`).
+ffi-header:
+    cd crates/idaptik-ffi && cbindgen --output include/idaptik.h
+
 fmt:
     cargo fmt --all
 
