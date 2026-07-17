@@ -176,7 +176,9 @@ pub enum ValidationError {
     EmptyRooms,
     DuplicateRoomId(RoomId),
     DuplicateDoorId(DoorId),
-    RoomsNotContiguous { gap_after: RoomId },
+    RoomsNotContiguous {
+        gap_after: RoomId,
+    },
     HideSpotRoomMissing(HideSpotId),
     CameraRoomMissing(CameraId),
     CameraRangeInverted(CameraId),
@@ -188,7 +190,26 @@ pub enum ValidationError {
     DifficultyMissing(DifficultyId),
     NegativeActionCost(ActionKind),
     SupportOutOfRange(RoomId),
-    ObjectSpawnOutOfBounds { obj: String },
+    ObjectSpawnOutOfBounds {
+        obj: String,
+    },
+    /// More cameras than the security subnet can address (see
+    /// [`crate::scenario::floor_graph::MAX_CAMERAS`]).
+    TooManyCameras {
+        count: usize,
+        max: usize,
+    },
+    /// More doors in one room than its automation subnet can address (see
+    /// [`crate::scenario::floor_graph::MAX_DOORS_PER_ROOM`]).
+    TooManyDoorsInRoom {
+        room: RoomId,
+        count: usize,
+        max: usize,
+    },
+    /// A snapshot whose format tag is not the one this build restores.
+    UnsupportedSnapshotFormat {
+        found: String,
+    },
 }
 
 /// One named check in the Exchange-House-style validation report.
@@ -338,6 +359,52 @@ impl ScenarioDefinition {
                 bad.map(|k| format!("{k:?} is negative"))
                     .unwrap_or_else(|| "all non-negative".into()),
                 bad.map(ValidationError::NegativeActionCost),
+            );
+        }
+
+        // --- addressing capacity ---------------------------------------------
+        // The floor graph addresses every camera and door by a host octet; the
+        // caps are derived from the same constants the derivation uses, so the
+        // two cannot drift. Overflow here would once have panicked
+        // `GhostLobbySim::new` deep inside `floor_graph`; now it is a plain
+        // validation failure.
+        {
+            let max = crate::scenario::floor_graph::MAX_CAMERAS;
+            let count = self.cameras.len();
+            check(
+                &mut checks,
+                "capacity",
+                "capacity.cameras",
+                "Cameras fit the security subnet's host range",
+                count <= max,
+                format!("{count} camera(s), max {max}"),
+                Some(ValidationError::TooManyCameras { count, max }),
+            );
+        }
+        if rooms_present {
+            let max = crate::scenario::floor_graph::MAX_DOORS_PER_ROOM;
+            let mut per_room: Vec<usize> = vec![0; self.rooms.len()];
+            for d in &self.doors {
+                let index = crate::scenario::sim::GhostLobbySim::room_index_at(self, d.x);
+                if let Some(slot) = per_room.get_mut(index) {
+                    *slot += 1;
+                }
+            }
+            let over = per_room
+                .iter()
+                .enumerate()
+                .find(|(_, n)| **n > max)
+                .and_then(|(i, n)| self.rooms.get(i).map(|r| (r.id.clone(), *n)));
+            check(
+                &mut checks,
+                "capacity",
+                "capacity.doors_per_room",
+                "Each room's doors fit its automation subnet's host range",
+                over.is_none(),
+                over.as_ref()
+                    .map(|(room, n)| format!("{room} has {n} door(s), max {max}"))
+                    .unwrap_or_else(|| format!("all rooms within {max}")),
+                over.map(|(room, count)| ValidationError::TooManyDoorsInRoom { room, count, max }),
             );
         }
 

@@ -16,8 +16,10 @@ use crate::scenario::tuning::{
 };
 use std::collections::BTreeMap;
 
-/// The scenario format tag (definition surface).
-pub const FORMAT: &str = "idaptik-ghost-lobby-v1";
+/// The scenario format tag (definition surface). v2: the runtime the definition
+/// drives grew agent sessions, camera loops and dead nodes (the grounded
+/// network fusion), so the surface family is bumped in step.
+pub const FORMAT: &str = "idaptik-ghost-lobby-v2";
 /// The stable scenario id.
 pub const SCENARIO_ID: &str = "envelope-001-ghost-lobby";
 

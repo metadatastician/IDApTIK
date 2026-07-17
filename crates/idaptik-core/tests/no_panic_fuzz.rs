@@ -71,9 +71,17 @@ proptest! {
         let _ = sim.drain_events();
         // Pivot in first, or every uplink in the stream is denied on route and the
         // fuzz never reaches the effects it exists to shake. The graph derives from
-        // the definition alone, so this lands on every seed.
-        sim.hacker_pivot("bridge.local").expect("the van can reach the maintenance bridge");
+        // the definition alone, so this lands on every seed — through the canonical
+        // command path, spending the run's first tick.
         let mut held = Buttons::default();
+        {
+            let input = fold(&[Command::Pivot { target: idaptik_core::scenario::command::PivotTarget::Bridge }], &mut held);
+            let events = sim.tick(&input);
+            prop_assert!(
+                events.iter().any(|e| matches!(e, idaptik_core::scenario::event::Event::PivotOpened { .. })),
+                "the van can reach the maintenance bridge"
+            );
+        }
         let mut last_phase = phase_rank(sim.state().phase);
         for i in 0..3600u64 {
             let code = codes.get((i as usize) % codes.len().max(1)).copied().unwrap_or(0);

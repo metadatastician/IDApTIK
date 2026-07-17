@@ -13,11 +13,16 @@ fn uplink(kind: ActionKind) -> Command {
 
 /// Pivot the hacker into the building's maintenance bridge, which is what opens a
 /// route from the van to the floor's fixtures. Every test that means to exercise a
-/// landed uplink must do this first.
+/// landed uplink must do this first. Driven as the real `Command::Pivot` (one
+/// tick), so the fixture takes exactly the path a recorded stream replays.
 fn pivot_in(r: &mut Runner) {
-    r.sim
-        .hacker_pivot("bridge.local")
-        .expect("the van can reach the maintenance bridge");
+    r.step(&[Command::Pivot {
+        target: idaptik_core::scenario::command::PivotTarget::Bridge,
+    }]);
+    assert!(
+        r.saw(|e| matches!(e, Event::PivotOpened { .. })),
+        "the van can reach the maintenance bridge"
+    );
 }
 
 #[test]

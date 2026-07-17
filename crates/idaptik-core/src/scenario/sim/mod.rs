@@ -12,7 +12,6 @@
 mod systems;
 
 use crate::netsim::graph::GroundedGraph;
-use crate::netsim::session::SessionError;
 use crate::scenario::agents::apply_effects;
 use crate::scenario::command::{PivotTarget, RunConfig, TickInput};
 use crate::scenario::common::{
@@ -35,7 +34,6 @@ use crate::scenario::rng::{Mulberry32, roll_init};
 use crate::scenario::snapshot::{RuntimeSnapshot, SNAPSHOT_FORMAT};
 use crate::scenario::state::{DoorState, RuntimeState};
 use crate::scenario::tuning::{ActionKind, DifficultyPreset};
-use std::net::Ipv4Addr;
 
 /// The playable Ghost Lobby simulation — forward-compatible as a UMS floor.
 #[derive(Debug, Clone)]
@@ -122,11 +120,18 @@ impl GhostLobbySim {
         Ok(sim)
     }
 
-    /// Rebuild an equivalent sim from a snapshot and its definition.
+    /// Rebuild an equivalent sim from a snapshot and its definition. A snapshot
+    /// tagged with any other format is refused up front, as a typed error,
+    /// rather than left to fail later (or worse, restore wrongly) on shape.
     pub fn restore(
         def: ScenarioDefinition,
         snap: RuntimeSnapshot,
     ) -> Result<Self, Vec<ValidationError>> {
+        if snap.format != SNAPSHOT_FORMAT {
+            return Err(vec![ValidationError::UnsupportedSnapshotFormat {
+                found: snap.format,
+            }]);
+        }
         def.ok()?;
         let preset = def
             .difficulty
@@ -185,15 +190,6 @@ impl GhostLobbySim {
     /// Borrow the floor's grounded network.
     pub fn graph(&self) -> &GroundedGraph {
         &self.graph
-    }
-
-    /// Pivot the hacker into `host`, as the van operator does before anything on
-    /// the floor will answer them. This is the whole of the mutable access the
-    /// outside world needs in order to drive a pivot, so it is offered in place of
-    /// a blanket `state_mut`: handing out the runtime state wholesale would let a
-    /// caller breach the clamp and determinism invariants the systems maintain.
-    pub fn hacker_pivot(&mut self, host: &str) -> Result<Ipv4Addr, SessionError> {
-        self.state.agents.hacker.ssh(&self.graph, host)
     }
 
     /// The resolved id index.
@@ -1105,13 +1101,20 @@ mod tests {
     use crate::scenario::ghost_lobby::ghost_lobby;
 
     /// A standard run with the hacker already pivoted onto the floor, so that an
-    /// uplink resolves rather than being denied on route.
+    /// uplink resolves rather than being denied on route. The pivot goes through
+    /// the canonical immediate — the same guard and events a played
+    /// `Command::Pivot` takes — so these fixtures never diverge from a replay.
     fn pivoted() -> GhostLobbySim {
         let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
             .expect("the definition is valid");
         let _ = sim.drain_events();
-        sim.hacker_pivot("bridge.local")
-            .expect("the van can reach the maintenance bridge");
+        sim.pivot(PivotTarget::Bridge);
+        assert!(
+            sim.drain_events()
+                .iter()
+                .any(|e| matches!(e, Event::PivotOpened { .. })),
+            "the van can reach the maintenance bridge"
+        );
         sim
     }
 

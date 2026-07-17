@@ -29,11 +29,16 @@ const HALL_CONE_X: f64 = 380.0;
 const INTO_THE_HALL_X: f64 = 330.0;
 
 /// Pivot the hacker into the building's maintenance bridge, which is what opens a
-/// route from the van to the floor's fixtures. Borrowed from `mechanics_b`.
+/// route from the van to the floor's fixtures. Borrowed from `mechanics_b`:
+/// driven as the real `Command::Pivot` (one tick), the same path a replay takes.
 fn pivot_in(r: &mut Runner) {
-    r.sim
-        .hacker_pivot("bridge.local")
-        .expect("the van can reach the maintenance bridge");
+    r.step(&[Command::Pivot {
+        target: PivotTarget::Bridge,
+    }]);
+    assert!(
+        r.saw(|e| matches!(e, Event::PivotOpened { .. })),
+        "the van can reach the maintenance bridge"
+    );
 }
 
 fn hold(button: Button) -> Command {
@@ -46,8 +51,8 @@ fn hold(button: Button) -> Command {
 ///
 /// The body is placed rather than walked in, for two reasons. Walking there would
 /// itself accumulate detection on the way, and these tests must measure a rise
-/// from a clean slate. And the sim deliberately offers no `state_mut` (see the
-/// note on `GhostLobbySim::hacker_pivot`), so a snapshot is the only public seam
+/// from a clean slate. And the sim deliberately offers no `state_mut` (mutable
+/// access goes through the command stream), so a snapshot is the only public seam
 /// through which a test can seed `dead_nodes`, which no uplink on this floor can
 /// reach.
 fn parked_snapshot() -> RuntimeSnapshot {
@@ -210,7 +215,8 @@ const TRACE_HACK_CEILING: usize = 1_000;
 /// action cooldowns would spread across a run far longer than the one under test,
 /// and the point being tested is the ending rather than the arithmetic that
 /// arrives at it. As Task 9 found, a snapshot is the public seam for this; the sim
-/// deliberately offers no `state_mut` (see `GhostLobbySim::hacker_pivot`).
+/// deliberately offers no `state_mut` (mutable access goes through the command
+/// stream).
 ///
 /// The session must pivot in before it can work: cold from its own vantage the
 /// hall lights answer `NoRoute`, the trace never moves, and the loop would never
@@ -315,12 +321,12 @@ fn the_two_routes_the_floor_offers_cost_the_link_differently() {
     };
     let upstream = {
         let mut r = Runner::standard();
-        r.sim
-            .hacker_pivot("ops.isp.net")
-            .expect("the van can reach the ISP");
-        r.sim
-            .hacker_pivot("jump.grid.local")
-            .expect("the ISP can reach the grid jump host");
+        r.step(&[Command::Pivot {
+            target: PivotTarget::IspOps,
+        }]);
+        r.step(&[Command::Pivot {
+            target: PivotTarget::GridJump,
+        }]);
         assert_eq!(
             r.sim.state().agents.hacker.hops(),
             2,
@@ -531,8 +537,9 @@ fn the_infiltrator_opens_the_same_door_locally_for_free() {
         "walking is not hacking: the infiltrator has not traced yet"
     );
 
-    // The sim offers no `state_mut`, deliberately (see `GhostLobbySim::hacker_pivot`),
-    // so the snapshot is the public seam through which the infiltrator's own hack
+    // The sim offers no `state_mut`, deliberately (mutable access goes through
+    // the command stream), so the snapshot is the public seam through which the
+    // infiltrator's own hack
     // is driven -- exactly as Tasks 9 and 10 found.
     let graph = r.sim.graph();
     let mut snap = r.sim.snapshot();
@@ -597,9 +604,11 @@ fn the_upstream_power_line_is_a_winnable_strategy() {
     );
     // The run being alive is the whole point, so pin how much room is left rather
     // than merely that some is: two pivots and a hack must not cost a third of the
-    // budget, or the line is a trap dressed as a choice.
+    // budget, or the line is a trap dressed as a choice. The whole line runs
+    // through Strong hosts, whose security-scaled trace cost (40 a touch, divided
+    // by the bounce depth) prices it at 73 of the 600-point budget.
     assert!(
-        snap.state.agents.hacker.trace_fraction() < 0.1,
+        snap.state.agents.hacker.trace_fraction() < 0.15,
         "the upstream line must stay affordable: {}",
         snap.state.agents.hacker.trace_fraction()
     );

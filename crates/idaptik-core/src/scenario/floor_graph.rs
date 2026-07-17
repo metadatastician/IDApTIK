@@ -41,8 +41,26 @@ const VACUUM_SEGMENT: &str = "auto-hall";
 /// Host octet of a room's lights within its automation subnet.
 const LIGHT_HOST: usize = 20;
 
-/// Host octet of the first camera within the security subnet.
-const CAMERA_HOST_BASE: usize = 30;
+/// Host octet of the first camera within the security subnet. Public so that
+/// [`crate::scenario::definition::ScenarioDefinition::validate`] derives its
+/// camera capacity from the same constant the derivation addresses by.
+pub const CAMERA_HOST_BASE: usize = 30;
+
+/// Host octet base of a room's doors within its automation subnet (the first
+/// door in a room lands on `DOOR_HOST_BASE + 1`). Public for the same reason as
+/// [`CAMERA_HOST_BASE`]: validation and derivation must not drift apart.
+pub const DOOR_HOST_BASE: usize = 10;
+
+/// The largest usable host octet in a dotted /24-style subnet prefix.
+const MAX_HOST_OCTET: usize = 254;
+
+/// The most cameras a definition can carry before camera addressing would
+/// overflow the security subnet's host octet.
+pub const MAX_CAMERAS: usize = MAX_HOST_OCTET - CAMERA_HOST_BASE + 1;
+
+/// The most doors one room can carry before door addressing would overflow the
+/// room's automation subnet host octet.
+pub const MAX_DOORS_PER_ROOM: usize = MAX_HOST_OCTET - DOOR_HOST_BASE;
 
 /// Host octet of the robot vacuum within its subnet.
 const VACUUM_HOST: usize = 40;
@@ -58,11 +76,18 @@ fn room_segment_id(room_id: &str) -> String {
     format!("auto-{room_id}")
 }
 
-/// An address built from a segment's dotted subnet prefix and a host octet.
-fn host_ip(subnet: &str, host: usize) -> Ipv4Addr {
-    format!("{subnet}{host}")
-        .parse()
-        .expect("a segment subnet and a host octet form a valid address")
+/// An address built from a segment's dotted subnet prefix and a host octet, or
+/// `None` if the octet overflows the subnet (or the prefix is malformed).
+/// Deliberately non-panicking: [`ScenarioDefinition::validate`] rejects
+/// definitions that would overflow (see [`MAX_CAMERAS`] /
+/// [`MAX_DOORS_PER_ROOM`]), and this is the defence in depth behind it, so a
+/// definition that slips past validation degrades to a missing node rather than
+/// a panic in the sim.
+fn host_ip(subnet: &str, host: usize) -> Option<Ipv4Addr> {
+    if host > MAX_HOST_OCTET {
+        return None;
+    }
+    format!("{subnet}{host}").parse().ok()
 }
 
 /// A derived fixture: a weakly secured, actuable device drawing from the feed.
@@ -143,7 +168,9 @@ pub fn floor_graph(def: &ScenarioDefinition) -> GroundedGraph {
             continue;
         };
         door_count[index] += 1;
-        let ip = host_ip(&segment.subnet, 10 + door_count[index]);
+        let Some(ip) = host_ip(&segment.subnet, DOOR_HOST_BASE + door_count[index]) else {
+            continue;
+        };
         nodes.push(fixture(
             door_node_id(door.id.clone()),
             format!("{} DOOR", door.label),
@@ -161,7 +188,9 @@ pub fn floor_graph(def: &ScenarioDefinition) -> GroundedGraph {
         let Some(segment) = graph.segment(&segment_id) else {
             continue;
         };
-        let ip = host_ip(&segment.subnet, LIGHT_HOST);
+        let Some(ip) = host_ip(&segment.subnet, LIGHT_HOST) else {
+            continue;
+        };
         nodes.push(fixture(
             light_node_id(room.id.as_str()),
             format!("{} LIGHTS", room.id.as_str().to_uppercase()),
@@ -177,10 +206,13 @@ pub fn floor_graph(def: &ScenarioDefinition) -> GroundedGraph {
     if let Some(segment) = graph.segment(CAMERA_SEGMENT) {
         let subnet = segment.subnet.clone();
         for (index, camera) in def.cameras.iter().enumerate() {
+            let Some(ip) = host_ip(&subnet, CAMERA_HOST_BASE + index) else {
+                continue;
+            };
             nodes.push(fixture(
                 camera_node_id(index),
                 format!("{} CAMERA", camera.room.as_str().to_uppercase()),
-                host_ip(&subnet, CAMERA_HOST_BASE + index),
+                ip,
                 CAMERA_SEGMENT.into(),
                 DeviceKind::Camera,
                 Actuation::LoopCamera,
@@ -188,8 +220,9 @@ pub fn floor_graph(def: &ScenarioDefinition) -> GroundedGraph {
         }
     }
 
-    if let Some(segment) = graph.segment(VACUUM_SEGMENT) {
-        let ip = host_ip(&segment.subnet, VACUUM_HOST);
+    if let Some(segment) = graph.segment(VACUUM_SEGMENT)
+        && let Some(ip) = host_ip(&segment.subnet, VACUUM_HOST)
+    {
         nodes.push(fixture(
             VACUUM_NODE_ID.into(),
             "ROBOT VACUUM".into(),
@@ -208,9 +241,12 @@ pub fn floor_graph(def: &ScenarioDefinition) -> GroundedGraph {
         let Some(segment) = graph.segment(&room_segment_id(room.id.as_str())) else {
             continue;
         };
+        let Some(entry_ip) = host_ip(&segment.subnet, INSIDE_ENTRY_HOST) else {
+            continue;
+        };
         vantages.push(VantageDef {
             kind: VantageKind::Inside,
-            entry_ip: host_ip(&segment.subnet, INSIDE_ENTRY_HOST),
+            entry_ip,
             physical_risk: INSIDE_RISK,
         });
     }
