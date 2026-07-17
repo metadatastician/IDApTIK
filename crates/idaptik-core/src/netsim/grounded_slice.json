@@ -34,7 +34,8 @@
       "category": "Isp",
       "subnet": "100.64.0.",
       "can_access": [
-        "utility"
+        "utility",
+        "public"
       ],
       "location": null
     },
@@ -43,6 +44,14 @@
       "range": "WideArea",
       "category": "Scada",
       "subnet": "10.10.1.",
+      "can_access": [],
+      "location": null
+    },
+    {
+      "id": "public",
+      "range": "WideArea",
+      "category": "Service",
+      "subnet": "",
       "can_access": [],
       "location": null
     }

@@ -42,6 +42,28 @@ fn wide_area_power_line_disables_the_maglock_door() {
 }
 
 #[test]
+fn base_vantage_reaches_raw_public_ips_through_the_isp() {
+    // The ISP segment carries an explicit edge to the "public" sink, which is
+    // what makes the (Some, None) arm of `can_reach` — a destination address in
+    // no known segment — answer for the remote Base vantage. Without that edge
+    // the shortcut segment ids in access.rs matched nothing in this slice and no
+    // vantage could ever reach the open internet.
+    let g = grounded_slice();
+    let v = vantage(&g, VantageKind::Base);
+    let s = AgentSession::new(&g, v, 1000);
+    assert!(
+        idaptik_core::netsim::ping(&g, s.vantage_ip(), Ipv4Addr::new(203, 0, 113, 9)),
+        "the base vantage must reach a raw public IP"
+    );
+    // The building's interior stays out of reach: the public edge is a way out,
+    // not a way in.
+    assert!(
+        !idaptik_core::netsim::ping(&g, s.vantage_ip(), Ipv4Addr::new(10, 20, 0, 12)),
+        "the public edge must not open the building's automation segment"
+    );
+}
+
+#[test]
 fn identical_command_sequences_are_deterministic() {
     let g = grounded_slice();
     let run = || {

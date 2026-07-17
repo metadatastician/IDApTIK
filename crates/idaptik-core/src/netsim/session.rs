@@ -1,6 +1,6 @@
 //! The stateful agent session: a vantage, a stack of pivots, an active trace
 //! (reused from `crate::trace`), the effects fired, and the logs left behind.
-use crate::device::DeviceKind;
+use crate::device::{DeviceKind, SecurityLevel};
 use crate::netsim::access::can_reach;
 use crate::netsim::addressing::segment_of;
 use crate::netsim::dns::resolve;
@@ -45,6 +45,18 @@ fn pivotable(kind: DeviceKind) -> bool {
         kind,
         DeviceKind::Server | DeviceKind::Laptop | DeviceKind::Terminal
     )
+}
+
+/// The trace cost of touching a node, scaled by how hard it is secured: a
+/// hardened substation is a louder, longer fight than an open kiosk, and the
+/// trace clock is where that difference is paid.
+fn trace_cost(sec: SecurityLevel) -> u32 {
+    match sec {
+        SecurityLevel::Open => 5,
+        SecurityLevel::Weak => 10,
+        SecurityLevel::Medium => 20,
+        SecurityLevel::Strong => 40,
+    }
 }
 
 impl AgentSession {
@@ -94,8 +106,11 @@ impl AgentSession {
     pub fn ssh(&mut self, graph: &GroundedGraph, host: &str) -> Result<Ipv4Addr, SessionError> {
         let ip = resolve(graph, host).ok_or(SessionError::Unresolved)?;
         // Pivoting into a host already occupied would inflate bounce_hops and
-        // cheaply slow the trace, so the self-pivot is rejected outright.
-        if ip == self.vantage_ip() || self.stack.contains(&ip) {
+        // cheaply slow the trace, so the self-pivot is rejected outright. The
+        // entry host is guarded explicitly: `vantage_ip()` answers the stack top
+        // once anything is stacked, which would otherwise leave the agent free to
+        // ssh out and straight back into their own entry host for a free hop.
+        if ip == self.vantage_ip() || ip == self.vantage.entry_ip || self.stack.contains(&ip) {
             return Err(SessionError::AlreadyThere);
         }
         if !can_reach(graph, self.vantage_ip(), ip) {
@@ -109,7 +124,8 @@ impl AgentSession {
         if !pivotable(node.kind) {
             return Err(SessionError::NotPivotable);
         }
-        self.trace.advance(10, self.bounce_hops());
+        self.trace
+            .advance(trace_cost(node.security), self.bounce_hops());
         self.stack.push(ip);
         Ok(ip)
     }
@@ -142,9 +158,11 @@ impl AgentSession {
             return Err(SessionError::NoRoute);
         }
         let local = self.is_local(graph, node_id);
-        // Your own local segment is yours: no trace. Everything else traces.
+        // Your own local segment is yours: no trace. Everything else traces, at a
+        // rate the target's security level sets.
         if !local {
-            self.trace.advance(10, self.bounce_hops());
+            self.trace
+                .advance(trace_cost(node.security), self.bounce_hops());
         }
         self.logs.push(node_id.to_string());
         Ok(apply_actuation(graph, node_id))
@@ -241,6 +259,70 @@ mod tests {
         assert!(s.exit());
         assert_eq!(s.vantage_ip(), Ipv4Addr::new(10, 0, 0, 25));
         assert!(!s.exit()); // back at the vantage, nothing to pop
+    }
+
+    #[test]
+    fn sshing_back_into_your_own_entry_host_is_refused() {
+        // Two mutually-accessible segments, both carrying pivotable servers. Once
+        // the agent has pivoted out, `vantage_ip()` answers the stack top, so the
+        // entry host must be guarded explicitly: ssh-ing back into it would be a
+        // free extra bounce_hop that cheaply slows the trace.
+        let g = GroundedGraph {
+            segments: vec![
+                seg("dmz", "10.0.0.", &["internal"]),
+                seg("internal", "10.0.1.", &["dmz"]),
+            ],
+            nodes: vec![
+                node("web", [10, 0, 0, 25], "dmz", DeviceKind::Server),
+                node("db", [10, 0, 1, 50], "internal", DeviceKind::Server),
+            ],
+            dns: vec![],
+            vantages: vec![],
+        };
+        let v = VantageDef {
+            kind: VantageKind::Van,
+            entry_ip: Ipv4Addr::new(10, 0, 0, 25),
+            physical_risk: 40,
+        };
+        let mut s = AgentSession::new(&g, v, 1000);
+        s.ssh(&g, "10.0.1.50")
+            .expect("db is reachable and pivotable");
+        assert_eq!(
+            s.ssh(&g, "10.0.0.25"),
+            Err(SessionError::AlreadyThere),
+            "the agent's own entry host must never be a pivot target"
+        );
+    }
+
+    #[test]
+    fn a_strong_node_advances_the_trace_four_times_a_weak_one() {
+        // The security level is the trace-cost dial: Strong (40) is 4x Weak (10).
+        // Both hacks are made from the same remote vantage at the same depth, so
+        // the security level is the only variable in the comparison.
+        let mut g = graph();
+        g.nodes.push({
+            let mut n = node("vault", [10, 0, 1, 60], "internal", DeviceKind::Server);
+            n.security = SecurityLevel::Strong;
+            n
+        });
+        let v = VantageDef {
+            kind: VantageKind::Van,
+            entry_ip: Ipv4Addr::new(10, 0, 0, 2),
+            physical_risk: 40,
+        };
+        let mut weak = AgentSession::new(&g, v.clone(), 1000);
+        weak.hack(&g, "db")
+            .expect("dmz reaches the weak internal db");
+        let mut strong = AgentSession::new(&g, v, 1000);
+        strong
+            .hack(&g, "vault")
+            .expect("dmz reaches the strong internal vault");
+        assert!(weak.trace_fraction() > 0.0, "a remote hack always traces");
+        assert_eq!(
+            strong.trace_fraction(),
+            4.0 * weak.trace_fraction(),
+            "a Strong node must cost exactly four times a Weak one"
+        );
     }
 
     #[test]

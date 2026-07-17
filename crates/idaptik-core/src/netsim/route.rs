@@ -37,7 +37,10 @@ pub fn traceroute(
         });
     }
     let registered = graph.nodes.iter().find(|n| n.ip == dst);
-    let external = registered.is_none();
+    // External-ness is segment membership, not node registration: an unregistered
+    // host inside a known segment is still on-site, and a registered node that
+    // sits in no segment is still out on the public internet.
+    let external = crate::netsim::addressing::segment_of(graph, dst).is_none();
     if external {
         hops.push(Hop {
             ip: Ipv4Addr::new(10, 255, 255, 1),
@@ -160,6 +163,48 @@ mod tests {
         assert_eq!(hops[1].ip, router);
         assert_eq!(hops[1].name, "ROUTER");
         assert_eq!(hops[1].latency_ms, 2);
+    }
+
+    #[test]
+    fn an_unregistered_ip_inside_a_known_segment_is_not_external() {
+        // Segment membership, not node registration, decides external-ness: a
+        // host the graph does not list but whose address sits inside the LAN
+        // subnet must not be routed out through the synthetic backbone.
+        let g = graph();
+        let router = Ipv4Addr::new(192, 168, 1, 1);
+        let unregistered = Ipv4Addr::new(192, 168, 1, 77);
+        let hops = traceroute(&g, router, unregistered, router);
+        assert_eq!(hops.len(), 1, "no backbone hops inside the LAN");
+        assert_eq!(hops[0].ip, unregistered);
+        assert_eq!(hops[0].name, "192.168.1.77", "unnamed, so the dotted IP");
+        assert_eq!(hops[0].latency_ms, 2, "on-site latency, not external");
+    }
+
+    #[test]
+    fn a_registered_node_in_no_segment_is_external() {
+        // The converse: registration does not make an address local. A node the
+        // graph lists but whose IP falls in no segment subnet is on the public
+        // internet, and the trace to it crosses the synthetic backbone — while
+        // the final hop still carries the registered node's name.
+        let mut g = graph();
+        g.nodes.push(Node {
+            id: "mirror".into(),
+            name: "OFFSITE MIRROR".into(),
+            ip: Ipv4Addr::new(198, 51, 100, 7),
+            segment: "lan".into(),
+            kind: DeviceKind::Server,
+            security: SecurityLevel::Medium,
+            actuation: None,
+            deps: vec![],
+        });
+        let router = Ipv4Addr::new(192, 168, 1, 1);
+        let dst = Ipv4Addr::new(198, 51, 100, 7);
+        let hops = traceroute(&g, router, dst, router);
+        assert_eq!(hops.len(), 4, "backbone hops plus the destination");
+        assert_eq!(hops[0].name, "isp-gateway");
+        assert_eq!(hops[3].ip, dst);
+        assert_eq!(hops[3].name, "OFFSITE MIRROR", "the registration names it");
+        assert_eq!(hops[3].latency_ms, 32, "external latency");
     }
 
     #[test]
