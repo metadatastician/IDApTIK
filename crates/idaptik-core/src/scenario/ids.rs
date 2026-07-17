@@ -46,6 +46,13 @@ id_newtype!(DoorId, "Stable id of a door.");
 id_newtype!(HideSpotId, "Stable id of a hide spot.");
 id_newtype!(CameraId, "Stable id of a patrol camera.");
 id_newtype!(ObjectiveId, "Stable id of an objective.");
+id_newtype!(FloorId, "Stable id of a building floor.");
+id_newtype!(
+    PortalId,
+    "Stable id of a building portal (door/stair/lift/ladder/vent)."
+);
+id_newtype!(CircuitId, "Stable id of a building power circuit.");
+id_newtype!(ZoneId, "Stable id of a building network zone.");
 
 /// Resolves content ids to `Vec` indices once, so the simulation can index
 /// directly. Built at [`crate::scenario::GhostLobbySim`] construction and after

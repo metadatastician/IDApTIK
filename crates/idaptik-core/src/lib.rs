@@ -27,10 +27,11 @@ pub use companion::{
 pub use device::{Device, DeviceId, DeviceKind, SecurityLevel};
 pub use network::{Network, Range, Zone};
 pub use scenario::{
-    ACTORS_JSON, ActorArchetype, ActorRegistry, Buttons, Command, ComposedActor, Debrief,
-    DifficultyId, Event, GHOST_LOBBY_JSON, GhostLobbySim, LogLine, Modifier, Mulberry32, RunConfig,
-    RuntimeSnapshot, ScenarioDefinition, ScenarioExport, TickInput, ValidationError,
-    default_registry, ghost_lobby, load_actor_pack,
+    ACTORS_JSON, ActorArchetype, ActorRegistry, BuildingDefinition, BuildingSim, Buttons, Command,
+    ComposedActor, Debrief, DifficultyId, EXCHANGE_HOUSE_JSON, Event, GHOST_LOBBY_JSON,
+    GhostLobbySim, LogLine, Modifier, Mulberry32, RunConfig, RuntimeSnapshot, ScenarioDefinition,
+    ScenarioExport, TickInput, ValidationError, default_registry, exchange_house, ghost_lobby,
+    load_actor_pack, load_building,
 };
 pub use trace::{Alert, Trace};
 

@@ -20,6 +20,7 @@
 
 pub mod actor;
 pub mod agents;
+pub mod building;
 pub mod command;
 pub mod common;
 pub mod constants;
@@ -43,6 +44,17 @@ pub use actor::{
     billy_archetype, default_registry, load_actor_pack,
 };
 pub use agents::Agents;
+pub use building::exchange_house::{EXCHANGE_HOUSE_JSON, EXCHANGE_HOUSE_RUN_JSON, exchange_house};
+pub use building::sim::{
+    BUILDING_SNAPSHOT_FORMAT, BuildingCommand, BuildingDebrief, BuildingDebriefExport,
+    BuildingDefinitionExport, BuildingDenyReason, BuildingEvent, BuildingExport, BuildingSim,
+    BuildingSnapshot, LegacyLevelConfig,
+};
+pub use building::{
+    BUILDING_FORMAT, BuildingCheck, BuildingDefinition, BuildingPackError, BuildingRoomDef,
+    BuildingValidationError, BuildingValidationReport, CircuitDef, FloorDef, FloorKind, PortalDef,
+    PortalKind, PortalLock, RoomRef, ZoneDef, load_building, scenario_floor_portals,
+};
 pub use command::{Button, Buttons, Command, Edge, PivotTarget, RunConfig, TickInput, fold};
 pub use common::BillyMode;
 pub use common::{
