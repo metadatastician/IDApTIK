@@ -13,12 +13,17 @@
 //! `(definition, config, seed, command stream)`.
 #![forbid(unsafe_code)]
 
+pub mod companion;
 pub mod device;
 pub mod netsim;
 pub mod network;
 pub mod scenario;
 pub mod trace;
 
+pub use companion::{
+    CompanionDefinition, MOLETAIRE_JSON, MoleCommand, MoleEvent, MoleParams, MoletaireSim,
+    MoletaireSnapshot, moletaire,
+};
 pub use device::{Device, DeviceId, DeviceKind, SecurityLevel};
 pub use network::{Network, Range, Zone};
 pub use scenario::{
