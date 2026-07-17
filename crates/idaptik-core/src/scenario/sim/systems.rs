@@ -2,8 +2,15 @@
 //! `impl GhostLobbySim` method the tick loop calls in sequence. The order is
 //! load-bearing (belief reads the player's NEW position and Billy's OLD one;
 //! Billy moves only in `system_billy`; collisions see Billy's NEW position).
+//!
+//! The behaviour and FSM systems are parameterised by the sim's composed
+//! [`crate::scenario::actor::ComposedActor`]: every speed, timer, engagement
+//! distance and belief number comes from the archetype (Billy is the default),
+//! and the interest arithmetic goes through the shared engine in
+//! [`crate::scenario::actor::belief`] rather than a private copy.
 
 use super::GhostLobbySim;
+use crate::scenario::actor::{self, Leakage, belief};
 use crate::scenario::command::{Button, Edge, TickInput};
 use crate::scenario::common::{
     BillyMode, ChuteMethod, CrisisReason, ExtractMethod, ObjectKind, ObjectiveStatus, Phase,
@@ -454,7 +461,7 @@ impl GhostLobbySim {
         self.state.vacuum.x += c::VAC_SPEED * self.state.vacuum.control.max(c::VAC_MOVE_MIN) * dt;
         if self.state.phase == Phase::Crisis
             && self.state.billy.belief.is_none()
-            && dist(self.state.billy.x, self.state.vacuum.x) < c::VAC_DISTRACT
+            && dist(self.state.billy.x, self.state.vacuum.x) < self.actor.stats.distract_dist
         {
             self.state.billy.last_known_x = self.state.vacuum.x;
             if !matches!(
@@ -605,89 +612,88 @@ impl GhostLobbySim {
     }
 
     // 8. BEHAVIOUR (belief) ------------------------------------------------
+    //
+    // The per-object interest model is the archetype's: each tracked object
+    // carries an `InterestProfile` (valueSignal economy) and the arithmetic
+    // goes through the shared `actor::belief` engine. With the default Billy
+    // archetype the numbers are the ported constants, bit for bit.
     pub(super) fn system_behaviour(&mut self) {
         let dt = TICK_DT;
         if self.state.phase != Phase::Crisis || self.state.billy.mode == BillyMode::Offsite {
             return;
         }
+        let stats = self.actor.stats;
+        let note_prof = self.actor.interest_or_inert(actor::NOTE_OBJECT);
+        let usb_prof = self.actor.interest_or_inert(actor::USB_OBJECT);
         let sees = self.can_billy_see_player();
         let pcx = self.state.player.x + self.def.player.w / 2.0;
         let moving = self.state.player.vx.abs() > c::MOVING_VX;
         let sprinting = self.state.player.sprinting;
+        let leakage = if sprinting {
+            Leakage::Sprinting
+        } else if moving {
+            Leakage::Moving
+        } else {
+            Leakage::Still
+        };
         if sees {
             self.state.billy.last_known_x = self.state.player.x;
             self.state.billy.last_seen_ago = 0.0;
-            let pi = if sprinting { c::PI_SPRINT } else { c::PI_SEEN };
+            let pi = if sprinting {
+                stats.pi_sprint
+            } else {
+                stats.pi_seen
+            };
             self.state.billy.player_interest =
                 clamp(self.state.billy.player_interest + pi * dt, 0.0, 100.0);
-            if dist(pcx, self.state.note.x) < c::NOTE_NEAR
+            if dist(pcx, self.state.note.x) < note_prof.near
                 || self.state.player.has_note
                 || self.state.note.progress > c::PROG_GATE
             {
-                let urg = if sprinting {
-                    c::NOTE_URG_SPRINT
-                } else if moving {
-                    c::NOTE_URG_MOVE
-                } else {
-                    c::NOTE_URG_STILL
-                };
-                let carry = if self.state.player.has_note {
-                    c::NOTE_CARRY * dt
-                } else {
-                    0.0
-                };
-                self.state.billy.note_interest = clamp(
-                    self.state.billy.note_interest + urg * dt + carry,
-                    0.0,
-                    100.0,
+                self.state.billy.note_interest = belief::interest_observed(
+                    self.state.billy.note_interest,
+                    &note_prof,
+                    leakage,
+                    self.state.player.has_note,
+                    dt,
                 );
             }
-            if dist(pcx, self.state.usb.x) < c::USB_NEAR || self.state.player.has_usb {
-                let urg = if sprinting {
-                    c::USB_URG_SPRINT
-                } else if moving {
-                    c::USB_URG_MOVE
-                } else {
-                    c::USB_URG_STILL
-                };
-                let carry = if self.state.player.has_usb {
-                    c::USB_CARRY * dt
-                } else {
-                    0.0
-                };
-                self.state.billy.usb_interest =
-                    clamp(self.state.billy.usb_interest + urg * dt + carry, 0.0, 100.0);
+            if dist(pcx, self.state.usb.x) < usb_prof.near || self.state.player.has_usb {
+                self.state.billy.usb_interest = belief::interest_observed(
+                    self.state.billy.usb_interest,
+                    &usb_prof,
+                    leakage,
+                    self.state.player.has_usb,
+                    dt,
+                );
             }
         } else {
             self.state.billy.last_seen_ago += dt;
             self.state.billy.player_interest =
-                (self.state.billy.player_interest - c::PI_DECAY * dt).max(0.0);
-            if !self.state.note.exposed && !self.state.player.has_note {
-                self.state.billy.note_interest =
-                    (self.state.billy.note_interest - c::NOTE_DECAY * dt).max(0.0);
-            }
-            if !self.state.usb.thrown && !self.state.player.has_usb {
-                self.state.billy.usb_interest =
-                    (self.state.billy.usb_interest - c::USB_DECAY * dt).max(0.0);
-            }
+                (self.state.billy.player_interest - stats.pi_decay * dt).max(0.0);
+            self.state.billy.note_interest = belief::interest_unobserved(
+                self.state.billy.note_interest,
+                &note_prof,
+                self.state.note.exposed || self.state.player.has_note,
+                dt,
+            );
+            self.state.billy.usb_interest = belief::interest_unobserved(
+                self.state.billy.usb_interest,
+                &usb_prof,
+                self.state.usb.thrown || self.state.player.has_usb,
+                dt,
+            );
         }
 
-        let max_obj = self
-            .state
-            .billy
-            .note_interest
-            .max(self.state.billy.usb_interest);
-        let belief = if max_obj >= c::BELIEF_THRESHOLD {
-            Some(
-                if self.state.billy.note_interest >= self.state.billy.usb_interest {
-                    ObjectKind::Note
-                } else {
-                    ObjectKind::Usb
-                },
-            )
-        } else {
-            None
-        };
+        // The note is listed first, so the engine's earlier-entry tie-break
+        // reproduces the prototype's `note >= usb` rule exactly.
+        let belief = belief::belief_over(
+            &[
+                (ObjectKind::Note, self.state.billy.note_interest),
+                (ObjectKind::Usb, self.state.billy.usb_interest),
+            ],
+            stats.belief_threshold,
+        );
         self.state.billy.belief = belief;
         if let Some(b) = belief
             && self.state.billy.belief_announced != Some(b)
@@ -717,10 +723,13 @@ impl GhostLobbySim {
         match self.state.billy.mode {
             BillyMode::Entering => {
                 let snack = self.state.billy.snack_x;
-                self.move_billy_toward(snack, self.preset.billy_speed * c::ENTER_SPEED);
+                self.move_billy_toward(
+                    snack,
+                    self.preset.billy_speed * self.actor.stats.enter_speed,
+                );
                 if dist(self.state.billy.x, snack) < c::SNACK_REACH {
                     self.set_billy_mode(BillyMode::Shock);
-                    self.state.billy.state_timer = c::SHOCK_T;
+                    self.state.billy.state_timer = self.actor.stats.shock_t;
                     self.state.billy.vx = 0.0;
                 }
                 return;
@@ -749,7 +758,7 @@ impl GhostLobbySim {
             self.set_billy_mode(BillyMode::Secure);
         }
         if sees
-            && dist(self.state.billy.x, self.state.player.x) < c::PURSUE_TRIGGER
+            && dist(self.state.billy.x, self.state.player.x) < self.actor.stats.pursue_trigger
             && !matches!(
                 self.state.billy.mode,
                 BillyMode::Guard | BillyMode::CallBoss
@@ -776,8 +785,8 @@ impl GhostLobbySim {
             self.set_billy_mode(BillyMode::Secure);
             return;
         }
-        let noise_invest = self.state.player.noise > c::NOISE_INVEST_NOISE
-            && dist(self.state.billy.x, self.state.player.x) < c::NOISE_INVEST_DIST;
+        let noise_invest = self.state.player.noise > self.actor.stats.invest_noise
+            && dist(self.state.billy.x, self.state.player.x) < self.actor.stats.invest_dist;
         if sees || noise_invest {
             self.state.billy.last_known_x = self.state.player.x;
             self.set_billy_mode(if sees {
@@ -788,19 +797,26 @@ impl GhostLobbySim {
             return;
         }
         let target = self.state.billy.patrol_target;
-        self.move_billy_toward(target, self.preset.billy_speed * c::ASSESS_SPEED);
+        self.move_billy_toward(
+            target,
+            self.preset.billy_speed * self.actor.stats.assess_speed,
+        );
         if dist(self.state.billy.x, self.state.billy.patrol_target) < 10.0 {
-            self.state.billy.patrol_target = if self.state.billy.patrol_target < c::PATROL_PIVOT {
-                c::PATROL_HI
-            } else {
-                c::PATROL_LO
-            };
+            self.state.billy.patrol_target =
+                if self.state.billy.patrol_target < self.actor.stats.patrol_pivot {
+                    self.actor.stats.patrol_hi
+                } else {
+                    self.actor.stats.patrol_lo
+                };
         }
     }
 
     fn billy_investigate(&mut self, sees: bool) {
         let target = self.state.billy.last_known_x;
-        self.move_billy_toward(target, self.preset.billy_speed * c::INVEST_SPEED);
+        self.move_billy_toward(
+            target,
+            self.preset.billy_speed * self.actor.stats.invest_speed,
+        );
         if sees {
             self.set_billy_mode(BillyMode::Pursue);
             return;
@@ -808,9 +824,9 @@ impl GhostLobbySim {
         if dist(self.state.billy.x, self.state.billy.last_known_x) < 15.0 {
             self.set_billy_mode(BillyMode::Assess);
             self.state.billy.patrol_target = if self.state.billy.x < 280.0 {
-                c::PATROL_HI
+                self.actor.stats.patrol_hi
             } else {
-                c::PATROL_LO
+                self.actor.stats.patrol_lo
             };
         }
     }
@@ -835,13 +851,14 @@ impl GhostLobbySim {
             }
             None => {}
         }
-        self.move_billy_toward(tx, self.preset.billy_speed * c::SECURE_SPEED);
-        if dist(self.state.billy.x + self.def.billy.w / 2.0, tx) < c::GRAB_DIST {
+        self.move_billy_toward(tx, self.preset.billy_speed * self.actor.stats.secure_speed);
+        if dist(self.state.billy.x + self.def.billy.w / 2.0, tx) < self.actor.stats.grab_dist {
             match target {
                 Some(ObjectKind::Note) if !self.state.note.held && !self.state.note.billy_has => {
                     self.state.note.billy_has = true;
                     self.state.billy.has_note = true;
-                    self.state.billy.guard_timer = c::GUARD_T_NOTE;
+                    self.state.billy.guard_timer =
+                        self.actor.interest_or_inert(actor::NOTE_OBJECT).guard_t;
                     self.state.billy.reported_target = Some(ReportedTarget::Note);
                     self.set_billy_mode(BillyMode::Guard);
                     self.events.push(Event::BillyTookNote);
@@ -852,7 +869,8 @@ impl GhostLobbySim {
                     self.state.usb.thrown = false;
                     self.state.usb.vx = 0.0;
                     self.state.usb.vy = 0.0;
-                    self.state.billy.guard_timer = c::GUARD_T_USB;
+                    self.state.billy.guard_timer =
+                        self.actor.interest_or_inert(actor::USB_OBJECT).guard_t;
                     self.state.billy.reported_target = Some(ReportedTarget::Usb);
                     self.set_billy_mode(BillyMode::Guard);
                     self.events.push(Event::BillyTookUsb);
@@ -876,11 +894,14 @@ impl GhostLobbySim {
             self.state.billy.x
         };
         if dist(self.state.billy.x, guard_x) > 35.0 {
-            self.move_billy_toward(guard_x, self.preset.billy_speed * c::GUARD_SPEED);
+            self.move_billy_toward(
+                guard_x,
+                self.preset.billy_speed * self.actor.stats.guard_speed,
+            );
         }
         if self.state.billy.guard_timer <= 0.0 && !self.state.billy.called {
             self.set_billy_mode(BillyMode::CallBoss);
-            self.state.billy.call_timer = c::CALL_T;
+            self.state.billy.call_timer = self.actor.stats.call_t;
         } else if self.state.billy.called {
             self.set_billy_mode(BillyMode::Pursue);
         }
@@ -925,15 +946,15 @@ impl GhostLobbySim {
             self.state.billy.last_known_x
         };
         let alert_boost = 1.0
-            + self.state.alert / c::ALERT_BOOST_DIV
-            + (f64::from(self.state.lights_uses) - 2.0).max(0.0) * c::LIGHTS_BOOST_K;
+            + self.state.alert / self.actor.stats.alert_boost_div
+            + (f64::from(self.state.lights_uses) - 2.0).max(0.0) * self.actor.stats.lights_boost_k;
         self.move_billy_toward(
             target_x,
-            self.preset.billy_speed * c::PURSUE_SPEED * alert_boost,
+            self.preset.billy_speed * self.actor.stats.pursue_speed * alert_boost,
         );
         if !sees
-            && self.state.billy.last_seen_ago > c::PURSUE_GIVEUP_AGO
-            && dist(self.state.billy.x, target_x) < c::PURSUE_GIVEUP_DIST
+            && self.state.billy.last_seen_ago > self.actor.stats.pursue_giveup_ago
+            && dist(self.state.billy.x, target_x) < self.actor.stats.pursue_giveup_dist
         {
             let next = if self.state.billy.belief.is_some() {
                 BillyMode::Secure

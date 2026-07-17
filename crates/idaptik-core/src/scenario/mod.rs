@@ -18,6 +18,7 @@
 //! surfaces are added in the next stage; this stage lays the deterministic
 //! foundation (RNG, constants, definition, commands, events).
 
+pub mod actor;
 pub mod agents;
 pub mod command;
 pub mod common;
@@ -35,6 +36,12 @@ pub mod snapshot;
 pub mod state;
 pub mod tuning;
 
+pub use actor::{
+    ACTORS_FORMAT, ACTORS_JSON, ActorArchetype, ActorCheck, ActorPackError, ActorRegistry,
+    ActorStats, ActorValidationError, ActorValidationReport, ComposeError, ComposedActor,
+    InterestProfile, Leakage, Modifier, ObjectClass, StatId, StatOp, StatOpKind, billy_actor,
+    billy_archetype, default_registry, load_actor_pack,
+};
 pub use agents::Agents;
 pub use command::{Button, Buttons, Command, Edge, PivotTarget, RunConfig, TickInput, fold};
 pub use common::BillyMode;
