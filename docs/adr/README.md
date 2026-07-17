@@ -10,6 +10,7 @@ asserted in the README and quietly contradicted later.
 | [0003](0003-engine-strategy.md) | Engine strategy: engine-agnostic core, Bevy + Fyrox as frontends | Accepted (evaluation) |
 | [0004](0004-deterministic-event-sourced-scenario-sim.md) | Deterministic, event-sourced, definition-as-data scenario simulation | Accepted (Envelope milestone) |
 | [0005](0005-session-relay-topology.md) | Session relay topology: relay-only lockstep over typed Command/Event | Accepted (vertical-slice milestone) |
+| [0006](0006-gossamer-host-and-burble-transport.md) | gossamer host window + burble transport: two-player windowed slice | Accepted (design; implementation deferred) |
 
 New ADRs: copy the format of an existing one, take the next number, and add a row
 above.
