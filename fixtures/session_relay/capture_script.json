@@ -1,0 +1,17 @@
+{
+  "seed": 123456,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 30,
+  "commands": [
+    { "at": 0, "hold": ["right"] },
+    { "at": 1, "press": ["jump"] },
+    { "at": 2, "press": ["camera"] },
+    { "at": 3, "press": ["grid"] },
+    { "at": 4, "press": ["isp"] },
+    { "at": 5, "press": ["grid"] },
+    { "at": 6, "press": ["unpivot"] },
+    { "at": 8, "hold": [] },
+    { "at": 10, "test": { "hook": "force_extract", "method": "service_exit" } }
+  ]
+}
