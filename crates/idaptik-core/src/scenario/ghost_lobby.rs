@@ -16,8 +16,10 @@ use crate::scenario::tuning::{
 };
 use std::collections::BTreeMap;
 
-/// The scenario format tag (definition surface).
-pub const FORMAT: &str = "idaptik-ghost-lobby-v1";
+/// The scenario format tag (definition surface). v2: the runtime the definition
+/// drives grew agent sessions, camera loops and dead nodes (the grounded
+/// network fusion), so the surface family is bumped in step.
+pub const FORMAT: &str = "idaptik-ghost-lobby-v2";
 /// The stable scenario id.
 pub const SCENARIO_ID: &str = "envelope-001-ghost-lobby";
 
@@ -137,6 +139,7 @@ fn tuning() -> TuningConstants {
             alert_pen: c::SUPPORT_ALERT_PEN,
             hidden: c::SUPPORT_HIDDEN,
             flicker: c::SUPPORT_FLICKER,
+            hop_pen: c::SUPPORT_HOP_PEN,
             clamp_min: c::SUPPORT_CLAMP_MIN,
             approach: c::SUPPORT_APPROACH,
             iso_gate: c::ISO_GATE,
@@ -315,6 +318,7 @@ fn difficulty() -> BTreeMap<DifficultyId, DifficultyPreset> {
                 alert_gain: c::STORY_ALERT_GAIN,
                 score_mult: c::STORY_SCORE_MULT,
                 rescue: c::STORY_RESCUE,
+                trace_threshold: c::STORY_TRACE_THRESHOLD,
             },
         ),
         (
@@ -334,6 +338,7 @@ fn difficulty() -> BTreeMap<DifficultyId, DifficultyPreset> {
                 alert_gain: c::STANDARD_ALERT_GAIN,
                 score_mult: c::STANDARD_SCORE_MULT,
                 rescue: c::STANDARD_RESCUE,
+                trace_threshold: c::STANDARD_TRACE_THRESHOLD,
             },
         ),
         (
@@ -353,6 +358,7 @@ fn difficulty() -> BTreeMap<DifficultyId, DifficultyPreset> {
                 alert_gain: c::OPERATOR_ALERT_GAIN,
                 score_mult: c::OPERATOR_SCORE_MULT,
                 rescue: c::OPERATOR_RESCUE,
+                trace_threshold: c::OPERATOR_TRACE_THRESHOLD,
             },
         ),
     ])

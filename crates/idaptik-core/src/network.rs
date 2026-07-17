@@ -6,16 +6,30 @@ use crate::device::{Device, DeviceId};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
-/// Network segmentation zone. Mirrors the topology in the project's
-/// NEXT_STEPS notes: an internet-facing DMZ, a protected internal segment, an
-/// isolated SCADA segment for power, a weak IoT segment, and the outside world.
+//## Network segmentation categories
+
+/// Network segmentation category. The concrete network segments live as data in
+/// the netsim graph; this is the coarse category each segment falls under.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Zone {
+    Lan,
     Dmz,
     Internal,
-    Scada,
     Iot,
-    External,
+    Management,
+    Scada,
+    Isp,
+    Service,
+}
+
+/// How far a segment sits from the target the infiltrator is inside. One network
+/// runs from the wider internet down to the corridor; `Range` places each segment
+/// along that distance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Range {
+    WideArea,
+    Perimeter,
+    LocalLan,
 }
 
 /// An undirected graph of devices and the links between them.

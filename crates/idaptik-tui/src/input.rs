@@ -32,7 +32,12 @@ impl InputState {
                     Command::Jump => self.edges.push(Edge::JumpUp),
                     Command::Interact => self.edges.push(Edge::InteractPress),
                     Command::ThrowUsb => self.edges.push(Edge::Throw),
-                    Command::Uplink { .. } => self.immediates.push(cmd),
+                    // A pivot lands where an uplink lands: before the systems, at
+                    // the pre-increment `t`, since every one of them reads the
+                    // vantage it moves.
+                    Command::Uplink { .. } | Command::Pivot { .. } | Command::Unpivot => {
+                        self.immediates.push(cmd)
+                    }
                     _ => {}
                 },
                 Intent::TogglePause => {

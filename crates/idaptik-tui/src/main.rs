@@ -8,6 +8,7 @@ mod export;
 mod headless;
 mod input;
 mod keymap;
+mod net;
 mod render;
 mod replay;
 mod script;
@@ -17,6 +18,17 @@ use export::ExportKind;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+/// The mode of operation, chosen by subcommand.
+#[derive(Debug, clap::Subcommand)]
+enum Mode {
+    /// Explore the grounded network from a chosen vantage.
+    Net {
+        /// Vantage: inside | van | base.
+        #[arg(long, default_value = "inside")]
+        vantage: String,
+    },
+}
+
 /// Command-line interface.
 #[derive(Debug, Parser)]
 #[command(
@@ -24,6 +36,9 @@ use std::process::ExitCode;
     about = "Interactive TUI + headless/replay/export verifier for the Ghost Lobby scenario"
 )]
 struct Cli {
+    /// Subcommand selecting an alternative mode (defaults to the Ghost Lobby TUI).
+    #[command(subcommand)]
+    mode: Option<Mode>,
     /// Run a script headlessly (needs --script) and print the JSON result.
     #[arg(long)]
     headless: bool,
@@ -49,6 +64,18 @@ struct Cli {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+
+    if let Some(Mode::Net { vantage }) = &cli.mode {
+        let v = match vantage.as_str() {
+            "van" => idaptik_core::netsim::VantageKind::Van,
+            "base" => idaptik_core::netsim::VantageKind::Base,
+            _ => idaptik_core::netsim::VantageKind::Inside,
+        };
+        return match crate::net::run(v) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) => fail(&e.to_string()),
+        };
+    }
 
     if let Some(path) = &cli.replay {
         return match replay::run(path) {

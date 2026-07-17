@@ -56,6 +56,10 @@ pub enum FailReason {
     Caught,
     Partition,
     Lockdown,
+    /// An agent's intrusion trace filled and followed the connection back to
+    /// where it was opened from. Carries no agent: the rule is symmetric, so
+    /// whichever peer is traced ends the run identically.
+    Traced,
 }
 
 /// What tipped the floor from quiet into crisis.
@@ -73,6 +77,7 @@ pub enum Outcome {
     Caught,
     Partition,
     Lockdown,
+    Traced,
 }
 
 /// Final grade band.
@@ -128,6 +133,9 @@ pub enum DenyReason {
     Cooldown,
     Bandwidth,
     VacuumFallen,
+    /// The target fixture is not reachable from where the agent is playing. Cold
+    /// from the van nothing on the floor answers; the hacker must pivot in first.
+    NoRoute,
 }
 
 /// Derived objective status for the ledger.

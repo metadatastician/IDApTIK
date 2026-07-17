@@ -162,6 +162,67 @@ fn no_extraction_room() {
 }
 
 #[test]
+fn too_many_cameras_fails_validation_without_panicking() {
+    use idaptik_core::scenario::definition::CameraDef;
+    use idaptik_core::scenario::floor_graph::MAX_CAMERAS;
+    let mut def = ghost_lobby();
+    // Grow the camera list one past the addressable cap. Duplicated fixtures on
+    // the same watched room are addressing-valid; only the count overflows.
+    let template = def.cameras[0].clone();
+    while def.cameras.len() <= MAX_CAMERAS {
+        let mut cam = CameraDef {
+            id: format!("cam-extra-{}", def.cameras.len()).into(),
+            ..template.clone()
+        };
+        cam.stale = true;
+        def.cameras.push(cam);
+    }
+    let count = def.cameras.len();
+    expect_one(
+        &def,
+        ValidationError::TooManyCameras {
+            count,
+            max: MAX_CAMERAS,
+        },
+    );
+    // And the defence in depth behind the check: even unvalidated, building the
+    // sim must not panic on the overflowing addresses.
+    let report = def.validate();
+    assert!(!report.passed());
+}
+
+#[test]
+fn too_many_doors_in_one_room_fails_validation_without_panicking() {
+    use idaptik_core::scenario::definition::DoorDef;
+    use idaptik_core::scenario::floor_graph::MAX_DOORS_PER_ROOM;
+    let mut def = ghost_lobby();
+    let anchor_x = def.doors[0].x;
+    let mut n = 0usize;
+    while def
+        .doors
+        .iter()
+        .filter(|d| (d.x - anchor_x).abs() < 1e-9)
+        .count()
+        <= MAX_DOORS_PER_ROOM
+    {
+        def.doors.push(DoorDef {
+            id: format!("D-extra-{n}").into(),
+            x: anchor_x,
+            label: "EXTRA".into(),
+        });
+        n += 1;
+    }
+    let errs = def.ok().expect_err("an overflowing room must fail");
+    assert!(
+        errs.iter().any(|e| matches!(
+            e,
+            ValidationError::TooManyDoorsInRoom { max, .. } if *max == MAX_DOORS_PER_ROOM
+        )),
+        "expected TooManyDoorsInRoom, got {errs:?}"
+    );
+}
+
+#[test]
 fn object_spawn_out_of_bounds() {
     let mut def = ghost_lobby();
     def.props.note.x = 99_999.0;

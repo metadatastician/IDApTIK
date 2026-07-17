@@ -234,6 +234,8 @@ A script is a sparse, tick-indexed timeline:
 
 `hold` sets the held-button set (persists until the next line changes it);
 `press` fires edge/uplink commands on that tick (`jump`, `interact`, `throw`,
-`camera`/`door`/`vacuum`/`lights`); `test` injects a Force* hook
+`camera`/`door`/`vacuum`/`lights`, and the network verbs: `pivot`/`bridge`
+for the maintenance bridge, `isp`/`ops` for the ISP operations host, `grid`
+for the grid jump host, `unpivot` to back out one hop); `test` injects a Force* hook
 (`force_crisis`, `force_extract` with `method` `service_exit`|`laundry_chute`,
-`force_fail` with `reason` `caught`|`partition`|`lockdown`).
+`force_fail` with `reason` `caught`|`partition`|`lockdown`|`traced`).

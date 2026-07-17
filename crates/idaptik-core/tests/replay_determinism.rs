@@ -2,7 +2,7 @@
 
 mod common;
 use common::Runner;
-use idaptik_core::scenario::command::{Button, Command};
+use idaptik_core::scenario::command::{Button, Command, PivotTarget};
 use idaptik_core::scenario::event::Event;
 
 /// A moderately busy scripted stream exercising movement, uplinks and crisis.
@@ -13,6 +13,16 @@ fn scripted(r: &mut Runner) {
             button: Button::Right,
             down: true,
         }];
+        // The uplinks below are route-gated, so the stream opens with the pivot,
+        // through the canonical command path so the recorded stream replays
+        // whole; without it the run would still be deterministic, but
+        // deterministically denied, and the landed actions would drop out of the
+        // replay it means to pin.
+        if t == 0 {
+            cmds.push(Command::Pivot {
+                target: PivotTarget::Bridge,
+            });
+        }
         if t == 10 {
             cmds.push(Command::Uplink {
                 kind: idaptik_core::scenario::ActionKind::Camera,

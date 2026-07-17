@@ -73,6 +73,23 @@ impl RunConfig {
     }
 }
 
+/// A foothold the hacker can pivot onto, named rather than addressed.
+///
+/// The hostnames themselves are authored in the floor's backbone, so the wire
+/// carries the *choice* and [`crate::scenario::floor_graph::pivot_host`] resolves
+/// it. That keeps [`Command`] `Copy` (a `String` host would not be) and keeps a
+/// renamed host from breaking every recorded script, exactly as [`ActionKind`]
+/// names the four uplinks rather than the fixtures they land on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PivotTarget {
+    /// The building's maintenance bridge: one hop, and the whole floor answers.
+    Bridge,
+    /// The ISP's operations host: the first hop of the upstream line.
+    IspOps,
+    /// The grid jump host: the second hop, and the only way to the substation.
+    GridJump,
+}
+
 /// A single wire command.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "cmd")]
@@ -87,6 +104,12 @@ pub enum Command {
     ThrowUsb,
     /// Immediate: perform an uplink action.
     Uplink { kind: ActionKind },
+    /// Immediate: pivot the hacker onto a foothold. Cold from the van nothing on
+    /// the floor answers, so this is the price of acting at all.
+    Pivot { target: PivotTarget },
+    /// Immediate: back out of one pivot, handing the link back what the reach
+    /// was costing it.
+    Unpivot,
     /// Immediate test hook: force the crisis phase.
     ForceCrisis,
     /// Immediate test hook: force an extraction.
@@ -123,6 +146,8 @@ pub fn fold(cmds: &[Command], held: &mut Buttons) -> TickInput {
             Command::Interact => edges.push(Edge::InteractPress),
             Command::ThrowUsb => edges.push(Edge::Throw),
             Command::Uplink { .. }
+            | Command::Pivot { .. }
+            | Command::Unpivot
             | Command::ForceCrisis
             | Command::ForceExtract { .. }
             | Command::ForceFail { .. }
@@ -177,5 +202,73 @@ mod tests {
         let next = fold(&[], &mut held);
         assert!(next.buttons.has(Button::Right));
         assert!(next.edges.is_empty());
+    }
+
+    #[test]
+    fn the_pivot_verbs_fold_into_immediates() {
+        // A pivot changes where the hacker plays from, which every later system
+        // reads. It must land before them, exactly as an uplink does, rather than
+        // queue as an edge the systems consume at their leisure.
+        let mut held = Buttons::default();
+        let input = fold(
+            &[
+                Command::Pivot {
+                    target: PivotTarget::IspOps,
+                },
+                Command::Pivot {
+                    target: PivotTarget::GridJump,
+                },
+                Command::Unpivot,
+            ],
+            &mut held,
+        );
+        assert!(input.edges.is_empty());
+        assert_eq!(
+            input.immediates,
+            vec![
+                Command::Pivot {
+                    target: PivotTarget::IspOps
+                },
+                Command::Pivot {
+                    target: PivotTarget::GridJump
+                },
+                Command::Unpivot,
+            ],
+            "the stream order is the pivot order, and it is load-bearing"
+        );
+    }
+
+    #[test]
+    fn the_pivot_verbs_round_trip_on_the_wire() {
+        // `Command` is the protocol the Elixir session layer and the TUI share, so
+        // a new variant that does not survive the wire is not a command at all.
+        for cmd in [
+            Command::Pivot {
+                target: PivotTarget::Bridge,
+            },
+            Command::Pivot {
+                target: PivotTarget::IspOps,
+            },
+            Command::Pivot {
+                target: PivotTarget::GridJump,
+            },
+            Command::Unpivot,
+        ] {
+            let json = serde_json::to_string(&cmd).expect("serialises");
+            let back: Command = serde_json::from_str(&json).expect("deserialises");
+            assert_eq!(back, cmd, "{json}");
+        }
+        // The externally-tagged shape the existing variants carry, pinned.
+        assert_eq!(
+            serde_json::to_string(&Command::Unpivot).expect("serialises"),
+            r#"{"cmd":"Unpivot"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&Command::Pivot {
+                target: PivotTarget::GridJump
+            })
+            .expect("serialises"),
+            r#"{"cmd":"Pivot","target":"GridJump"}"#
+        );
     }
 }

@@ -27,7 +27,7 @@ fn headless_clean_extract_prints_json_and_exits_zero() {
     assert_eq!(v["debrief"]["success"], serde_json::Value::Bool(true));
     assert_eq!(
         v["final_snapshot"]["format"],
-        "idaptik-ghost-lobby-runtime-v1"
+        "idaptik-ghost-lobby-runtime-v2"
     );
 }
 
@@ -69,7 +69,7 @@ fn export_definition_has_format_tag() {
         .success();
     let stdout = String::from_utf8(out.get_output().stdout.clone()).unwrap();
     let v: serde_json::Value = serde_json::from_str(&stdout).unwrap();
-    assert_eq!(v["format"], "idaptik-ghost-lobby-v1");
+    assert_eq!(v["format"], "idaptik-ghost-lobby-v2");
     assert!(v.get("definition").is_some());
     assert!(v.get("validation").is_some());
 }

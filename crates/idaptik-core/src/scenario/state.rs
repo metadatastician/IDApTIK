@@ -6,18 +6,21 @@
 //! beyond [`RuntimeState::initial`], which builds the quiet-phase start from a
 //! reset roll.
 
+use crate::scenario::agents::Agents;
 use crate::scenario::command::RunConfig;
 use crate::scenario::common::{
     BillyMode, ChuteMethod, ExtractMethod, ObjectKind, ObjectiveStatus, Phase, ReportedTarget,
 };
 use crate::scenario::constants as c;
 use crate::scenario::definition::ScenarioDefinition;
+use crate::scenario::floor_graph::floor_graph;
 use crate::scenario::ids::DoorId;
 use crate::scenario::outcome::Debrief;
 use crate::scenario::rng::InitRoll;
+use crate::scenario::sim::GhostLobbySim;
 use crate::scenario::tuning::{ActionKind, DifficultyPreset};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The infiltrator's physical and interaction state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -214,6 +217,14 @@ pub struct RuntimeState {
     pub actions: BTreeMap<ActionKind, ActionState>,
     pub throttles: Throttles,
     pub stats: Stats,
+    /// The two players' network sessions.
+    pub agents: Agents,
+    /// Per camera, in definition order: seconds of looped footage remaining.
+    pub camera_looped: Vec<f64>,
+    /// The nodes currently without power. A `BTreeSet`, not a `HashSet`: the
+    /// simulation iterates it, so its order must be deterministic or the event
+    /// log stops being reproducible.
+    pub dead_nodes: BTreeSet<String>,
     /// The last emitted objective ledger — a change emits `ObjectivesUpdated`.
     pub objective_ledger: (ObjectiveStatus, ObjectiveStatus, ObjectiveStatus),
     pub ended: bool,
@@ -226,7 +237,7 @@ impl RuntimeState {
         def: &ScenarioDefinition,
         roll: &InitRoll,
         _cfg: RunConfig,
-        _preset: &DifficultyPreset,
+        preset: &DifficultyPreset,
     ) -> Self {
         let doors = def
             .doors
@@ -250,6 +261,15 @@ impl RuntimeState {
                 (*k, ActionState { cd: 0.0, max })
             })
             .collect();
+
+        // The infiltrator's vantage is the room they spawn in, judged exactly as
+        // the simulation judges it. `player.x` below is `def.player.spawn_x`, so
+        // the lookup reads the same value the field is about to take. A
+        // definition with no rooms yields no room id, and `Agents::initial` then
+        // seats the infiltrator in the van rather than panicking.
+        let graph = floor_graph(def);
+        let start_room = GhostLobbySim::room_id_at(def, def.player.spawn_x).unwrap_or_default();
+        let agents = Agents::initial(&graph, start_room, preset.trace_threshold);
 
         RuntimeState {
             phase: Phase::Quiet,
@@ -352,6 +372,9 @@ impl RuntimeState {
             actions,
             throttles: Throttles::default(),
             stats: Stats::default(),
+            agents,
+            camera_looped: vec![0.0; def.cameras.len()],
+            dead_nodes: BTreeSet::new(),
             objective_ledger: (
                 ObjectiveStatus::Open,
                 ObjectiveStatus::Open,

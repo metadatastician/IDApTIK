@@ -11,6 +11,7 @@ use crate::scenario::common::{
 };
 use crate::scenario::constants as c;
 use crate::scenario::event::Event;
+use crate::scenario::floor_graph::camera_node_id;
 use crate::scenario::ids::RoomId;
 use crate::scenario::mathf::{TICK_DT, approach, clamp, dist, powf, sin};
 
@@ -23,6 +24,10 @@ impl GhostLobbySim {
         s.lights_flicker = (s.lights_flicker - dt).max(0.0);
         s.camera_lockout = (s.camera_lockout - dt).max(0.0);
         s.player.caught_grace = (s.player.caught_grace - dt).max(0.0);
+        // Looped footage runs out camera by camera, in definition order.
+        for loop_left in &mut s.camera_looped {
+            *loop_left = (*loop_left - dt).max(0.0);
+        }
         for a in s.actions.values_mut() {
             a.cd = (a.cd - dt).max(0.0);
         }
@@ -483,8 +488,16 @@ impl GhostLobbySim {
         let crouch = self.state.player.crouching;
         let vx = self.state.player.vx;
         let cur = room_id.as_ref();
-        let seen = self.def.cameras.iter().any(|cam| {
+        let looped = &self.state.camera_looped;
+        let dead = &self.state.dead_nodes;
+        let seen = self.def.cameras.iter().enumerate().any(|(i, cam)| {
             if cur != Some(&cam.room) || cam.stale {
+                return false;
+            }
+            // A looped camera is showing the operator yesterday's corridor, and an
+            // unpowered one is showing nothing at all. Neither can flag anybody, so
+            // the hack the hacker paid for is worth exactly what it promised.
+            if looped.get(i).is_some_and(|left| *left > 0.0) || dead.contains(&camera_node_id(i)) {
                 return false;
             }
             let sweep = sin(t * c::CAM_SWEEP_W + cam.phase) * c::CAM_SWEEP_A;
@@ -551,6 +564,11 @@ impl GhostLobbySim {
         if self.state.lights_flicker > 0.0 {
             target += c::SUPPORT_FLICKER;
         }
+        // The room base is the infiltrator's own vantage; this is the hacker's.
+        // Every pivot they stand on is another leg the link must carry, so depth
+        // costs whatever the room grants. It is charged inside the clamp, so the
+        // envelope still cannot leave [SUPPORT_CLAMP_MIN, 1].
+        target -= f64::from(self.state.agents.hacker.hops()) * c::SUPPORT_HOP_PEN;
         target = clamp(target, c::SUPPORT_CLAMP_MIN, 1.0);
         self.state.support = approach(self.state.support, target, c::SUPPORT_APPROACH * dt);
 

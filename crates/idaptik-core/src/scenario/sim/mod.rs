@@ -11,13 +11,20 @@
 
 mod systems;
 
-use crate::scenario::command::{RunConfig, TickInput};
+use crate::netsim::graph::GroundedGraph;
+use crate::scenario::agents::apply_effects;
+use crate::scenario::command::{PivotTarget, RunConfig, TickInput};
 use crate::scenario::common::{
-    BillyMode, CrisisReason, ExtractMethod, FailReason, Outcome, Phase, ReportedTarget, Tone,
+    BillyMode, CrisisReason, DenyReason, ExtractMethod, FailReason, Outcome, Phase, ReportedTarget,
+    Tone,
 };
 use crate::scenario::constants as c;
 use crate::scenario::definition::{RoomDef, ScenarioDefinition, ValidationError};
 use crate::scenario::event::Event;
+use crate::scenario::floor_graph::{
+    VACUUM_NODE_ID, camera_node_id, door_node_id, floor_graph, inside_vantage, light_node_id,
+    pivot_host,
+};
 use crate::scenario::ids::IdIndex;
 use crate::scenario::mathf::{TICK_DT, clamp, js_round, sign_or};
 use crate::scenario::outcome::{
@@ -40,6 +47,10 @@ pub struct GhostLobbySim {
     idx: IdIndex,
     /// The active difficulty preset (resolved once; rebuilt on reset/restore).
     preset: DifficultyPreset,
+    /// The floor's grounded network, derived from the definition once. It is a
+    /// pure function of `def`, so a reset cannot stale it and a snapshot need not
+    /// carry it; `restore` rebuilds it from the definition it is handed.
+    graph: GroundedGraph,
     paused: bool,
     events: Vec<Event>,
 }
@@ -63,6 +74,11 @@ fn fallback_preset() -> DifficultyPreset {
         alert_gain: 1.0,
         score_mult: 1.0,
         rescue: false,
+        // Every other field here is a benign zero, but a zero trace threshold is
+        // not benign: `traced()` is `progress >= threshold`, so it would trip on
+        // the first tick and end the run instantly. A last-resort preset must
+        // fail safe, so it borrows the standard threshold.
+        trace_threshold: c::STANDARD_TRACE_THRESHOLD,
     }
 }
 
@@ -86,6 +102,7 @@ impl GhostLobbySim {
         let mut rng = Mulberry32::new(seed);
         let roll = roll_init(&def, &mut rng, cfg.difficulty);
         let state = RuntimeState::initial(&def, &roll, cfg, &preset);
+        let graph = floor_graph(&def);
         let mut sim = Self {
             def,
             cfg,
@@ -95,6 +112,7 @@ impl GhostLobbySim {
             state,
             idx,
             preset,
+            graph,
             paused: false,
             events: Vec::new(),
         };
@@ -102,11 +120,18 @@ impl GhostLobbySim {
         Ok(sim)
     }
 
-    /// Rebuild an equivalent sim from a snapshot and its definition.
+    /// Rebuild an equivalent sim from a snapshot and its definition. A snapshot
+    /// tagged with any other format is refused up front, as a typed error,
+    /// rather than left to fail later (or worse, restore wrongly) on shape.
     pub fn restore(
         def: ScenarioDefinition,
         snap: RuntimeSnapshot,
     ) -> Result<Self, Vec<ValidationError>> {
+        if snap.format != SNAPSHOT_FORMAT {
+            return Err(vec![ValidationError::UnsupportedSnapshotFormat {
+                found: snap.format,
+            }]);
+        }
         def.ok()?;
         let preset = def
             .difficulty
@@ -114,6 +139,7 @@ impl GhostLobbySim {
             .cloned()
             .unwrap_or_else(fallback_preset);
         let idx = IdIndex::resolve(&def);
+        let graph = floor_graph(&def);
         Ok(Self {
             def,
             cfg: snap.cfg,
@@ -123,6 +149,7 @@ impl GhostLobbySim {
             state: snap.state,
             idx,
             preset,
+            graph,
             paused: snap.paused,
             events: Vec::new(),
         })
@@ -158,6 +185,11 @@ impl GhostLobbySim {
     /// Borrow the definition.
     pub fn definition(&self) -> &ScenarioDefinition {
         &self.def
+    }
+
+    /// Borrow the floor's grounded network.
+    pub fn graph(&self) -> &GroundedGraph {
+        &self.graph
     }
 
     /// The resolved id index.
@@ -283,6 +315,12 @@ impl GhostLobbySim {
                     crate::scenario::command::Command::Uplink { kind } => {
                         self.perform_action(*kind);
                     }
+                    crate::scenario::command::Command::Pivot { target } => {
+                        self.pivot(*target);
+                    }
+                    crate::scenario::command::Command::Unpivot => {
+                        self.unpivot();
+                    }
                     crate::scenario::command::Command::ForceCrisis => {
                         self.begin_crisis(CrisisReason::Test);
                     }
@@ -312,6 +350,23 @@ impl GhostLobbySim {
 
         self.system_timers();
         self.system_player(input);
+
+        //## The network vantage follows the body
+        // The infiltrator plays from wherever they physically stand, so the vantage
+        // is recomputed the moment the body has moved and before anything reads it.
+        // `set_vantage` drops the pivot stack, which is the whole point: a foothold
+        // cannot be carried down the corridor. It is therefore called only when the
+        // room they now stand in offers a different vantage from the one they hold;
+        // calling it every tick would wipe a pivot they had only just made. A room
+        // the graph gives no vantage leaves them where they were rather than
+        // unseating them, since the fuzz test drives this with any definition.
+        if let Some(room) = Self::room_id_at(&self.def, self.state.player.x)
+            && let Some(vantage) = inside_vantage(&self.graph, room)
+            && vantage.entry_ip != self.state.agents.infiltrator.vantage().entry_ip
+        {
+            self.state.agents.infiltrator.set_vantage(vantage);
+        }
+
         self.system_interactions(input);
         if self.state.ended {
             return;
@@ -340,6 +395,20 @@ impl GhostLobbySim {
         }
         if self.state.alert >= c::LOCKDOWN && !self.state.ended {
             self.fail_mission(FailReason::Lockdown);
+        }
+
+        //## The trace is each agent's own clock
+        // Checked here in POST beside Lockdown, so a hack that trips the trace still
+        // lands its effects this tick before the run ends.
+        //
+        // Both peers are checked, and deliberately so. Typical play has only the
+        // hacker reaching in from the van, but the two are symmetric: an infiltrator
+        // working off their own segment traces exactly as the hacker does, and
+        // whoever is traced, the run ends.
+        if (self.state.agents.hacker.traced() || self.state.agents.infiltrator.traced())
+            && !self.state.ended
+        {
+            self.fail_mission(FailReason::Traced);
         }
     }
 
@@ -476,7 +545,92 @@ impl GhostLobbySim {
         self.events.push(Event::CrisisBegan { reason });
     }
 
+    /// Which node an action targets, given who is acting and where they stand.
+    /// `None` names no fixture the floor carries, which is a content gap rather
+    /// than a play state; the caller shrugs rather than denying or panicking.
+    fn action_target(&self, kind: ActionKind) -> Option<String> {
+        match kind {
+            ActionKind::Camera => {
+                // The camera watching the room the agent stands in, or failing
+                // that whichever the definition lists first.
+                let here = Self::room_id_at(&self.def, self.state.player.x);
+                let index = here
+                    .and_then(|room| {
+                        self.def
+                            .cameras
+                            .iter()
+                            .position(|c| c.room.as_str() == room)
+                    })
+                    .or_else(|| (!self.def.cameras.is_empty()).then_some(0))?;
+                Some(camera_node_id(index))
+            }
+            ActionKind::Door => {
+                let centre = self.state.player.x + self.def.player.w / 2.0;
+                let door = self
+                    .state
+                    .doors
+                    .get(Self::nearest_door(&self.state.doors, centre)?)?;
+                Some(door_node_id(door.id.clone()))
+            }
+            ActionKind::Vacuum => Some(VACUUM_NODE_ID.to_owned()),
+            ActionKind::Lights => Some(light_node_id(Self::room_id_at(
+                &self.def,
+                self.state.player.x,
+            )?)),
+        }
+    }
+
+    /// Pivot the hacker onto a named foothold (immediate; self-guards on
+    /// paused/ended).
+    ///
+    /// This is the verb the four uplinks were always waiting on: cold from the van
+    /// every action answers `NoRoute`, so without a way to say this the hacker
+    /// cannot act at all. A refusal is reported rather than swallowed, because
+    /// which refusal it was is how the player learns the shape of the network:
+    /// the grid jump host answers `NoRoute` until they have gone through the ISP.
+    ///
+    /// It costs no bandwidth and no cooldown. The price of reach is paid in the
+    /// two currencies the model already has: the trace `ssh` advances, and the
+    /// support the hop penalty frays for as long as they stand there.
+    pub(crate) fn pivot(&mut self, target: PivotTarget) {
+        if self.paused || self.state.ended {
+            return;
+        }
+        let host = pivot_host(target);
+        match self.state.agents.hacker.ssh(&self.graph, host) {
+            Ok(_) => {
+                let hops = self.state.agents.hacker.hops();
+                self.events.push(Event::PivotOpened {
+                    host: host.to_owned(),
+                    hops,
+                });
+            }
+            Err(reason) => self.events.push(Event::PivotDenied {
+                host: host.to_owned(),
+                reason,
+            }),
+        }
+    }
+
+    /// Back the hacker out of one pivot (immediate; self-guards on paused/ended).
+    /// Standing at the vantage there is nothing to pop, and nothing to report.
+    pub(crate) fn unpivot(&mut self) {
+        if self.paused || self.state.ended {
+            return;
+        }
+        if self.state.agents.hacker.exit() {
+            let hops = self.state.agents.hacker.hops();
+            self.events.push(Event::PivotClosed { hops });
+        }
+    }
+
     /// Perform an uplink action (immediate; self-guards on paused/ended).
+    ///
+    /// An action is no longer a direct mutation of the floor: it resolves to a
+    /// node and is a hack against it, which only lands if the hacker can actually
+    /// reach that node from where they are playing. Cold from the van nothing on
+    /// the floor answers, so the pivot into the building is the price of acting at
+    /// all.
     pub(crate) fn perform_action(&mut self, kind: ActionKind) {
         if self.paused || self.state.ended {
             return;
@@ -518,78 +672,67 @@ impl GhostLobbySim {
             return;
         }
 
+        // The route is consulted last: after both gates, so their throttling is
+        // untouched, and before any charge, so a route never had costs nothing.
+        // A fixture the floor does not carry is a content gap, not a denial.
+        let Some(target) = self.action_target(kind) else {
+            return;
+        };
+        let effects = match self.state.agents.hacker.hack(&self.graph, &target) {
+            Ok(effects) => effects,
+            // `NoRoute` is the play state the hacker must answer by pivoting in.
+            // Every other error means the graph carries no such node, which is a
+            // content bug; it denies identically rather than panicking.
+            Err(_) => {
+                self.state.stats.failed_actions += 1;
+                if let Some(slot) = self.state.throttles.cd.get_mut(i)
+                    && t - *slot >= c::THROTTLE_CDBW
+                {
+                    *slot = t;
+                    self.events.push(Event::UplinkDenied {
+                        kind,
+                        reason: DenyReason::NoRoute,
+                    });
+                }
+                return;
+            }
+        };
+
         self.state.bandwidth -= spec.cost;
         if let Some(a) = self.state.actions.get_mut(&kind) {
             a.cd = spec.cooldown;
         }
         self.state.stats.hacker_actions += 1;
-        let ag = self.preset.alert_gain;
         self.events.push(Event::UplinkAction { kind });
 
-        match kind {
-            ActionKind::Camera => {
-                self.state.camera_ping = c::PING_DUR;
-                self.state.alert = clamp(self.state.alert + spec.alert_gain * ag, 0.0, 100.0);
-                let laundry = Self::room_id_at(&self.def, self.state.player.x) == Some("laundry");
-                self.events.push(Event::CameraPinged {
-                    laundry_view: laundry,
-                });
-            }
-            ActionKind::Door => {
-                let center = self.state.player.x + self.def.player.w / 2.0;
-                if let Some(di) = Self::nearest_door(&self.state.doors, center)
-                    && let Some(d) = self.state.doors.get_mut(di)
-                {
-                    d.pending = d.route_delay;
-                    d.badge_logged = false;
-                    let (door_id, delay) = (d.id.clone(), d.route_delay);
-                    self.state.stats.doors_held += 1;
-                    self.state.alert = clamp(self.state.alert + spec.alert_gain * ag, 0.0, 100.0);
-                    self.events.push(Event::DoorRouted {
-                        door: door_id,
-                        delay,
-                    });
-                }
-            }
-            ActionKind::Vacuum => {
-                if self.state.vacuum.fallen {
-                    self.state.stats.failed_actions += 1;
-                    self.events.push(Event::UplinkDenied {
-                        kind,
-                        reason: crate::scenario::common::DenyReason::VacuumFallen,
-                    });
-                    return;
-                }
-                self.state.vacuum.active = true;
-                self.state.vacuum.target = c::VAC_TARGET;
-                self.state.stats.vacuum_used = true;
-                self.state.alert = clamp(self.state.alert + spec.alert_gain * ag, 0.0, 100.0);
-                self.events.push(Event::VacuumRouted);
-            }
-            ActionKind::Lights => {
-                self.state.lights_flicker = if self.cfg.reduced_motion {
-                    c::LIGHTS_DUR_RM
-                } else {
-                    c::LIGHTS_DUR
-                };
-                self.state.lights_uses += 1;
-                self.state.stats.light_flickers += 1;
-                self.state.billy.stun = self.state.billy.stun.max(c::LIGHTS_STUN);
-                let extra = if self.state.lights_uses >= 3 {
-                    6.0 + f64::from(self.state.lights_uses) * 1.5
-                } else {
-                    0.0
-                };
-                self.state.alert = clamp(
-                    self.state.alert + (spec.alert_gain + extra) * ag,
-                    0.0,
-                    100.0,
-                );
-                self.events.push(Event::LightsFlickered {
-                    third_use: self.state.lights_uses == 3,
-                });
-            }
+        let events = apply_effects(&self.def, &mut self.state, self.cfg, &effects);
+        self.events.extend(events);
+
+        // The vacuum's own fall is not a gate: the command above was paid for
+        // in full. This is feedback on the attempt's effect, not a denial of
+        // the attempt itself, so it is unthrottled, exactly as the original
+        // short-circuiting denial was.
+        if kind == ActionKind::Vacuum && self.state.vacuum.fallen {
+            self.events.push(Event::UplinkDenied {
+                kind,
+                reason: DenyReason::VacuumFallen,
+            });
         }
+
+        // The escalating Lights extra reads `lights_uses` after the effect has
+        // counted this use, exactly as the direct mutation it replaces did: the
+        // old arm incremented the counter and only then sized the extra from it.
+        let extra = if kind == ActionKind::Lights && self.state.lights_uses >= 3 {
+            6.0 + f64::from(self.state.lights_uses) * 1.5
+        } else {
+            0.0
+        };
+        let ag = self.preset.alert_gain;
+        self.state.alert = clamp(
+            self.state.alert + (spec.alert_gain + extra) * ag,
+            0.0,
+            100.0,
+        );
     }
 
     /// Move Billy toward a target x at `speed`, handling door-blocking and the
@@ -886,6 +1029,11 @@ impl GhostLobbySim {
                 "Building-wide lockdown",
                 Tag::new("Infrastructure fully awake", Tone::Bad),
             ),
+            FailReason::Traced => (
+                Outcome::Traced,
+                "Traced to the source",
+                Tag::new("The trace ran to completion", Tone::Bad),
+            ),
         };
         let mut tags = vec![first_tag];
         if has_note {
@@ -929,6 +1077,7 @@ impl GhostLobbySim {
             FailReason::Caught => "Billy catches the field agent outside a viable support response. Solo brilliance was not enough.".to_owned(),
             FailReason::Partition => "A security partition slams down. You are trapped. This is a team-support failure, not a solo death.".to_owned(),
             FailReason::Lockdown => "The building reaches a complete administrative opinion. Every partition closes at once.".to_owned(),
+            FailReason::Traced => "The trace fills and the connection is followed back to the place it was opened from. Nobody had to be caught on the floor; an address was enough.".to_owned(),
         }
     }
 
@@ -943,5 +1092,129 @@ impl GhostLobbySim {
             reason: None,
         });
         self.events.push(Event::RunEnded { outcome });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::scenario::ghost_lobby::ghost_lobby;
+
+    /// A standard run with the hacker already pivoted onto the floor, so that an
+    /// uplink resolves rather than being denied on route. The pivot goes through
+    /// the canonical immediate — the same guard and events a played
+    /// `Command::Pivot` takes — so these fixtures never diverge from a replay.
+    fn pivoted() -> GhostLobbySim {
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        sim.pivot(PivotTarget::Bridge);
+        assert!(
+            sim.drain_events()
+                .iter()
+                .any(|e| matches!(e, Event::PivotOpened { .. })),
+            "the van can reach the maintenance bridge"
+        );
+        sim
+    }
+
+    #[test]
+    fn the_lights_escalation_sizes_itself_on_the_use_it_is_charging_for() {
+        // The escalation reads `lights_uses` AFTER the effect counts this use, as
+        // the direct mutation this replaces did: it incremented, then sized the
+        // extra from the incremented count. Third use => extra = 6.0 + 3 * 1.5.
+        // Reading the pre-increment count would size it 6.0 + 2 * 1.5 instead, so
+        // this pins the ordering, not merely the presence, of the escalation.
+        let mut sim = pivoted();
+        sim.state.lights_uses = 2;
+        sim.state.alert = 0.0;
+        let ag = sim.preset.alert_gain;
+        let gain = sim
+            .def
+            .actions
+            .get(&ActionKind::Lights)
+            .expect("the definition tunes the lights")
+            .alert_gain;
+
+        // Called directly, so no system runs to decay the alert underneath us.
+        sim.perform_action(ActionKind::Lights);
+
+        assert_eq!(sim.state.lights_uses, 3, "the use is counted");
+        assert_eq!(sim.state.alert, (gain + 6.0 + 3.0 * 1.5) * ag);
+    }
+
+    #[test]
+    fn a_route_denial_spends_neither_bandwidth_nor_cooldown() {
+        // Cold from the van: the same action, without the pivot.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let bandwidth = sim.state.bandwidth;
+        sim.perform_action(ActionKind::Lights);
+
+        assert_eq!(sim.state.bandwidth, bandwidth, "no route, no charge");
+        assert_eq!(
+            sim.state.actions.get(&ActionKind::Lights).map(|a| a.cd),
+            Some(0.0),
+            "no route, no cooldown"
+        );
+        assert_eq!(sim.state.stats.hacker_actions, 0);
+        assert_eq!(sim.state.stats.failed_actions, 1);
+        assert_eq!(sim.state.alert, 0.0, "a wall raises no alert");
+    }
+
+    #[test]
+    fn each_action_resolves_to_a_node_the_floor_actually_carries() {
+        // `action_target` naming a node the graph lacks would deny every action of
+        // that kind for ever, silently. Every kind must resolve against the graph.
+        let sim = pivoted();
+        for kind in [
+            ActionKind::Camera,
+            ActionKind::Door,
+            ActionKind::Vacuum,
+            ActionKind::Lights,
+        ] {
+            let target = sim
+                .action_target(kind)
+                .unwrap_or_else(|| panic!("{kind:?} resolves to a target"));
+            assert!(
+                sim.graph.node(&target).is_some(),
+                "{kind:?} resolved to {target}, which the floor graph does not carry"
+            );
+        }
+    }
+
+    #[test]
+    fn driving_a_fallen_vacuum_still_charges_but_denies_the_effect() {
+        // The retune moved the fallen check into `apply_effects`, so the player
+        // pays for the attempt in full; only its effect on the world is refused.
+        let mut sim = pivoted();
+        sim.state.vacuum.fallen = true;
+        let bandwidth = sim.state.bandwidth;
+
+        sim.perform_action(ActionKind::Vacuum);
+
+        assert!(
+            sim.state.bandwidth < bandwidth,
+            "the command is paid for even though the vacuum cannot move"
+        );
+        assert_eq!(
+            sim.state.stats.hacker_actions, 1,
+            "the attempt lands and is counted"
+        );
+        assert_eq!(
+            sim.state.stats.failed_actions, 0,
+            "the world refusing the effect is not a failed action"
+        );
+        assert!(
+            sim.events.iter().any(|e| matches!(
+                e,
+                Event::UplinkDenied {
+                    kind: ActionKind::Vacuum,
+                    reason: DenyReason::VacuumFallen,
+                }
+            )),
+            "the player learns the robot did not move"
+        );
     }
 }

@@ -2,7 +2,8 @@
 
 mod common;
 use common::Runner;
-use idaptik_core::scenario::command::{Button, Command, TickInput, fold};
+use idaptik_core::scenario::command::{Button, Command, PivotTarget, TickInput, fold};
+use idaptik_core::scenario::definition::ValidationError;
 use idaptik_core::scenario::event::Event;
 use idaptik_core::scenario::{GhostLobbySim, ghost_lobby};
 
@@ -11,12 +12,26 @@ fn step_stream(t: u64) -> Vec<Command> {
         button: Button::Right,
         down: true,
     }];
+    // The uplinks below are route-gated, so the stream opens with the pivot —
+    // through the canonical command path, so a recorded stream replays whole.
+    if t == 0 {
+        cmds.push(Command::Pivot {
+            target: PivotTarget::Bridge,
+        });
+    }
     if t == 30 {
         cmds.push(Command::ForceCrisis);
     }
     if t == 80 {
         cmds.push(Command::Uplink {
             kind: idaptik_core::scenario::ActionKind::Camera,
+        });
+    }
+    // An uplink on the far side of the snapshot: the hacker's pivot lives in the
+    // runtime state, so this only lands if the session survived the round trip.
+    if t == 200 {
+        cmds.push(Command::Uplink {
+            kind: idaptik_core::scenario::ActionKind::Lights,
         });
     }
     cmds
@@ -82,6 +97,25 @@ fn paused_snapshot_restores_paused() {
     let ev = restored.tick(&input);
     assert!(ev.is_empty(), "paused restore ignores the command stream");
     assert_eq!(restored.current_tick(), before_tick);
+}
+
+#[test]
+fn restore_refuses_a_foreign_snapshot_format() {
+    // A snapshot from another format family (say, a v1 file on disk) must be
+    // refused up front with a typed error, not left to fail obscurely on shape.
+    let mut r = Runner::standard();
+    for t in 0..10u64 {
+        r.step(&step_stream(t));
+    }
+    let mut snap = r.sim.snapshot();
+    snap.format = "idaptik-ghost-lobby-runtime-v1".to_owned();
+    let errs = GhostLobbySim::restore(ghost_lobby(), snap).expect_err("v1 must be refused");
+    assert_eq!(
+        errs,
+        vec![ValidationError::UnsupportedSnapshotFormat {
+            found: "idaptik-ghost-lobby-runtime-v1".to_owned()
+        }]
+    );
 }
 
 #[test]

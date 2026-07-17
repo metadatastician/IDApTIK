@@ -14,12 +14,13 @@
 #![forbid(unsafe_code)]
 
 pub mod device;
+pub mod netsim;
 pub mod network;
 pub mod scenario;
 pub mod trace;
 
 pub use device::{Device, DeviceId, DeviceKind, SecurityLevel};
-pub use network::{Network, Zone};
+pub use network::{Network, Range, Zone};
 pub use scenario::{
     Buttons, Command, Debrief, DifficultyId, Event, GHOST_LOBBY_JSON, GhostLobbySim, LogLine,
     Mulberry32, RunConfig, RuntimeSnapshot, ScenarioDefinition, ScenarioExport, TickInput,

@@ -6,7 +6,7 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use idaptik_core::scenario::ActionKind;
-use idaptik_core::scenario::command::{Button, Command};
+use idaptik_core::scenario::command::{Button, Command, PivotTarget};
 
 /// A decoded high-level input intent.
 #[derive(Debug, Clone, PartialEq)]
@@ -75,7 +75,20 @@ pub fn map_key(ev: KeyEvent) -> Vec<Intent> {
         KeyCode::Char('2') => uplink(is_press, ActionKind::Door),
         KeyCode::Char('3') => uplink(is_press, ActionKind::Vacuum),
         KeyCode::Char('4') => uplink(is_press, ActionKind::Lights),
-        KeyCode::Char('p') | KeyCode::Char('P') if is_press => vec![Intent::TogglePause],
+        // The pivots. Case is significant here and nowhere else on this keyboard:
+        // `p` and `P` are the floor's two lines, and they are the one pair of verbs
+        // a player must not confuse, so they sit on the same finger. `g` is the
+        // upstream line's second hop, without which the substation is unreachable
+        // and the power-line strategy is unplayable.
+        KeyCode::Char('p') => pivot(is_press, PivotTarget::Bridge),
+        KeyCode::Char('P') => pivot(is_press, PivotTarget::IspOps),
+        KeyCode::Char('g') | KeyCode::Char('G') => pivot(is_press, PivotTarget::GridJump),
+        KeyCode::Char('x') | KeyCode::Char('X') if is_press => {
+            vec![Intent::Edge(Command::Unpivot)]
+        }
+        // Pause moved off `p` to make room for the pivots; `p` is the verb a
+        // player reaches for a hundred times a run, pause perhaps twice.
+        KeyCode::Tab if is_press => vec![Intent::TogglePause],
         KeyCode::Char('r') | KeyCode::Char('R') if is_press => vec![Intent::Restart],
         KeyCode::Char('h') | KeyCode::Char('H') if is_press => vec![Intent::Hint],
         KeyCode::Esc if is_press => vec![Intent::Quit],
@@ -92,5 +105,60 @@ fn uplink(is_press: bool, kind: ActionKind) -> Vec<Intent> {
         vec![Intent::Edge(Command::Uplink { kind })]
     } else {
         vec![Intent::Ignore]
+    }
+}
+
+fn pivot(is_press: bool, target: PivotTarget) -> Vec<Intent> {
+    if is_press {
+        vec![Intent::Edge(Command::Pivot { target })]
+    } else {
+        vec![Intent::Ignore]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn press(code: KeyCode) -> Vec<Intent> {
+        map_key(KeyEvent::new(code, KeyModifiers::NONE))
+    }
+
+    #[test]
+    fn the_pivot_keys_map_to_the_footholds_they_name() {
+        // Both lines, and both depths of the upstream one. Binding `P` without `g`
+        // would ship the substation strategy unreachable, so all three are pinned.
+        assert_eq!(
+            press(KeyCode::Char('p')),
+            vec![Intent::Edge(Command::Pivot {
+                target: PivotTarget::Bridge
+            })]
+        );
+        assert_eq!(
+            map_key(KeyEvent::new(KeyCode::Char('P'), KeyModifiers::SHIFT)),
+            vec![Intent::Edge(Command::Pivot {
+                target: PivotTarget::IspOps
+            })],
+            "shifted P must reach the ISP, not fall through to the sprint arm"
+        );
+        assert_eq!(
+            press(KeyCode::Char('g')),
+            vec![Intent::Edge(Command::Pivot {
+                target: PivotTarget::GridJump
+            })]
+        );
+        assert_eq!(
+            press(KeyCode::Char('x')),
+            vec![Intent::Edge(Command::Unpivot)]
+        );
+    }
+
+    #[test]
+    fn pause_answers_to_tab_now_that_p_pivots() {
+        assert_eq!(press(KeyCode::Tab), vec![Intent::TogglePause]);
+        assert!(
+            !press(KeyCode::Char('p')).contains(&Intent::TogglePause),
+            "p must no longer pause, or the pivot is unreachable"
+        );
     }
 }

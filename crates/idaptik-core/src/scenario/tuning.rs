@@ -99,6 +99,7 @@ pub struct DifficultyPreset {
     pub alert_gain: f64,
     pub score_mult: f64,
     pub rescue: bool,
+    pub trace_threshold: u32,
 }
 
 // --- Tuning sub-tables --------------------------------------------------------
@@ -223,6 +224,7 @@ pub struct SupportTuning {
     pub alert_pen: f64,
     pub hidden: f64,
     pub flicker: f64,
+    pub hop_pen: f64,
     pub clamp_min: f64,
     pub approach: f64,
     pub iso_gate: f64,
