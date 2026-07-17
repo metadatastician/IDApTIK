@@ -1,0 +1,118 @@
+{
+  "format": "idaptik-actors/1",
+  "archetypes": {
+    "billy": {
+      "id": "billy",
+      "name": "Billy",
+      "stats": {
+        "enter_speed": 0.72,
+        "assess_speed": 0.55,
+        "invest_speed": 0.82,
+        "secure_speed": 0.92,
+        "guard_speed": 0.45,
+        "pursue_speed": 1.2,
+        "shock_t": 1.15,
+        "call_t": 1.9,
+        "patrol_lo": 130.0,
+        "patrol_hi": 355.0,
+        "patrol_pivot": 220.0,
+        "grab_dist": 31.0,
+        "pursue_trigger": 115.0,
+        "pursue_giveup_ago": 3.2,
+        "pursue_giveup_dist": 20.0,
+        "accel": 520.0,
+        "sight_back": 0.34,
+        "sight_crouch": 0.62,
+        "sight_alert": 1.12,
+        "sight_alert_hi": 65.0,
+        "alert_boost_div": 260.0,
+        "lights_boost_k": 0.035,
+        "distract_dist": 245.0,
+        "invest_noise": 0.45,
+        "invest_dist": 260.0,
+        "belief_threshold": 48.0,
+        "pi_seen": 4.0,
+        "pi_sprint": 12.0,
+        "pi_decay": 0.9
+      },
+      "interests": {
+        "note": {
+          "kind": "Objective",
+          "value_signal": 0.9,
+          "near": 105.0,
+          "urg_still": 4.0,
+          "urg_move": 10.0,
+          "urg_sprint": 20.0,
+          "carry": 13.0,
+          "decay": 0.25,
+          "guard_t": 1.9
+        },
+        "usb": {
+          "kind": "Decoy",
+          "value_signal": 0.75,
+          "near": 112.0,
+          "urg_still": 3.0,
+          "urg_move": 8.0,
+          "urg_sprint": 17.0,
+          "carry": 12.0,
+          "decay": 0.2,
+          "guard_t": 1.7
+        }
+      }
+    }
+  },
+  "modifiers": {
+    "skittish": {
+      "id": "skittish",
+      "name": "Skittish",
+      "ops": [
+        {
+          "stat": "AssessSpeed",
+          "op": "Mul",
+          "value": 1.2
+        },
+        {
+          "stat": "BeliefThreshold",
+          "op": "Mul",
+          "value": 0.5
+        },
+        {
+          "stat": "PiDecay",
+          "op": "Add",
+          "value": 0.45
+        },
+        {
+          "stat": "PursueGiveupDist",
+          "op": "Mul",
+          "value": 1.5
+        }
+      ]
+    },
+    "veteran": {
+      "id": "veteran",
+      "name": "Veteran",
+      "ops": [
+        {
+          "stat": "PursueSpeed",
+          "op": "Mul",
+          "value": 1.15
+        },
+        {
+          "stat": "BeliefThreshold",
+          "op": "Add",
+          "value": -6.0
+        },
+        {
+          "stat": "SightCrouch",
+          "op": "Mul",
+          "value": 1.15
+        },
+        {
+          "stat": "PursueGiveupAgo",
+          "op": "Add",
+          "value": 1.4
+        }
+      ]
+    }
+  }
+}

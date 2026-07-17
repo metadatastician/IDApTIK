@@ -12,6 +12,7 @@
 mod systems;
 
 use crate::netsim::graph::GroundedGraph;
+use crate::scenario::actor::{ComposedActor, billy_actor};
 use crate::scenario::agents::apply_effects;
 use crate::scenario::command::{PivotTarget, RunConfig, TickInput};
 use crate::scenario::common::{
@@ -51,6 +52,12 @@ pub struct GhostLobbySim {
     /// pure function of `def`, so a reset cannot stale it and a snapshot need not
     /// carry it; `restore` rebuilds it from the definition it is handed.
     graph: GroundedGraph,
+    /// Billy expressed as data: the default archetype's composed form. Like
+    /// `graph` it is a pure function of committed content, so a snapshot need
+    /// not carry it and `restore`/`reset` cannot stale it. The FSM, sight and
+    /// belief systems read every tunable number from here, so any registry
+    /// archetype drives the same machinery.
+    actor: ComposedActor,
     paused: bool,
     events: Vec<Event>,
 }
@@ -113,6 +120,7 @@ impl GhostLobbySim {
             idx,
             preset,
             graph,
+            actor: billy_actor(),
             paused: false,
             events: Vec::new(),
         };
@@ -150,6 +158,7 @@ impl GhostLobbySim {
             idx,
             preset,
             graph,
+            actor: billy_actor(),
             paused: snap.paused,
             events: Vec::new(),
         })
@@ -190,6 +199,11 @@ impl GhostLobbySim {
     /// Borrow the floor's grounded network.
     pub fn graph(&self) -> &GroundedGraph {
         &self.graph
+    }
+
+    /// Borrow the composed actor whose archetype drives Billy's FSM.
+    pub fn actor(&self) -> &ComposedActor {
+        &self.actor
     }
 
     /// The resolved id index.
@@ -497,17 +511,18 @@ impl GhostLobbySim {
         if Self::room_index_at(&self.def, b.x) != Self::room_index_at(&self.def, p.x) {
             return false;
         }
+        let a = &self.actor.stats;
         let dx = (p.x + self.def.player.w / 2.0) - (b.x + self.def.billy.w / 2.0);
         let in_front = sign_or(dx, b.facing) == b.facing;
-        let mut range = self.preset.billy_sight * if in_front { 1.0 } else { c::SIGHT_BACK };
+        let mut range = self.preset.billy_sight * if in_front { 1.0 } else { a.sight_back };
         if p.crouching {
-            range *= c::SIGHT_CROUCH;
+            range *= a.sight_crouch;
         }
         if let Some(room) = Self::room_at(&self.def, p.x) {
             range *= room.sight_multiplier;
         }
-        if s.alert > c::SIGHT_ALERT_HI {
-            range *= c::SIGHT_ALERT;
+        if s.alert > a.sight_alert_hi {
+            range *= a.sight_alert;
         }
         dx.abs() <= range
     }
@@ -749,8 +764,11 @@ impl GhostLobbySim {
         if dir != 0.0 {
             self.state.billy.facing = dir;
         }
-        self.state.billy.vx =
-            crate::scenario::mathf::approach(self.state.billy.vx, dir * speed, c::BILLY_ACCEL * dt);
+        self.state.billy.vx = crate::scenario::mathf::approach(
+            self.state.billy.vx,
+            dir * speed,
+            self.actor.stats.accel * dt,
+        );
         self.state.billy.x += self.state.billy.vx * dt;
         self.state.billy.x = clamp(self.state.billy.x, c::BILLY_CLAMP_LO, c::BILLY_CLAMP_HI);
         let before = self.state.billy.x;

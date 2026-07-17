@@ -22,9 +22,10 @@ pub mod trace;
 pub use device::{Device, DeviceId, DeviceKind, SecurityLevel};
 pub use network::{Network, Range, Zone};
 pub use scenario::{
-    Buttons, Command, Debrief, DifficultyId, Event, GHOST_LOBBY_JSON, GhostLobbySim, LogLine,
-    Mulberry32, RunConfig, RuntimeSnapshot, ScenarioDefinition, ScenarioExport, TickInput,
-    ValidationError, ghost_lobby,
+    ACTORS_JSON, ActorArchetype, ActorRegistry, Buttons, Command, ComposedActor, Debrief,
+    DifficultyId, Event, GHOST_LOBBY_JSON, GhostLobbySim, LogLine, Modifier, Mulberry32, RunConfig,
+    RuntimeSnapshot, ScenarioDefinition, ScenarioExport, TickInput, ValidationError,
+    default_registry, ghost_lobby, load_actor_pack,
 };
 pub use trace::{Alert, Trace};
 
