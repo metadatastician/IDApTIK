@@ -613,4 +613,26 @@ mod tests {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/scenario/ghost_lobby.json");
         std::fs::write(path, json.as_bytes()).expect("write golden json");
     }
+
+    /// Round-trips the Nickel-authored scenario (config/ghost_lobby_scenario.ncl)
+    /// through serde and the validator: the export must be a definition
+    /// `validate()` accepts, equal to the Rust-authored [`ghost_lobby`].
+    /// Numeric formatting is the one normalisation (Nickel prints `585`, serde
+    /// `585.0`); parsing both sides into [`ScenarioDefinition`] absorbs it.
+    /// Ignored because it needs a prior `nickel export`; run via
+    /// `just config-check`, which seeds /tmp/ghost_lobby_scenario_raw.json.
+    #[test]
+    #[ignore = "needs /tmp/ghost_lobby_scenario_raw.json from nickel export; run via just config-check"]
+    fn nickel_scenario_round_trips_and_validates() {
+        let raw =
+            std::fs::read_to_string("/tmp/ghost_lobby_scenario_raw.json").expect("nickel export");
+        let def: ScenarioDefinition = serde_json::from_str(&raw).expect("parse nickel json");
+        let report = def.validate();
+        assert!(report.passed(), "validate() rejected: {:?}", report.ok());
+        assert_eq!(
+            def,
+            ghost_lobby(),
+            "the Nickel-authored scenario drifted from the Rust-authored definition"
+        );
+    }
 }

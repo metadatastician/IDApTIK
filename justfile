@@ -101,7 +101,22 @@ server-test:
 # --- Config (Nickel) -----------------------------------------------------------
 
 config-check:
-    @if command -v nickel >/dev/null 2>&1; then nickel export config/default.ncl >/dev/null && nickel export config/grounded_slice.ncl >/dev/null && nickel export config/ghost_lobby_floor.ncl >/dev/null && echo "config: ok (schema applied)"; else echo "nickel not installed: run 'just setup'"; fi
+    @if command -v nickel >/dev/null 2>&1; then nickel export config/default.ncl >/dev/null && nickel export config/grounded_slice.ncl >/dev/null && nickel export config/ghost_lobby_floor.ncl >/dev/null && just config-scenario-check && echo "config: ok (schema applied)"; else echo "nickel not installed: run 'just setup'"; fi
+
+# Check the Nickel-authored scenario against scenario-schema.ncl: the good
+# fixture must export and round-trip through the Rust validator unchanged, and
+# every bad fixture must be rejected by the contract (mirroring the Rust
+# ValidationError variants).
+config-scenario-check:
+    nickel export config/ghost_lobby_scenario.ncl --format json > /tmp/ghost_lobby_scenario_raw.json
+    cargo test -q -p idaptik-core nickel_scenario_round_trips_and_validates -- --ignored
+    @for f in config/scenario-fixtures/bad_*.ncl; do \
+        if nickel export "$f" >/dev/null 2>&1; then \
+            echo "FAIL: $f exported but the contract should reject it"; exit 1; \
+        fi; \
+        echo "rejected as expected: $f"; \
+    done
+    @echo "scenario config: ok"
 
 # Re-export the Nickel graphs and rewrite the committed goldens they embed. The
 # exports are read at compile time, so each regeneration is its own cargo run:
