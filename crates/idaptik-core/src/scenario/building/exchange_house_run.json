@@ -1,0 +1,2560 @@
+{
+  "format": "idaptik-building-export-v1",
+  "definition": {
+    "format": "idaptik-scenario/1",
+    "definition": {
+      "format": "idaptik-scenario/1",
+      "building_id": "exchange-house",
+      "name": "Exchange House",
+      "entry": {
+        "floor": "exchange",
+        "room": "lobby"
+      },
+      "floors": [
+        {
+          "id": "service",
+          "name": "SERVICE LAYER",
+          "level": -1,
+          "kind": "Service",
+          "rooms": [
+            {
+              "id": "plant",
+              "name": "PLANT ROOM"
+            },
+            {
+              "id": "crawl",
+              "name": "CRAWLSPACE"
+            }
+          ]
+        },
+        {
+          "id": "exchange",
+          "name": "EXCHANGE HALL",
+          "level": 0,
+          "kind": "Standard",
+          "rooms": [
+            {
+              "id": "lobby",
+              "name": "STREET LOBBY"
+            },
+            {
+              "id": "hall",
+              "name": "EXCHANGE HALL"
+            },
+            {
+              "id": "tellers",
+              "name": "TELLER ROW"
+            }
+          ]
+        },
+        {
+          "id": "office",
+          "name": "OFFICE FLOOR",
+          "level": 1,
+          "kind": "Standard",
+          "rooms": [
+            {
+              "id": "landing",
+              "name": "STAIR LANDING"
+            },
+            {
+              "id": "bullpen",
+              "name": "CLERKS' BULLPEN"
+            },
+            {
+              "id": "manager",
+              "name": "MANAGER'S OFFICE"
+            }
+          ]
+        },
+        {
+          "id": "ghost-lobby",
+          "name": "Envelope 001 — Ghost Lobby",
+          "level": 2,
+          "kind": "Billy",
+          "rooms": [
+            {
+              "id": "kitchen",
+              "name": "KITCHEN / BREAK ROOM"
+            },
+            {
+              "id": "hall",
+              "name": "HALLWAY"
+            },
+            {
+              "id": "office",
+              "name": "LIT OFFICE / USB TRAP"
+            },
+            {
+              "id": "laundry",
+              "name": "LAUNDRY / WARDROBE"
+            },
+            {
+              "id": "exit",
+              "name": "SERVICE EXIT"
+            }
+          ],
+          "scenario": {
+            "format": "idaptik-ghost-lobby-v2",
+            "scenario_id": "envelope-001-ghost-lobby",
+            "name": "Envelope 001 — Ghost Lobby",
+            "floor_id": 0,
+            "world": {
+              "floor": 585.0,
+              "room_offset": 14.0,
+              "width": 1260.0
+            },
+            "rooms": [
+              {
+                "id": "kitchen",
+                "name": "KITCHEN / BREAK ROOM",
+                "x": 20.0,
+                "w": 250.0,
+                "support": 1.0,
+                "ping_support_bonus": 0.0,
+                "sight_multiplier": 1.0,
+                "lit": false
+              },
+              {
+                "id": "hall",
+                "name": "HALLWAY",
+                "x": 270.0,
+                "w": 240.0,
+                "support": 0.84,
+                "ping_support_bonus": 0.16,
+                "sight_multiplier": 1.0,
+                "lit": false
+              },
+              {
+                "id": "office",
+                "name": "LIT OFFICE / USB TRAP",
+                "x": 510.0,
+                "w": 285.0,
+                "support": 0.34,
+                "ping_support_bonus": 0.3,
+                "sight_multiplier": 1.15,
+                "lit": true
+              },
+              {
+                "id": "laundry",
+                "name": "LAUNDRY / WARDROBE",
+                "x": 795.0,
+                "w": 245.0,
+                "support": 0.5,
+                "ping_support_bonus": 0.05,
+                "sight_multiplier": 1.0,
+                "lit": false
+              },
+              {
+                "id": "exit",
+                "name": "SERVICE EXIT",
+                "x": 1040.0,
+                "w": 220.0,
+                "support": 0.69,
+                "ping_support_bonus": 0.12,
+                "sight_multiplier": 1.0,
+                "lit": false
+              }
+            ],
+            "doors": [
+              {
+                "id": "D1",
+                "x": 270.0,
+                "label": "KITCHEN/HALL"
+              },
+              {
+                "id": "D2",
+                "x": 510.0,
+                "label": "HALL/OFFICE"
+              },
+              {
+                "id": "D3",
+                "x": 795.0,
+                "label": "OFFICE/LAUNDRY"
+              },
+              {
+                "id": "D4",
+                "x": 1040.0,
+                "label": "SERVICE EXIT"
+              }
+            ],
+            "hide_spots": [
+              {
+                "id": "counter",
+                "room": "kitchen",
+                "x": 205.0,
+                "radius": 58.0,
+                "label": "prep counter shadow"
+              },
+              {
+                "id": "copier",
+                "room": "hall",
+                "x": 404.0,
+                "radius": 50.0,
+                "label": "copier recess"
+              },
+              {
+                "id": "desk",
+                "room": "office",
+                "x": 655.0,
+                "radius": 62.0,
+                "label": "office desk"
+              },
+              {
+                "id": "wardrobe",
+                "room": "laundry",
+                "x": 885.0,
+                "radius": 58.0,
+                "label": "wardrobe"
+              },
+              {
+                "id": "crate",
+                "room": "exit",
+                "x": 1125.0,
+                "radius": 50.0,
+                "label": "delivery crate"
+              }
+            ],
+            "cameras": [
+              {
+                "id": "cam-hall",
+                "room": "hall",
+                "x": 330.0,
+                "range": [
+                  292.0,
+                  495.0
+                ],
+                "phase": 0.2,
+                "stale": false
+              },
+              {
+                "id": "cam-office",
+                "room": "office",
+                "x": 565.0,
+                "range": [
+                  530.0,
+                  782.0
+                ],
+                "phase": 1.3,
+                "stale": false
+              },
+              {
+                "id": "cam-laundry",
+                "room": "laundry",
+                "x": 830.0,
+                "range": [
+                  812.0,
+                  1015.0
+                ],
+                "phase": 2.1,
+                "stale": true
+              }
+            ],
+            "props": {
+              "note": {
+                "x": 92.0,
+                "y": 282.0
+              },
+              "usb": {
+                "x": 622.0,
+                "y": 569.0
+              },
+              "chute": {
+                "x": 946.0,
+                "y": 495.0
+              },
+              "vacuum": {
+                "x": 592.0,
+                "y": 568.0
+              }
+            },
+            "player": {
+              "spawn_x": 72.0,
+              "spawn_y": 531.0,
+              "w": 28.0,
+              "h": 54.0
+            },
+            "billy": {
+              "spawn_x": -90.0,
+              "spawn_y": 521.0,
+              "w": 36.0,
+              "h": 64.0
+            },
+            "objectives": [
+              {
+                "id": "note",
+                "kind": "Note",
+                "label": "Secure the contact note",
+                "room": "kitchen"
+              },
+              {
+                "id": "misdirect",
+                "kind": "Misdirect",
+                "label": "Convince Billy it was the drive",
+                "room": "office"
+              },
+              {
+                "id": "exit",
+                "kind": "Exit",
+                "label": "Reach the service exit or laundry chute",
+                "room": "exit"
+              }
+            ],
+            "actions": {
+              "Camera": {
+                "cost": 18.0,
+                "cooldown": 4.2,
+                "alert_gain": 2.4
+              },
+              "Door": {
+                "cost": 17.0,
+                "cooldown": 1.0,
+                "alert_gain": 3.2
+              },
+              "Vacuum": {
+                "cost": 25.0,
+                "cooldown": 8.0,
+                "alert_gain": 4.2
+              },
+              "Lights": {
+                "cost": 15.0,
+                "cooldown": 5.0,
+                "alert_gain": 8.5
+              }
+            },
+            "difficulty": {
+              "Story": {
+                "label": "STORY",
+                "arrival": [
+                  24.0,
+                  31.0
+                ],
+                "player_speed": 172.0,
+                "sprint": 250.0,
+                "billy_speed": 77.0,
+                "billy_sight": 210.0,
+                "support_limit": 7.2,
+                "bandwidth_regen": 8.0,
+                "badge_delay": 1.65,
+                "usb_timer": 14.0,
+                "camera_lock": 1.05,
+                "alert_gain": 0.78,
+                "score_mult": 0.85,
+                "rescue": true,
+                "trace_threshold": 900
+              },
+              "Standard": {
+                "label": "STANDARD",
+                "arrival": [
+                  19.0,
+                  26.0
+                ],
+                "player_speed": 166.0,
+                "sprint": 242.0,
+                "billy_speed": 91.0,
+                "billy_sight": 245.0,
+                "support_limit": 5.2,
+                "bandwidth_regen": 6.1,
+                "badge_delay": 1.32,
+                "usb_timer": 11.0,
+                "camera_lock": 0.78,
+                "alert_gain": 1.0,
+                "score_mult": 1.0,
+                "rescue": true,
+                "trace_threshold": 600
+              },
+              "Operator": {
+                "label": "OPERATOR",
+                "arrival": [
+                  15.0,
+                  21.0
+                ],
+                "player_speed": 162.0,
+                "sprint": 235.0,
+                "billy_speed": 106.0,
+                "billy_sight": 280.0,
+                "support_limit": 3.8,
+                "bandwidth_regen": 4.5,
+                "badge_delay": 1.02,
+                "usb_timer": 8.5,
+                "camera_lock": 0.58,
+                "alert_gain": 1.2,
+                "score_mult": 1.25,
+                "rescue": false,
+                "trace_threshold": 400
+              }
+            },
+            "tuning": {
+              "geometry": {
+                "floor": 585.0,
+                "room_offset": 14.0,
+                "player_w": 28.0,
+                "player_h": 54.0,
+                "billy_w": 36.0,
+                "billy_h": 64.0,
+                "collision_radius": 30.0,
+                "world_width": 1260.0
+              },
+              "movement": {
+                "gravity": 1080.0,
+                "jump_vy": -430.0,
+                "accel_drive": 980.0,
+                "accel_brake": 1250.0,
+                "crouch_speed": 0.46,
+                "stam_drain": 24.0,
+                "stam_regen": 17.0,
+                "stam_regen_crouch": 11.0,
+                "sprint_min_stam": 2.0,
+                "hide_max_vx": 92.0,
+                "crouch_cam_vx": 80.0,
+                "moving_vx": 65.0,
+                "clamp_lo": 26.0,
+                "clamp_hi": 1250.0,
+                "land_vy": 190.0
+              },
+              "noise": {
+                "jump": 0.7,
+                "land": 0.8,
+                "decay": 1.1,
+                "sprint_base": 0.68,
+                "sprint_k": 0.3,
+                "walk_k": 0.24,
+                "crouch": 0.08,
+                "move_min_vx": 15.0
+              },
+              "fsm": {
+                "start_x": -90.0,
+                "crisis_x": 26.0,
+                "enter_speed": 0.72,
+                "shock_t": 1.15,
+                "assess_speed": 0.55,
+                "patrol_lo": 130.0,
+                "patrol_hi": 355.0,
+                "patrol_pivot": 220.0,
+                "invest_speed": 0.82,
+                "secure_speed": 0.92,
+                "grab_dist": 31.0,
+                "guard_speed": 0.45,
+                "guard_t_note": 1.9,
+                "guard_t_usb": 1.7,
+                "call_t": 1.9,
+                "pursue_speed": 1.2,
+                "pursue_trigger": 115.0,
+                "pursue_giveup_ago": 3.2,
+                "pursue_giveup_dist": 20.0,
+                "accel": 520.0,
+                "clamp_lo": 25.0,
+                "clamp_hi": 1230.0,
+                "badge_open": 1.55,
+                "snack_reach": 12.0,
+                "alert_boost_div": 260.0,
+                "lights_boost_k": 0.035,
+                "vac_distract": 245.0,
+                "sight_back": 0.34,
+                "sight_crouch": 0.62,
+                "sight_office": 1.15,
+                "sight_alert": 1.12,
+                "sight_alert_hi": 65.0,
+                "invest_noise": 0.45,
+                "invest_dist": 260.0
+              },
+              "belief": {
+                "threshold": 48.0,
+                "misdirect_threshold": 72.0,
+                "moving_vx": 65.0,
+                "pi_seen": 4.0,
+                "pi_sprint": 12.0,
+                "note_near": 105.0,
+                "usb_near": 112.0,
+                "note_urg_sprint": 20.0,
+                "note_urg_move": 10.0,
+                "note_urg_still": 4.0,
+                "usb_urg_sprint": 17.0,
+                "usb_urg_move": 8.0,
+                "usb_urg_still": 3.0,
+                "note_carry": 13.0,
+                "usb_carry": 12.0,
+                "prog_gate": 0.12,
+                "pi_decay": 0.9,
+                "note_decay": 0.25,
+                "usb_decay": 0.2,
+                "peel_interest": 36.0,
+                "secure_note_seen": 72.0,
+                "take_usb_seen": 74.0,
+                "take_usb_unseen": 28.0,
+                "camera_player_int": 30.0
+              },
+              "support": {
+                "ping_hall": 0.16,
+                "ping_office": 0.3,
+                "ping_laundry": 0.05,
+                "ping_exit": 0.12,
+                "lowbw_x": 18.0,
+                "lowbw_pen": 0.12,
+                "alert_pen": 0.0022,
+                "hidden": 0.06,
+                "flicker": 0.04,
+                "hop_pen": 0.07,
+                "clamp_min": 0.05,
+                "approach": 1.15,
+                "iso_gate": 0.4,
+                "iso_pressure_div": 130.0,
+                "fray_frac": 0.5,
+                "iso_decay": 1.35,
+                "iso_decay_hidden": 2.2,
+                "ping_dur": 3.4
+              },
+              "bandwidth": {
+                "regen_a": 0.55,
+                "regen_b": 0.75,
+                "alert_decay_quiet": 0.45,
+                "alert_decay_crisis": 0.18,
+                "lockdown": 100.0
+              },
+              "action": {
+                "lights_dur": 1.45,
+                "lights_dur_rm": 0.7,
+                "lights_stun": 1.05,
+                "route_duration": 3.2,
+                "throttle_cdbw": 1.2,
+                "throttle_fray": 4.2,
+                "throttle_badge": 8.0,
+                "call_alert": 12.0
+              },
+              "camera": {
+                "sweep_w": 0.75,
+                "sweep_a": 25.0,
+                "lockout": 5.5,
+                "alert": 14.0,
+                "decay_unseen": 1.4,
+                "decay_off": 2.2
+              },
+              "usb": {
+                "throw_vx": 330.0,
+                "throw_vy": -170.0,
+                "throw_off": 34.0,
+                "held_off": 15.0,
+                "grav": 780.0,
+                "drag": 0.985,
+                "floor": 574.0,
+                "bounce": -0.24,
+                "friction": 0.72,
+                "rest_vx": 14.0,
+                "rest_vy": 18.0,
+                "clamp_lo": 35.0,
+                "clamp_hi": 1235.0,
+                "wipe_alert": 27.0,
+                "throw_alert": 5.0
+              },
+              "vacuum": {
+                "lag_x": 795.0,
+                "ctrl_loss": 0.42,
+                "ctrl_min": 0.22,
+                "lag_warn": 0.72,
+                "ctrl_gain": 0.18,
+                "speed": 72.0,
+                "move_min": 0.26,
+                "target": 958.0,
+                "fall_off": 8.0
+              },
+              "interaction": {
+                "note_dist": 58.0,
+                "note_hold": 0.85,
+                "usb_dist": 50.0,
+                "chute_enter": 62.0,
+                "chute_search_off": 18.0,
+                "chute_search_dist": 70.0,
+                "chute_hold": 1.55,
+                "pickpocket_dist": 57.0,
+                "pickpocket_hold": 0.72,
+                "exit_prompt_x": 1215.0,
+                "exit_x": 1242.0
+              },
+              "rescue": {
+                "support_min": 0.68,
+                "bw_min": 20.0,
+                "bw_cost": 20.0,
+                "stun": 1.6,
+                "grace": 1.8,
+                "displace": 58.0
+              }
+            },
+            "scoring": {
+              "base": 700.0,
+              "note": 650.0,
+              "note_lost": -260.0,
+              "note_none": -80.0,
+              "misdir": 330.0,
+              "misdir_leak": -180.0,
+              "noboss": 150.0,
+              "boss": -140.0,
+              "nocam": 120.0,
+              "cam_each": -65.0,
+              "iso_ok": 100.0,
+              "iso_snap": -90.0,
+              "iso_snap_frac": 0.55,
+              "chute": 110.0,
+              "usbtrace": -170.0,
+              "rescue": -80.0,
+              "time_base": 220.0,
+              "time_k": 1.7,
+              "alert_k": 2.7,
+              "fail_act": 28.0,
+              "fail_note": 420.0,
+              "fail_base": 120.0,
+              "fail_usb": 180.0,
+              "fail_alert_k": 2.0,
+              "grades": {
+                "s": 1850.0,
+                "a": 1450.0,
+                "b": 1050.0,
+                "c": 700.0,
+                "fail_c": 500.0
+              }
+            },
+            "spawn": {
+              "note_x": [
+                92.0,
+                78.0
+              ],
+              "usb_x": [
+                622.0,
+                112.0
+              ],
+              "stale_pulse": [
+                2.5,
+                3.5
+              ],
+              "snack_x": [
+                165.0,
+                68.0
+              ],
+              "door_delay": [
+                0.22,
+                0.5
+              ],
+              "operator_door_penalty": 0.45
+            }
+          }
+        }
+      ],
+      "portals": [
+        {
+          "id": "p-front",
+          "kind": "Door",
+          "label": "FRONT DOORS",
+          "from": {
+            "floor": "exchange",
+            "room": "lobby"
+          },
+          "to": {
+            "floor": "exchange",
+            "room": "hall"
+          },
+          "travel_time": 2.0
+        },
+        {
+          "id": "p-tellers",
+          "kind": "Door",
+          "label": "TELLER GATE",
+          "from": {
+            "floor": "exchange",
+            "room": "hall"
+          },
+          "to": {
+            "floor": "exchange",
+            "room": "tellers"
+          },
+          "travel_time": 2.0,
+          "lock": {
+            "controller": "lock-tellers"
+          },
+          "circuit": "main"
+        },
+        {
+          "id": "p-stair-1",
+          "kind": "Stair",
+          "label": "MAIN STAIR",
+          "from": {
+            "floor": "exchange",
+            "room": "hall"
+          },
+          "to": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "travel_time": 6.0
+        },
+        {
+          "id": "p-bullpen",
+          "kind": "Door",
+          "label": "BULLPEN DOOR",
+          "from": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "to": {
+            "floor": "office",
+            "room": "bullpen"
+          },
+          "travel_time": 2.0
+        },
+        {
+          "id": "p-manager",
+          "kind": "Door",
+          "label": "MANAGER'S DOOR",
+          "from": {
+            "floor": "office",
+            "room": "bullpen"
+          },
+          "to": {
+            "floor": "office",
+            "room": "manager"
+          },
+          "travel_time": 2.0
+        },
+        {
+          "id": "p-lift-01",
+          "kind": "Lift",
+          "label": "LIFT (GROUND-FIRST)",
+          "from": {
+            "floor": "exchange",
+            "room": "lobby"
+          },
+          "to": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "travel_time": 8.0,
+          "circuit": "main"
+        },
+        {
+          "id": "p-lift-12",
+          "kind": "Lift",
+          "label": "LIFT (FIRST-SECOND)",
+          "from": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "kitchen"
+          },
+          "travel_time": 8.0,
+          "circuit": "main"
+        },
+        {
+          "id": "p-stair-2",
+          "kind": "Stair",
+          "label": "BACK STAIR",
+          "from": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "kitchen"
+          },
+          "travel_time": 6.0
+        },
+        {
+          "id": "p-hatch",
+          "kind": "Ladder",
+          "label": "SERVICE HATCH",
+          "from": {
+            "floor": "exchange",
+            "room": "lobby"
+          },
+          "to": {
+            "floor": "service",
+            "room": "plant"
+          },
+          "travel_time": 5.0
+        },
+        {
+          "id": "p-crawl",
+          "kind": "Door",
+          "label": "CRAWL DOOR",
+          "from": {
+            "floor": "service",
+            "room": "plant"
+          },
+          "to": {
+            "floor": "service",
+            "room": "crawl"
+          },
+          "travel_time": 3.0
+        },
+        {
+          "id": "p-vent-tellers",
+          "kind": "Vent",
+          "label": "TELLER VENT GRILLE",
+          "from": {
+            "floor": "service",
+            "room": "crawl"
+          },
+          "to": {
+            "floor": "exchange",
+            "room": "tellers"
+          },
+          "travel_time": 10.0,
+          "lock": {
+            "controller": "lock-grille"
+          },
+          "circuit": "service"
+        },
+        {
+          "id": "p-vent-laundry",
+          "kind": "Vent",
+          "label": "LAUNDRY RISER VENT",
+          "from": {
+            "floor": "service",
+            "room": "crawl"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "laundry"
+          },
+          "travel_time": 14.0
+        },
+        {
+          "id": "ghost-lobby-d1",
+          "kind": "Door",
+          "label": "KITCHEN/HALL",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "kitchen"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "hall"
+          },
+          "travel_time": 1.0
+        },
+        {
+          "id": "ghost-lobby-d2",
+          "kind": "Door",
+          "label": "HALL/OFFICE",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "hall"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "office"
+          },
+          "travel_time": 1.0
+        },
+        {
+          "id": "ghost-lobby-d3",
+          "kind": "Door",
+          "label": "OFFICE/LAUNDRY",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "office"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "laundry"
+          },
+          "travel_time": 1.0
+        },
+        {
+          "id": "ghost-lobby-d4",
+          "kind": "Door",
+          "label": "SERVICE EXIT",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "laundry"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "exit"
+          },
+          "travel_time": 1.0
+        }
+      ],
+      "circuits": [
+        {
+          "id": "main",
+          "name": "MAIN RISER",
+          "source": "feed-main",
+          "zone": "corp"
+        },
+        {
+          "id": "service",
+          "name": "SERVICE RISER",
+          "source": "feed-service",
+          "zone": "ot"
+        }
+      ],
+      "zones": [
+        {
+          "id": "corp",
+          "name": "CORPORATE LAN",
+          "subnet": "10.60.10.",
+          "rooms": [
+            {
+              "floor": "exchange",
+              "room": "lobby"
+            },
+            {
+              "floor": "exchange",
+              "room": "hall"
+            },
+            {
+              "floor": "exchange",
+              "room": "tellers"
+            },
+            {
+              "floor": "office",
+              "room": "landing"
+            },
+            {
+              "floor": "office",
+              "room": "bullpen"
+            },
+            {
+              "floor": "office",
+              "room": "manager"
+            }
+          ]
+        },
+        {
+          "id": "ops",
+          "name": "OPERATIONS LAN",
+          "subnet": "10.60.20.",
+          "rooms": [
+            {
+              "floor": "ghost-lobby",
+              "room": "kitchen"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "hall"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "office"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "laundry"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "exit"
+            }
+          ]
+        },
+        {
+          "id": "ot",
+          "name": "BUILDING OT",
+          "subnet": "10.60.30.",
+          "rooms": [
+            {
+              "floor": "service",
+              "room": "plant"
+            },
+            {
+              "floor": "service",
+              "room": "crawl"
+            }
+          ]
+        }
+      ]
+    },
+    "validation": {
+      "checks": [
+        {
+          "id": "format.recognised",
+          "label": "The payload format tag is the one this build reads",
+          "passed": true,
+          "detail": "found \"idaptik-scenario/1\", expected \"idaptik-scenario/1\"",
+          "family": "format"
+        },
+        {
+          "id": "floors.present",
+          "label": "At least one floor is defined",
+          "passed": true,
+          "detail": "4 floor(s)",
+          "family": "floors"
+        },
+        {
+          "id": "floors.unique_ids",
+          "label": "Floor ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "floors"
+        },
+        {
+          "id": "floors.unique_levels",
+          "label": "Storey levels are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "floors"
+        },
+        {
+          "id": "floors.billy",
+          "label": "Exactly one Billy floor is designated",
+          "passed": true,
+          "detail": "1 Billy floor(s)",
+          "family": "floors"
+        },
+        {
+          "id": "floors.rooms_present",
+          "label": "Every floor has at least one room",
+          "passed": true,
+          "detail": "all populated",
+          "family": "floors"
+        },
+        {
+          "id": "rooms.unique",
+          "label": "Every (floor, room) pair is unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "rooms"
+        },
+        {
+          "id": "scenario.valid",
+          "label": "Every embedded scenario definition validates",
+          "passed": true,
+          "detail": "all valid",
+          "family": "scenario"
+        },
+        {
+          "id": "scenario.rooms_match",
+          "label": "Every scenario floor's rooms mirror its scenario's rooms",
+          "passed": true,
+          "detail": "all mirrored",
+          "family": "scenario"
+        },
+        {
+          "id": "portals.unique_ids",
+          "label": "Portal ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "portals"
+        },
+        {
+          "id": "portals.endpoints_resolve",
+          "label": "Every portal endpoint names a real room",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "portals"
+        },
+        {
+          "id": "portals.no_self_loop",
+          "label": "No portal connects a room to itself",
+          "passed": true,
+          "detail": "none",
+          "family": "portals"
+        },
+        {
+          "id": "portals.travel_time",
+          "label": "Every travel time is finite and non-negative",
+          "passed": true,
+          "detail": "all valid",
+          "family": "portals"
+        },
+        {
+          "id": "portals.lock_controller",
+          "label": "Every lock controller id is non-empty and unique",
+          "passed": true,
+          "detail": "all valid",
+          "family": "portals"
+        },
+        {
+          "id": "portals.lift_powered",
+          "label": "Every lift draws from a circuit",
+          "passed": true,
+          "detail": "all powered",
+          "family": "portals"
+        },
+        {
+          "id": "portals.circuit_resolves",
+          "label": "Every portal circuit names a real circuit",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "portals"
+        },
+        {
+          "id": "circuits.unique_ids",
+          "label": "Circuit ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "circuits"
+        },
+        {
+          "id": "circuits.source",
+          "label": "Every circuit source id is non-empty and unique",
+          "passed": true,
+          "detail": "all valid",
+          "family": "circuits"
+        },
+        {
+          "id": "circuits.zone_resolves",
+          "label": "Every circuit sits on a real zone",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "circuits"
+        },
+        {
+          "id": "zones.unique_ids",
+          "label": "Zone ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "zones"
+        },
+        {
+          "id": "zones.subnet",
+          "label": "Every zone subnet is a usable dotted prefix",
+          "passed": true,
+          "detail": "all usable",
+          "family": "zones"
+        },
+        {
+          "id": "zones.rooms_resolve",
+          "label": "Every zone room names a real room",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "zones"
+        },
+        {
+          "id": "zones.rooms_disjoint",
+          "label": "Every room sits in at most one zone",
+          "passed": true,
+          "detail": "all disjoint",
+          "family": "zones"
+        },
+        {
+          "id": "graph.entry_resolves",
+          "label": "The entry names a real room",
+          "passed": true,
+          "detail": "entry exchange/lobby",
+          "family": "graph"
+        },
+        {
+          "id": "graph.connected",
+          "label": "Every room is reachable from the entry",
+          "passed": true,
+          "detail": "13 room(s) reachable",
+          "family": "graph"
+        }
+      ]
+    }
+  },
+  "runtime": {
+    "format": "idaptik-building-runtime-v1",
+    "definition": {
+      "format": "idaptik-scenario/1",
+      "building_id": "exchange-house",
+      "name": "Exchange House",
+      "entry": {
+        "floor": "exchange",
+        "room": "lobby"
+      },
+      "floors": [
+        {
+          "id": "service",
+          "name": "SERVICE LAYER",
+          "level": -1,
+          "kind": "Service",
+          "rooms": [
+            {
+              "id": "plant",
+              "name": "PLANT ROOM"
+            },
+            {
+              "id": "crawl",
+              "name": "CRAWLSPACE"
+            }
+          ]
+        },
+        {
+          "id": "exchange",
+          "name": "EXCHANGE HALL",
+          "level": 0,
+          "kind": "Standard",
+          "rooms": [
+            {
+              "id": "lobby",
+              "name": "STREET LOBBY"
+            },
+            {
+              "id": "hall",
+              "name": "EXCHANGE HALL"
+            },
+            {
+              "id": "tellers",
+              "name": "TELLER ROW"
+            }
+          ]
+        },
+        {
+          "id": "office",
+          "name": "OFFICE FLOOR",
+          "level": 1,
+          "kind": "Standard",
+          "rooms": [
+            {
+              "id": "landing",
+              "name": "STAIR LANDING"
+            },
+            {
+              "id": "bullpen",
+              "name": "CLERKS' BULLPEN"
+            },
+            {
+              "id": "manager",
+              "name": "MANAGER'S OFFICE"
+            }
+          ]
+        },
+        {
+          "id": "ghost-lobby",
+          "name": "Envelope 001 — Ghost Lobby",
+          "level": 2,
+          "kind": "Billy",
+          "rooms": [
+            {
+              "id": "kitchen",
+              "name": "KITCHEN / BREAK ROOM"
+            },
+            {
+              "id": "hall",
+              "name": "HALLWAY"
+            },
+            {
+              "id": "office",
+              "name": "LIT OFFICE / USB TRAP"
+            },
+            {
+              "id": "laundry",
+              "name": "LAUNDRY / WARDROBE"
+            },
+            {
+              "id": "exit",
+              "name": "SERVICE EXIT"
+            }
+          ],
+          "scenario": {
+            "format": "idaptik-ghost-lobby-v2",
+            "scenario_id": "envelope-001-ghost-lobby",
+            "name": "Envelope 001 — Ghost Lobby",
+            "floor_id": 0,
+            "world": {
+              "floor": 585.0,
+              "room_offset": 14.0,
+              "width": 1260.0
+            },
+            "rooms": [
+              {
+                "id": "kitchen",
+                "name": "KITCHEN / BREAK ROOM",
+                "x": 20.0,
+                "w": 250.0,
+                "support": 1.0,
+                "ping_support_bonus": 0.0,
+                "sight_multiplier": 1.0,
+                "lit": false
+              },
+              {
+                "id": "hall",
+                "name": "HALLWAY",
+                "x": 270.0,
+                "w": 240.0,
+                "support": 0.84,
+                "ping_support_bonus": 0.16,
+                "sight_multiplier": 1.0,
+                "lit": false
+              },
+              {
+                "id": "office",
+                "name": "LIT OFFICE / USB TRAP",
+                "x": 510.0,
+                "w": 285.0,
+                "support": 0.34,
+                "ping_support_bonus": 0.3,
+                "sight_multiplier": 1.15,
+                "lit": true
+              },
+              {
+                "id": "laundry",
+                "name": "LAUNDRY / WARDROBE",
+                "x": 795.0,
+                "w": 245.0,
+                "support": 0.5,
+                "ping_support_bonus": 0.05,
+                "sight_multiplier": 1.0,
+                "lit": false
+              },
+              {
+                "id": "exit",
+                "name": "SERVICE EXIT",
+                "x": 1040.0,
+                "w": 220.0,
+                "support": 0.69,
+                "ping_support_bonus": 0.12,
+                "sight_multiplier": 1.0,
+                "lit": false
+              }
+            ],
+            "doors": [
+              {
+                "id": "D1",
+                "x": 270.0,
+                "label": "KITCHEN/HALL"
+              },
+              {
+                "id": "D2",
+                "x": 510.0,
+                "label": "HALL/OFFICE"
+              },
+              {
+                "id": "D3",
+                "x": 795.0,
+                "label": "OFFICE/LAUNDRY"
+              },
+              {
+                "id": "D4",
+                "x": 1040.0,
+                "label": "SERVICE EXIT"
+              }
+            ],
+            "hide_spots": [
+              {
+                "id": "counter",
+                "room": "kitchen",
+                "x": 205.0,
+                "radius": 58.0,
+                "label": "prep counter shadow"
+              },
+              {
+                "id": "copier",
+                "room": "hall",
+                "x": 404.0,
+                "radius": 50.0,
+                "label": "copier recess"
+              },
+              {
+                "id": "desk",
+                "room": "office",
+                "x": 655.0,
+                "radius": 62.0,
+                "label": "office desk"
+              },
+              {
+                "id": "wardrobe",
+                "room": "laundry",
+                "x": 885.0,
+                "radius": 58.0,
+                "label": "wardrobe"
+              },
+              {
+                "id": "crate",
+                "room": "exit",
+                "x": 1125.0,
+                "radius": 50.0,
+                "label": "delivery crate"
+              }
+            ],
+            "cameras": [
+              {
+                "id": "cam-hall",
+                "room": "hall",
+                "x": 330.0,
+                "range": [
+                  292.0,
+                  495.0
+                ],
+                "phase": 0.2,
+                "stale": false
+              },
+              {
+                "id": "cam-office",
+                "room": "office",
+                "x": 565.0,
+                "range": [
+                  530.0,
+                  782.0
+                ],
+                "phase": 1.3,
+                "stale": false
+              },
+              {
+                "id": "cam-laundry",
+                "room": "laundry",
+                "x": 830.0,
+                "range": [
+                  812.0,
+                  1015.0
+                ],
+                "phase": 2.1,
+                "stale": true
+              }
+            ],
+            "props": {
+              "note": {
+                "x": 92.0,
+                "y": 282.0
+              },
+              "usb": {
+                "x": 622.0,
+                "y": 569.0
+              },
+              "chute": {
+                "x": 946.0,
+                "y": 495.0
+              },
+              "vacuum": {
+                "x": 592.0,
+                "y": 568.0
+              }
+            },
+            "player": {
+              "spawn_x": 72.0,
+              "spawn_y": 531.0,
+              "w": 28.0,
+              "h": 54.0
+            },
+            "billy": {
+              "spawn_x": -90.0,
+              "spawn_y": 521.0,
+              "w": 36.0,
+              "h": 64.0
+            },
+            "objectives": [
+              {
+                "id": "note",
+                "kind": "Note",
+                "label": "Secure the contact note",
+                "room": "kitchen"
+              },
+              {
+                "id": "misdirect",
+                "kind": "Misdirect",
+                "label": "Convince Billy it was the drive",
+                "room": "office"
+              },
+              {
+                "id": "exit",
+                "kind": "Exit",
+                "label": "Reach the service exit or laundry chute",
+                "room": "exit"
+              }
+            ],
+            "actions": {
+              "Camera": {
+                "cost": 18.0,
+                "cooldown": 4.2,
+                "alert_gain": 2.4
+              },
+              "Door": {
+                "cost": 17.0,
+                "cooldown": 1.0,
+                "alert_gain": 3.2
+              },
+              "Vacuum": {
+                "cost": 25.0,
+                "cooldown": 8.0,
+                "alert_gain": 4.2
+              },
+              "Lights": {
+                "cost": 15.0,
+                "cooldown": 5.0,
+                "alert_gain": 8.5
+              }
+            },
+            "difficulty": {
+              "Story": {
+                "label": "STORY",
+                "arrival": [
+                  24.0,
+                  31.0
+                ],
+                "player_speed": 172.0,
+                "sprint": 250.0,
+                "billy_speed": 77.0,
+                "billy_sight": 210.0,
+                "support_limit": 7.2,
+                "bandwidth_regen": 8.0,
+                "badge_delay": 1.65,
+                "usb_timer": 14.0,
+                "camera_lock": 1.05,
+                "alert_gain": 0.78,
+                "score_mult": 0.85,
+                "rescue": true,
+                "trace_threshold": 900
+              },
+              "Standard": {
+                "label": "STANDARD",
+                "arrival": [
+                  19.0,
+                  26.0
+                ],
+                "player_speed": 166.0,
+                "sprint": 242.0,
+                "billy_speed": 91.0,
+                "billy_sight": 245.0,
+                "support_limit": 5.2,
+                "bandwidth_regen": 6.1,
+                "badge_delay": 1.32,
+                "usb_timer": 11.0,
+                "camera_lock": 0.78,
+                "alert_gain": 1.0,
+                "score_mult": 1.0,
+                "rescue": true,
+                "trace_threshold": 600
+              },
+              "Operator": {
+                "label": "OPERATOR",
+                "arrival": [
+                  15.0,
+                  21.0
+                ],
+                "player_speed": 162.0,
+                "sprint": 235.0,
+                "billy_speed": 106.0,
+                "billy_sight": 280.0,
+                "support_limit": 3.8,
+                "bandwidth_regen": 4.5,
+                "badge_delay": 1.02,
+                "usb_timer": 8.5,
+                "camera_lock": 0.58,
+                "alert_gain": 1.2,
+                "score_mult": 1.25,
+                "rescue": false,
+                "trace_threshold": 400
+              }
+            },
+            "tuning": {
+              "geometry": {
+                "floor": 585.0,
+                "room_offset": 14.0,
+                "player_w": 28.0,
+                "player_h": 54.0,
+                "billy_w": 36.0,
+                "billy_h": 64.0,
+                "collision_radius": 30.0,
+                "world_width": 1260.0
+              },
+              "movement": {
+                "gravity": 1080.0,
+                "jump_vy": -430.0,
+                "accel_drive": 980.0,
+                "accel_brake": 1250.0,
+                "crouch_speed": 0.46,
+                "stam_drain": 24.0,
+                "stam_regen": 17.0,
+                "stam_regen_crouch": 11.0,
+                "sprint_min_stam": 2.0,
+                "hide_max_vx": 92.0,
+                "crouch_cam_vx": 80.0,
+                "moving_vx": 65.0,
+                "clamp_lo": 26.0,
+                "clamp_hi": 1250.0,
+                "land_vy": 190.0
+              },
+              "noise": {
+                "jump": 0.7,
+                "land": 0.8,
+                "decay": 1.1,
+                "sprint_base": 0.68,
+                "sprint_k": 0.3,
+                "walk_k": 0.24,
+                "crouch": 0.08,
+                "move_min_vx": 15.0
+              },
+              "fsm": {
+                "start_x": -90.0,
+                "crisis_x": 26.0,
+                "enter_speed": 0.72,
+                "shock_t": 1.15,
+                "assess_speed": 0.55,
+                "patrol_lo": 130.0,
+                "patrol_hi": 355.0,
+                "patrol_pivot": 220.0,
+                "invest_speed": 0.82,
+                "secure_speed": 0.92,
+                "grab_dist": 31.0,
+                "guard_speed": 0.45,
+                "guard_t_note": 1.9,
+                "guard_t_usb": 1.7,
+                "call_t": 1.9,
+                "pursue_speed": 1.2,
+                "pursue_trigger": 115.0,
+                "pursue_giveup_ago": 3.2,
+                "pursue_giveup_dist": 20.0,
+                "accel": 520.0,
+                "clamp_lo": 25.0,
+                "clamp_hi": 1230.0,
+                "badge_open": 1.55,
+                "snack_reach": 12.0,
+                "alert_boost_div": 260.0,
+                "lights_boost_k": 0.035,
+                "vac_distract": 245.0,
+                "sight_back": 0.34,
+                "sight_crouch": 0.62,
+                "sight_office": 1.15,
+                "sight_alert": 1.12,
+                "sight_alert_hi": 65.0,
+                "invest_noise": 0.45,
+                "invest_dist": 260.0
+              },
+              "belief": {
+                "threshold": 48.0,
+                "misdirect_threshold": 72.0,
+                "moving_vx": 65.0,
+                "pi_seen": 4.0,
+                "pi_sprint": 12.0,
+                "note_near": 105.0,
+                "usb_near": 112.0,
+                "note_urg_sprint": 20.0,
+                "note_urg_move": 10.0,
+                "note_urg_still": 4.0,
+                "usb_urg_sprint": 17.0,
+                "usb_urg_move": 8.0,
+                "usb_urg_still": 3.0,
+                "note_carry": 13.0,
+                "usb_carry": 12.0,
+                "prog_gate": 0.12,
+                "pi_decay": 0.9,
+                "note_decay": 0.25,
+                "usb_decay": 0.2,
+                "peel_interest": 36.0,
+                "secure_note_seen": 72.0,
+                "take_usb_seen": 74.0,
+                "take_usb_unseen": 28.0,
+                "camera_player_int": 30.0
+              },
+              "support": {
+                "ping_hall": 0.16,
+                "ping_office": 0.3,
+                "ping_laundry": 0.05,
+                "ping_exit": 0.12,
+                "lowbw_x": 18.0,
+                "lowbw_pen": 0.12,
+                "alert_pen": 0.0022,
+                "hidden": 0.06,
+                "flicker": 0.04,
+                "hop_pen": 0.07,
+                "clamp_min": 0.05,
+                "approach": 1.15,
+                "iso_gate": 0.4,
+                "iso_pressure_div": 130.0,
+                "fray_frac": 0.5,
+                "iso_decay": 1.35,
+                "iso_decay_hidden": 2.2,
+                "ping_dur": 3.4
+              },
+              "bandwidth": {
+                "regen_a": 0.55,
+                "regen_b": 0.75,
+                "alert_decay_quiet": 0.45,
+                "alert_decay_crisis": 0.18,
+                "lockdown": 100.0
+              },
+              "action": {
+                "lights_dur": 1.45,
+                "lights_dur_rm": 0.7,
+                "lights_stun": 1.05,
+                "route_duration": 3.2,
+                "throttle_cdbw": 1.2,
+                "throttle_fray": 4.2,
+                "throttle_badge": 8.0,
+                "call_alert": 12.0
+              },
+              "camera": {
+                "sweep_w": 0.75,
+                "sweep_a": 25.0,
+                "lockout": 5.5,
+                "alert": 14.0,
+                "decay_unseen": 1.4,
+                "decay_off": 2.2
+              },
+              "usb": {
+                "throw_vx": 330.0,
+                "throw_vy": -170.0,
+                "throw_off": 34.0,
+                "held_off": 15.0,
+                "grav": 780.0,
+                "drag": 0.985,
+                "floor": 574.0,
+                "bounce": -0.24,
+                "friction": 0.72,
+                "rest_vx": 14.0,
+                "rest_vy": 18.0,
+                "clamp_lo": 35.0,
+                "clamp_hi": 1235.0,
+                "wipe_alert": 27.0,
+                "throw_alert": 5.0
+              },
+              "vacuum": {
+                "lag_x": 795.0,
+                "ctrl_loss": 0.42,
+                "ctrl_min": 0.22,
+                "lag_warn": 0.72,
+                "ctrl_gain": 0.18,
+                "speed": 72.0,
+                "move_min": 0.26,
+                "target": 958.0,
+                "fall_off": 8.0
+              },
+              "interaction": {
+                "note_dist": 58.0,
+                "note_hold": 0.85,
+                "usb_dist": 50.0,
+                "chute_enter": 62.0,
+                "chute_search_off": 18.0,
+                "chute_search_dist": 70.0,
+                "chute_hold": 1.55,
+                "pickpocket_dist": 57.0,
+                "pickpocket_hold": 0.72,
+                "exit_prompt_x": 1215.0,
+                "exit_x": 1242.0
+              },
+              "rescue": {
+                "support_min": 0.68,
+                "bw_min": 20.0,
+                "bw_cost": 20.0,
+                "stun": 1.6,
+                "grace": 1.8,
+                "displace": 58.0
+              }
+            },
+            "scoring": {
+              "base": 700.0,
+              "note": 650.0,
+              "note_lost": -260.0,
+              "note_none": -80.0,
+              "misdir": 330.0,
+              "misdir_leak": -180.0,
+              "noboss": 150.0,
+              "boss": -140.0,
+              "nocam": 120.0,
+              "cam_each": -65.0,
+              "iso_ok": 100.0,
+              "iso_snap": -90.0,
+              "iso_snap_frac": 0.55,
+              "chute": 110.0,
+              "usbtrace": -170.0,
+              "rescue": -80.0,
+              "time_base": 220.0,
+              "time_k": 1.7,
+              "alert_k": 2.7,
+              "fail_act": 28.0,
+              "fail_note": 420.0,
+              "fail_base": 120.0,
+              "fail_usb": 180.0,
+              "fail_alert_k": 2.0,
+              "grades": {
+                "s": 1850.0,
+                "a": 1450.0,
+                "b": 1050.0,
+                "c": 700.0,
+                "fail_c": 500.0
+              }
+            },
+            "spawn": {
+              "note_x": [
+                92.0,
+                78.0
+              ],
+              "usb_x": [
+                622.0,
+                112.0
+              ],
+              "stale_pulse": [
+                2.5,
+                3.5
+              ],
+              "snack_x": [
+                165.0,
+                68.0
+              ],
+              "door_delay": [
+                0.22,
+                0.5
+              ],
+              "operator_door_penalty": 0.45
+            }
+          }
+        }
+      ],
+      "portals": [
+        {
+          "id": "p-front",
+          "kind": "Door",
+          "label": "FRONT DOORS",
+          "from": {
+            "floor": "exchange",
+            "room": "lobby"
+          },
+          "to": {
+            "floor": "exchange",
+            "room": "hall"
+          },
+          "travel_time": 2.0
+        },
+        {
+          "id": "p-tellers",
+          "kind": "Door",
+          "label": "TELLER GATE",
+          "from": {
+            "floor": "exchange",
+            "room": "hall"
+          },
+          "to": {
+            "floor": "exchange",
+            "room": "tellers"
+          },
+          "travel_time": 2.0,
+          "lock": {
+            "controller": "lock-tellers"
+          },
+          "circuit": "main"
+        },
+        {
+          "id": "p-stair-1",
+          "kind": "Stair",
+          "label": "MAIN STAIR",
+          "from": {
+            "floor": "exchange",
+            "room": "hall"
+          },
+          "to": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "travel_time": 6.0
+        },
+        {
+          "id": "p-bullpen",
+          "kind": "Door",
+          "label": "BULLPEN DOOR",
+          "from": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "to": {
+            "floor": "office",
+            "room": "bullpen"
+          },
+          "travel_time": 2.0
+        },
+        {
+          "id": "p-manager",
+          "kind": "Door",
+          "label": "MANAGER'S DOOR",
+          "from": {
+            "floor": "office",
+            "room": "bullpen"
+          },
+          "to": {
+            "floor": "office",
+            "room": "manager"
+          },
+          "travel_time": 2.0
+        },
+        {
+          "id": "p-lift-01",
+          "kind": "Lift",
+          "label": "LIFT (GROUND-FIRST)",
+          "from": {
+            "floor": "exchange",
+            "room": "lobby"
+          },
+          "to": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "travel_time": 8.0,
+          "circuit": "main"
+        },
+        {
+          "id": "p-lift-12",
+          "kind": "Lift",
+          "label": "LIFT (FIRST-SECOND)",
+          "from": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "kitchen"
+          },
+          "travel_time": 8.0,
+          "circuit": "main"
+        },
+        {
+          "id": "p-stair-2",
+          "kind": "Stair",
+          "label": "BACK STAIR",
+          "from": {
+            "floor": "office",
+            "room": "landing"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "kitchen"
+          },
+          "travel_time": 6.0
+        },
+        {
+          "id": "p-hatch",
+          "kind": "Ladder",
+          "label": "SERVICE HATCH",
+          "from": {
+            "floor": "exchange",
+            "room": "lobby"
+          },
+          "to": {
+            "floor": "service",
+            "room": "plant"
+          },
+          "travel_time": 5.0
+        },
+        {
+          "id": "p-crawl",
+          "kind": "Door",
+          "label": "CRAWL DOOR",
+          "from": {
+            "floor": "service",
+            "room": "plant"
+          },
+          "to": {
+            "floor": "service",
+            "room": "crawl"
+          },
+          "travel_time": 3.0
+        },
+        {
+          "id": "p-vent-tellers",
+          "kind": "Vent",
+          "label": "TELLER VENT GRILLE",
+          "from": {
+            "floor": "service",
+            "room": "crawl"
+          },
+          "to": {
+            "floor": "exchange",
+            "room": "tellers"
+          },
+          "travel_time": 10.0,
+          "lock": {
+            "controller": "lock-grille"
+          },
+          "circuit": "service"
+        },
+        {
+          "id": "p-vent-laundry",
+          "kind": "Vent",
+          "label": "LAUNDRY RISER VENT",
+          "from": {
+            "floor": "service",
+            "room": "crawl"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "laundry"
+          },
+          "travel_time": 14.0
+        },
+        {
+          "id": "ghost-lobby-d1",
+          "kind": "Door",
+          "label": "KITCHEN/HALL",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "kitchen"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "hall"
+          },
+          "travel_time": 1.0
+        },
+        {
+          "id": "ghost-lobby-d2",
+          "kind": "Door",
+          "label": "HALL/OFFICE",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "hall"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "office"
+          },
+          "travel_time": 1.0
+        },
+        {
+          "id": "ghost-lobby-d3",
+          "kind": "Door",
+          "label": "OFFICE/LAUNDRY",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "office"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "laundry"
+          },
+          "travel_time": 1.0
+        },
+        {
+          "id": "ghost-lobby-d4",
+          "kind": "Door",
+          "label": "SERVICE EXIT",
+          "from": {
+            "floor": "ghost-lobby",
+            "room": "laundry"
+          },
+          "to": {
+            "floor": "ghost-lobby",
+            "room": "exit"
+          },
+          "travel_time": 1.0
+        }
+      ],
+      "circuits": [
+        {
+          "id": "main",
+          "name": "MAIN RISER",
+          "source": "feed-main",
+          "zone": "corp"
+        },
+        {
+          "id": "service",
+          "name": "SERVICE RISER",
+          "source": "feed-service",
+          "zone": "ot"
+        }
+      ],
+      "zones": [
+        {
+          "id": "corp",
+          "name": "CORPORATE LAN",
+          "subnet": "10.60.10.",
+          "rooms": [
+            {
+              "floor": "exchange",
+              "room": "lobby"
+            },
+            {
+              "floor": "exchange",
+              "room": "hall"
+            },
+            {
+              "floor": "exchange",
+              "room": "tellers"
+            },
+            {
+              "floor": "office",
+              "room": "landing"
+            },
+            {
+              "floor": "office",
+              "room": "bullpen"
+            },
+            {
+              "floor": "office",
+              "room": "manager"
+            }
+          ]
+        },
+        {
+          "id": "ops",
+          "name": "OPERATIONS LAN",
+          "subnet": "10.60.20.",
+          "rooms": [
+            {
+              "floor": "ghost-lobby",
+              "room": "kitchen"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "hall"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "office"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "laundry"
+            },
+            {
+              "floor": "ghost-lobby",
+              "room": "exit"
+            }
+          ]
+        },
+        {
+          "id": "ot",
+          "name": "BUILDING OT",
+          "subnet": "10.60.30.",
+          "rooms": [
+            {
+              "floor": "service",
+              "room": "plant"
+            },
+            {
+              "floor": "service",
+              "room": "crawl"
+            }
+          ]
+        }
+      ]
+    },
+    "state": {
+      "at": {
+        "floor": "ghost-lobby",
+        "room": "kitchen"
+      },
+      "clock": 18.0,
+      "traversals": 5,
+      "visited": [
+        {
+          "floor": "exchange",
+          "room": "lobby"
+        },
+        {
+          "floor": "exchange",
+          "room": "hall"
+        },
+        {
+          "floor": "exchange",
+          "room": "tellers"
+        },
+        {
+          "floor": "office",
+          "room": "landing"
+        },
+        {
+          "floor": "ghost-lobby",
+          "room": "kitchen"
+        }
+      ],
+      "portals_used": [
+        "p-front",
+        "p-tellers",
+        "p-stair-1",
+        "p-stair-2"
+      ],
+      "powered": {
+        "main": false,
+        "service": true
+      },
+      "locked": {
+        "p-tellers": false,
+        "p-vent-tellers": true
+      },
+      "circuits_cut": [
+        "main"
+      ]
+    },
+    "validation": {
+      "checks": [
+        {
+          "id": "format.recognised",
+          "label": "The payload format tag is the one this build reads",
+          "passed": true,
+          "detail": "found \"idaptik-scenario/1\", expected \"idaptik-scenario/1\"",
+          "family": "format"
+        },
+        {
+          "id": "floors.present",
+          "label": "At least one floor is defined",
+          "passed": true,
+          "detail": "4 floor(s)",
+          "family": "floors"
+        },
+        {
+          "id": "floors.unique_ids",
+          "label": "Floor ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "floors"
+        },
+        {
+          "id": "floors.unique_levels",
+          "label": "Storey levels are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "floors"
+        },
+        {
+          "id": "floors.billy",
+          "label": "Exactly one Billy floor is designated",
+          "passed": true,
+          "detail": "1 Billy floor(s)",
+          "family": "floors"
+        },
+        {
+          "id": "floors.rooms_present",
+          "label": "Every floor has at least one room",
+          "passed": true,
+          "detail": "all populated",
+          "family": "floors"
+        },
+        {
+          "id": "rooms.unique",
+          "label": "Every (floor, room) pair is unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "rooms"
+        },
+        {
+          "id": "scenario.valid",
+          "label": "Every embedded scenario definition validates",
+          "passed": true,
+          "detail": "all valid",
+          "family": "scenario"
+        },
+        {
+          "id": "scenario.rooms_match",
+          "label": "Every scenario floor's rooms mirror its scenario's rooms",
+          "passed": true,
+          "detail": "all mirrored",
+          "family": "scenario"
+        },
+        {
+          "id": "portals.unique_ids",
+          "label": "Portal ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "portals"
+        },
+        {
+          "id": "portals.endpoints_resolve",
+          "label": "Every portal endpoint names a real room",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "portals"
+        },
+        {
+          "id": "portals.no_self_loop",
+          "label": "No portal connects a room to itself",
+          "passed": true,
+          "detail": "none",
+          "family": "portals"
+        },
+        {
+          "id": "portals.travel_time",
+          "label": "Every travel time is finite and non-negative",
+          "passed": true,
+          "detail": "all valid",
+          "family": "portals"
+        },
+        {
+          "id": "portals.lock_controller",
+          "label": "Every lock controller id is non-empty and unique",
+          "passed": true,
+          "detail": "all valid",
+          "family": "portals"
+        },
+        {
+          "id": "portals.lift_powered",
+          "label": "Every lift draws from a circuit",
+          "passed": true,
+          "detail": "all powered",
+          "family": "portals"
+        },
+        {
+          "id": "portals.circuit_resolves",
+          "label": "Every portal circuit names a real circuit",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "portals"
+        },
+        {
+          "id": "circuits.unique_ids",
+          "label": "Circuit ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "circuits"
+        },
+        {
+          "id": "circuits.source",
+          "label": "Every circuit source id is non-empty and unique",
+          "passed": true,
+          "detail": "all valid",
+          "family": "circuits"
+        },
+        {
+          "id": "circuits.zone_resolves",
+          "label": "Every circuit sits on a real zone",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "circuits"
+        },
+        {
+          "id": "zones.unique_ids",
+          "label": "Zone ids are unique",
+          "passed": true,
+          "detail": "all unique",
+          "family": "zones"
+        },
+        {
+          "id": "zones.subnet",
+          "label": "Every zone subnet is a usable dotted prefix",
+          "passed": true,
+          "detail": "all usable",
+          "family": "zones"
+        },
+        {
+          "id": "zones.rooms_resolve",
+          "label": "Every zone room names a real room",
+          "passed": true,
+          "detail": "all resolve",
+          "family": "zones"
+        },
+        {
+          "id": "zones.rooms_disjoint",
+          "label": "Every room sits in at most one zone",
+          "passed": true,
+          "detail": "all disjoint",
+          "family": "zones"
+        },
+        {
+          "id": "graph.entry_resolves",
+          "label": "The entry names a real room",
+          "passed": true,
+          "detail": "entry exchange/lobby",
+          "family": "graph"
+        },
+        {
+          "id": "graph.connected",
+          "label": "Every room is reachable from the entry",
+          "passed": true,
+          "detail": "13 room(s) reachable",
+          "family": "graph"
+        }
+      ]
+    }
+  },
+  "levelconfig": {
+    "format": "idaptik-legacy-levelconfig-v1",
+    "name": "Exchange House",
+    "rooms": [
+      {
+        "id": "service/plant",
+        "name": "PLANT ROOM",
+        "floor": "service",
+        "level": -1
+      },
+      {
+        "id": "service/crawl",
+        "name": "CRAWLSPACE",
+        "floor": "service",
+        "level": -1
+      },
+      {
+        "id": "exchange/lobby",
+        "name": "STREET LOBBY",
+        "floor": "exchange",
+        "level": 0
+      },
+      {
+        "id": "exchange/hall",
+        "name": "EXCHANGE HALL",
+        "floor": "exchange",
+        "level": 0
+      },
+      {
+        "id": "exchange/tellers",
+        "name": "TELLER ROW",
+        "floor": "exchange",
+        "level": 0
+      },
+      {
+        "id": "office/landing",
+        "name": "STAIR LANDING",
+        "floor": "office",
+        "level": 1
+      },
+      {
+        "id": "office/bullpen",
+        "name": "CLERKS' BULLPEN",
+        "floor": "office",
+        "level": 1
+      },
+      {
+        "id": "office/manager",
+        "name": "MANAGER'S OFFICE",
+        "floor": "office",
+        "level": 1
+      },
+      {
+        "id": "ghost-lobby/kitchen",
+        "name": "KITCHEN / BREAK ROOM",
+        "floor": "ghost-lobby",
+        "level": 2
+      },
+      {
+        "id": "ghost-lobby/hall",
+        "name": "HALLWAY",
+        "floor": "ghost-lobby",
+        "level": 2
+      },
+      {
+        "id": "ghost-lobby/office",
+        "name": "LIT OFFICE / USB TRAP",
+        "floor": "ghost-lobby",
+        "level": 2
+      },
+      {
+        "id": "ghost-lobby/laundry",
+        "name": "LAUNDRY / WARDROBE",
+        "floor": "ghost-lobby",
+        "level": 2
+      },
+      {
+        "id": "ghost-lobby/exit",
+        "name": "SERVICE EXIT",
+        "floor": "ghost-lobby",
+        "level": 2
+      }
+    ],
+    "connections": [
+      {
+        "from": "exchange/lobby",
+        "to": "exchange/hall",
+        "kind": "Door",
+        "travel_time": 2.0,
+        "locked": false
+      },
+      {
+        "from": "exchange/hall",
+        "to": "exchange/tellers",
+        "kind": "Door",
+        "travel_time": 2.0,
+        "locked": true
+      },
+      {
+        "from": "exchange/hall",
+        "to": "office/landing",
+        "kind": "Stair",
+        "travel_time": 6.0,
+        "locked": false
+      },
+      {
+        "from": "office/landing",
+        "to": "office/bullpen",
+        "kind": "Door",
+        "travel_time": 2.0,
+        "locked": false
+      },
+      {
+        "from": "office/bullpen",
+        "to": "office/manager",
+        "kind": "Door",
+        "travel_time": 2.0,
+        "locked": false
+      },
+      {
+        "from": "exchange/lobby",
+        "to": "office/landing",
+        "kind": "Lift",
+        "travel_time": 8.0,
+        "locked": false
+      },
+      {
+        "from": "office/landing",
+        "to": "ghost-lobby/kitchen",
+        "kind": "Lift",
+        "travel_time": 8.0,
+        "locked": false
+      },
+      {
+        "from": "office/landing",
+        "to": "ghost-lobby/kitchen",
+        "kind": "Stair",
+        "travel_time": 6.0,
+        "locked": false
+      },
+      {
+        "from": "exchange/lobby",
+        "to": "service/plant",
+        "kind": "Ladder",
+        "travel_time": 5.0,
+        "locked": false
+      },
+      {
+        "from": "service/plant",
+        "to": "service/crawl",
+        "kind": "Door",
+        "travel_time": 3.0,
+        "locked": false
+      },
+      {
+        "from": "service/crawl",
+        "to": "exchange/tellers",
+        "kind": "Vent",
+        "travel_time": 10.0,
+        "locked": true
+      },
+      {
+        "from": "service/crawl",
+        "to": "ghost-lobby/laundry",
+        "kind": "Vent",
+        "travel_time": 14.0,
+        "locked": false
+      },
+      {
+        "from": "ghost-lobby/kitchen",
+        "to": "ghost-lobby/hall",
+        "kind": "Door",
+        "travel_time": 1.0,
+        "locked": false
+      },
+      {
+        "from": "ghost-lobby/hall",
+        "to": "ghost-lobby/office",
+        "kind": "Door",
+        "travel_time": 1.0,
+        "locked": false
+      },
+      {
+        "from": "ghost-lobby/office",
+        "to": "ghost-lobby/laundry",
+        "kind": "Door",
+        "travel_time": 1.0,
+        "locked": false
+      },
+      {
+        "from": "ghost-lobby/laundry",
+        "to": "ghost-lobby/exit",
+        "kind": "Door",
+        "travel_time": 1.0,
+        "locked": false
+      }
+    ]
+  },
+  "after_action": {
+    "format": "idaptik-building-after-action-v1",
+    "debrief": {
+      "format": "idaptik-building-after-action-v1",
+      "elapsed": 18.0,
+      "traversals": 5,
+      "rooms_visited": [
+        "exchange/lobby",
+        "exchange/hall",
+        "exchange/tellers",
+        "office/landing",
+        "ghost-lobby/kitchen"
+      ],
+      "portals_used": [
+        "p-front",
+        "p-tellers",
+        "p-stair-1",
+        "p-stair-2"
+      ],
+      "circuits_cut": [
+        "main"
+      ]
+    }
+  }
+}
