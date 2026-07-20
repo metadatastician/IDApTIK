@@ -39,11 +39,13 @@ pub struct AgentSession {
     logs: Vec<String>,
 }
 
-/// Whether a device kind can be used as a pivot foothold.
+/// Whether a device kind can be used as a pivot foothold. General-purpose
+/// hosts qualify (Desktop is the UMS-authored sibling of Laptop/Terminal);
+/// infrastructure such as Router/Switch/AccessPoint and passive plant do not.
 fn pivotable(kind: DeviceKind) -> bool {
     matches!(
         kind,
-        DeviceKind::Server | DeviceKind::Laptop | DeviceKind::Terminal
+        DeviceKind::Server | DeviceKind::Laptop | DeviceKind::Terminal | DeviceKind::Desktop
     )
 }
 
@@ -236,6 +238,24 @@ mod tests {
             ],
             dns: vec![],
             vantages: vec![],
+        }
+    }
+
+    /// The UMS parity kinds split the same way the originals do: an authored
+    /// Desktop is a foothold like Laptop/Terminal, while Switch/AccessPoint are
+    /// infrastructure like Router and passive plant is never a foothold.
+    #[test]
+    fn ums_parity_kinds_split_pivotable_as_ruled() {
+        assert!(pivotable(DeviceKind::Desktop));
+        for kind in [
+            DeviceKind::PatchPanel,
+            DeviceKind::FibreHub,
+            DeviceKind::PhoneSystem,
+            DeviceKind::AccessPoint,
+            DeviceKind::Switch,
+            DeviceKind::PowerSupply,
+        ] {
+            assert!(!pivotable(kind), "{kind:?} must not be a pivot foothold");
         }
     }
 
