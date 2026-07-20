@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: MPL-2.0
+# 0-AI-MANIFEST.a2ml — Root AI manifest for IDApTIK
+
+## Purpose
+
+This is the root AI-assistant manifest for IDApTIK, an asymmetric two-player
+infiltration game (attempt four): Rust owns gameplay truth, Elixir owns
+multiplayer/session life. Read this first, then
+`.machine_readable/6a2/STATE.a2ml`.
+
+## Where Things Live
+
+- `crates/idaptik-core`  — engine-agnostic gameplay truth (network sim + scenario); no rendering.
+- `crates/idaptik-ffi`   — C-ABI surface for Zig/Idris2 consumers (ADR-0001).
+- `crates/idaptik-tui`   — ratatui/crossterm frontend + headless/replay/export verifier (ADR-0004).
+- `crates/idaptik-bevy`  — Bevy rendering frontend (evaluation, ADR-0003).
+- `crates/idaptik-fyrox` — Fyrox rendering frontend (evaluation, ADR-0003).
+- `server/`              — Elixir/OTP session relay: Bandit + Phoenix Channels (ADR-0002, ADR-0005).
+- `config/`              — Nickel typed, schema-checked game/level/network config.
+- `docs/adr/`            — architecture decision records (ADR-0001..0006).
+- `.machine_readable/`   — this manifest's detail: 6a2/ (six core A2ML files) + contractiles/.
+
+## Machine-Readable Standard
+
+- `.machine_readable/6a2/`         — STATE, META, ECOSYSTEM, AGENTIC, NEUROSYM, PLAYBOOK (+ 0-AI-MANIFEST, README.adoc).
+- `.machine_readable/contractiles/` — Intentfile, Mustfile, Trustfile, Adjustfile, Justfile, dust/Dustfile, bust/Bustfile.
+- `k9iser.toml`                    — wraps IDApTIK's real TOML configs into self-validating K9 contracts.
+
+## Invariants (read before editing)
+
+- Licence layers are deliberate and layered: engine & code are
+  AGPL-3.0-or-later (strong copyleft, including hosted service), game content
+  is CC-BY-SA-4.0, and the names/marks (IDApTIK, Moletaire) are trademarked.
+  Do NOT relicense the engine or flatten the layers.
+- Gameplay truth lives in crates/idaptik-core and stays engine-agnostic and
+  deterministic; Bevy/Fyrox are thin, replaceable frontends.
+- The session layer is Bandit + Phoenix Channels, not LiveView.
+- State/metadata belongs under .machine_readable/, not the repository root.
+- Contributions come in under the DCO 1.1 — sign commits with `git commit -s`.

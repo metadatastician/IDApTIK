@@ -1,0 +1,97 @@
+# SPDX-License-Identifier: MPL-2.0
+# Mustfile — Physical-state contract for IDApTIK
+# Author: IDApTIK contributors
+#
+# What MUST be true about this repository. Hard requirements.
+# Run with: must check
+
+@abstract:
+Physical-state invariants for IDApTIK, the asymmetric two-player infiltration
+game (Rust gameplay truth + Elixir session relay). These are hard
+requirements: CI and pre-commit hooks should fail if any check fails. Probes
+target IDApTIK's real tree, not a generic template.
+@end
+
+## File Presence
+
+### license-present
+- description: LICENSE file must exist
+- run: test -f LICENSE
+- severity: critical
+
+### license-texts-present
+- description: All three licence-layer texts are vendored under LICENSES/
+- run: test -f LICENSES/AGPL-3.0-or-later.txt && test -f LICENSES/CC-BY-SA-4.0.txt
+- severity: critical
+
+### readme-present
+- description: README.md must exist
+- run: test -f README.md
+- severity: critical
+
+### ai-manifest-present
+- description: Root 0-AI-MANIFEST.a2ml must exist
+- run: test -f 0-AI-MANIFEST.a2ml
+- severity: critical
+
+### governance-docs
+- description: GOVERNANCE.md, MAINTAINERS, CODE_OF_CONDUCT.md, and CODEOWNERS must exist
+- run: test -f GOVERNANCE.md && test -f MAINTAINERS && test -f CODE_OF_CONDUCT.md && test -f .github/CODEOWNERS
+- severity: critical
+
+## Toolchain Pins
+
+### mise-pins-present
+- description: mise.toml pins the toolchains (ADR-0001)
+- run: test -f mise.toml && grep -q 'zig' mise.toml && grep -q 'elixir' mise.toml
+- severity: critical
+
+### rust-toolchain-pinned
+- description: rust-toolchain.toml pins the Rust channel (MSRV for Bevy 0.19)
+- run: test -f rust-toolchain.toml && grep -q 'channel = "1.95.0"' rust-toolchain.toml
+- severity: critical
+
+### engine-license-agpl
+- description: The Cargo workspace declares the engine licence AGPL-3.0-or-later
+- run: grep -q 'license = "AGPL-3.0-or-later"' Cargo.toml
+- severity: critical
+- notes: The engine is strong copyleft by design; do not relicense without an ADR.
+
+## Directory Structure
+
+### crates-workspace
+- description: The Rust workspace crates exist (core + ffi + tui + bevy + fyrox)
+- run: test -d crates/idaptik-core && test -d crates/idaptik-ffi && test -d crates/idaptik-tui && test -d crates/idaptik-bevy && test -d crates/idaptik-fyrox
+- severity: critical
+
+### server-and-config
+- description: The Elixir server relay and the Nickel config dir exist
+- run: test -d server && test -d config
+- severity: critical
+
+### adr-records
+- description: The architecture decision records exist (ADR-0001..0006)
+- run: test -f docs/adr/0001-toolchain-and-runtime-management.md && test -f docs/adr/0006-gossamer-host-and-burble-transport.md
+- severity: warning
+
+## Machine-Readable Structure
+
+### machine-readable-dir
+- description: .machine_readable/ directory must exist
+- run: test -d .machine_readable
+- severity: critical
+
+### six-directory-present
+- description: 6a2 directory holds all six core A2ML files
+- run: test -d .machine_readable/6a2 && test -f .machine_readable/6a2/META.a2ml && test -f .machine_readable/6a2/ECOSYSTEM.a2ml && test -f .machine_readable/6a2/STATE.a2ml && test -f .machine_readable/6a2/PLAYBOOK.a2ml && test -f .machine_readable/6a2/AGENTIC.a2ml && test -f .machine_readable/6a2/NEUROSYM.a2ml
+- severity: critical
+
+### contractiles-present
+- description: All four primary contractile files plus bust/dust exist
+- run: test -f .machine_readable/contractiles/Intentfile.a2ml && test -f .machine_readable/contractiles/Mustfile.a2ml && test -f .machine_readable/contractiles/Trustfile.a2ml && test -f .machine_readable/contractiles/Adjustfile.a2ml && test -f .machine_readable/contractiles/bust/Bustfile.a2ml && test -f .machine_readable/contractiles/dust/Dustfile.a2ml
+- severity: critical
+
+### k9iser-manifest
+- description: k9iser.toml manifest exists at the repository root
+- run: test -f k9iser.toml
+- severity: critical
