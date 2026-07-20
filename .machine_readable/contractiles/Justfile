@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MPL-2.0
+# Contractile Justfile for IDApTIK — runs the machine-readable checks.
+#
+# These recipes exercise the contractile set and the k9iser/a2ml validators.
+# Paths are relative to the repository root; run from there:
+#   just -f .machine_readable/contractiles/Justfile <recipe>
+
+set shell := ["bash", "-uc"]
+
+# List available recipes.
+default:
+    @just --list --unsorted
+
+# Validate the whole A2ML set (a2ml-validate-action semantics).
+validate-a2ml path=".machine_readable":
+    @INPUT_PATH="{{path}}" bash validate-a2ml.sh
+
+# Validate the k9iser.toml manifest for correctness.
+k9-validate:
+    @k9iser validate --manifest k9iser.toml
+
+# Generate the K9 contracts from the manifest + real configs.
+k9-generate:
+    @k9iser generate --manifest k9iser.toml --output generated/k9iser
+
+# Validate the real configs against their generated K9 contracts.
+# NOTE: k9iser build resolves sources relative to the CWD — run from repo root.
+k9-build:
+    @k9iser build --manifest k9iser.toml
+
+# Run the MUST hard-gate probes (informational aggregate).
+must-check:
+    @echo "See .machine_readable/contractiles/Mustfile.a2ml for the probe list."
+
+# Show the current project phase from STATE.a2ml.
+phase:
+    @grep -oP 'current-phase\s*=\s*"\K[^"]+' .machine_readable/6a2/STATE.a2ml | head -1

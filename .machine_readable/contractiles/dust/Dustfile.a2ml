@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: MPL-2.0
+# Dustfile — Cleanup and hygiene contract for IDApTIK
+# Author: IDApTIK contributors
+#
+# Paired runner: dust.ncl
+# Verb:          dust
+# Semantics:     What should be cleaned up. Housekeeping, not blockers.
+
+@abstract:
+Cleanup and hygiene items for IDApTIK. These are maintenance tasks that keep
+the repository tidy — stale build artifacts, editor cruft, and metadata drift
+— none of which block a build.
+@end
+
+## Stale Files
+
+### no-build-artifacts-committed
+- description: Rust/Elixir build output is not committed
+- run: test ! -d target/CACHEDIR.TAG && test -z "$(git ls-files target _build 2>/dev/null)"
+- severity: info
+- notes: target/ and _build/ are git-ignored; they should never be tracked.
+
+### no-editor-cruft
+- description: No stray editor/backup files in the tree
+- run: test -z "$(find . -path ./target -prune -o \( -name '*.orig' -o -name '*~' -o -name '.DS_Store' \) -print 2>/dev/null | head -1)"
+- severity: info
+
+## Format Hygiene
+
+### metadata-format-a2ml
+- description: Machine-readable metadata files use the .a2ml format
+- run: test -z "$(find .machine_readable -name '*.contractile' -o -name '*.hs' 2>/dev/null | head -1)"
+- severity: warning
+- notes: All contractiles should be .a2ml.
+
+### no-duplicate-root-metadata
+- description: No stray STATE/META/etc. copies in the repository root
+- run: test ! -f STATE.a2ml && test ! -f META.a2ml && test ! -f ECOSYSTEM.a2ml
+- severity: warning
+- notes: The authoritative copies live under .machine_readable/6a2/.
+
+## Generated Output
+
+### k9-generated-not-tracked
+- description: k9iser-generated contracts are regenerable and need not be committed
+- run: test -z "$(git ls-files generated/k9iser 2>/dev/null)"
+- severity: info
+- notes: Re-emit with `k9iser generate`; keep them out of version control unless intentionally pinned.
