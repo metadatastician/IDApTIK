@@ -8,7 +8,8 @@
     | doc "The kind of device on the network."
     = [| 'Laptop, 'Router, 'Server, 'IotCamera, 'Terminal, 'PowerStation, 'Ups,
          'Firewall, 'SmartDoor, 'Camera, 'Lock, 'Elevator, 'Light, 'Sensor,
-         'Substation |],
+         'Substation, 'PatchPanel, 'FibreHub, 'PhoneSystem, 'AccessPoint,
+         'Switch, 'Desktop, 'PowerSupply |],
 
   SecurityLevel
     | doc "How hard a device is to compromise."

@@ -9,8 +9,10 @@ use std::net::Ipv4Addr;
 pub struct DeviceId(pub u32);
 
 /// The kind of device on the network. The original taxonomy (Laptop, Router,
-/// Server, IoT camera, Terminal, PowerStation, UPS) plus a Firewall and the
-/// physical-function devices the hacker actuates.
+/// Server, IoT camera, Terminal, PowerStation, UPS) plus a Firewall, the
+/// physical-function devices the hacker actuates, and the UMS editor kinds
+/// (below the marker comment) so `idaptik-edit/1` content maps 1:1 into the
+/// game with no lossy remapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DeviceKind {
     Laptop,
@@ -28,6 +30,18 @@ pub enum DeviceKind {
     Light,
     Sensor,
     Substation,
+    // UMS parity (idaptik-edit/1): kinds the level editor authors that the game
+    // taxonomy lacked. Appended so existing wire tags and orderings are
+    // untouched. Passive plant (PatchPanel, FibreHub, PowerSupply) carries no
+    // actuation; infrastructure (Switch, AccessPoint) plays a Router-like
+    // topology role; Desktop is an end-user host like Laptop/Terminal.
+    PatchPanel,
+    FibreHub,
+    PhoneSystem,
+    AccessPoint,
+    Switch,
+    Desktop,
+    PowerSupply,
 }
 
 /// How hard a device is to compromise. Ordered from easiest to hardest, so
@@ -84,6 +98,27 @@ mod tests {
     fn security_levels_are_ordered() {
         assert!(SecurityLevel::Open < SecurityLevel::Strong);
         assert!(SecurityLevel::Medium >= SecurityLevel::Weak);
+    }
+
+    /// The UMS↔game seam (idaptik-edit/1) maps device kinds by these exact
+    /// wire tags; a rename here silently breaks every authored DLC manifest.
+    #[test]
+    fn ums_parity_kinds_have_stable_wire_tags() {
+        let tags = [
+            (DeviceKind::PatchPanel, "\"PatchPanel\""),
+            (DeviceKind::FibreHub, "\"FibreHub\""),
+            (DeviceKind::PhoneSystem, "\"PhoneSystem\""),
+            (DeviceKind::AccessPoint, "\"AccessPoint\""),
+            (DeviceKind::Switch, "\"Switch\""),
+            (DeviceKind::Desktop, "\"Desktop\""),
+            (DeviceKind::PowerSupply, "\"PowerSupply\""),
+        ];
+        for (kind, tag) in tags {
+            let json = serde_json::to_string(&kind).expect("kinds serialize");
+            assert_eq!(json, tag);
+            let back: DeviceKind = serde_json::from_str(&json).expect("kinds deserialize");
+            assert_eq!(back, kind);
+        }
     }
 
     #[test]
