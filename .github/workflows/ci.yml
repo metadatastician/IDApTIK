@@ -1,0 +1,59 @@
+# Build + test CI for IDApTIK.
+#
+# Until now the only workflow was CodeQL; none of the project's own gates ran on
+# push/PR. This wires the two real local gates into CI so they are enforced:
+#
+#   just test-ghost           -> cargo test (core/tui/ffi) + clippy -D warnings + fmt --check
+#   just config-scenario-check -> Nickel export round-trips through the Rust
+#                                 validator AND every bad_*.ncl fixture is rejected
+#
+# Both were confirmed green locally before this workflow was added. Bevy/Fyrox
+# frontends are deliberately excluded (they need system GPU/windowing libs and
+# are evaluation-only); test-ghost already scopes to core/tui/ffi.
+#
+# The Rust toolchain (channel + clippy/rustfmt/rust-src + wasm32 target) is pinned
+# by rust-toolchain.toml, which rustup installs automatically on first use.
+
+name: CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-ghost:
+    name: test-ghost (core/tui/ffi + clippy + fmt)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Install just (task runner, same recipe as local)
+        run: cargo install just --version 1.46.0 --locked
+      - name: just test-ghost
+        run: just test-ghost
+
+  config-scenario-check:
+    name: config-scenario-check (Nickel negative fixtures + round-trip)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Install just + nickel (versions mirror mise.toml)
+        run: |
+          cargo install just --version 1.46.0 --locked
+          cargo install nickel-lang-cli --version 1.16.0 --locked
+      - name: just config-scenario-check
+        run: just config-scenario-check
