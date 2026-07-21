@@ -267,3 +267,40 @@ amended to say so.
   *barrier* — a seat streams commands only after holding the peer's
   `net:hello`, re-sent on `peer_joined`, because a relay-only topic has no
   history and anything sent before both seats are joined is unobservable.
+
+## Status note (2026-07-21, later): the interactive-client slice landed
+
+The live seat exists (`idaptik-netplay`): delay-based lockstep on the same
+wire shapes, with the `idaptik-tui` face reused for interactive play
+(`--interactive`) and a scripted feed for verification. What v1 deferred is
+now real, and the loss path gained its second half:
+
+- **Real-time pacing over `at`** — input sampled at local step `T` executes
+  at `T + input_delay`; pacing hides latency, nobody rolls back, and seats
+  with *different* delays interoperate (every command carries its own `at`).
+- **`net:commit` watermarks** — sparse command streams cannot distinguish
+  "no command at tick T" from "command still in flight", so each seat follows
+  its sends with a cumulative `net:commit { through }`; a tick executes only
+  when both watermarks cover it. Protocol version in `net:hello` is now 2.
+- **Pause is lockstep-safe by construction** — `Pause` rides the scheduled
+  command path like any either-seat immediate (scripts spell it
+  `pause`/`resume`).
+- **Resync via `RuntimeSnapshot` (`net:resync`)** — on loss the survivor
+  *holds the run open*; a returning peer (fresh process, `rejoin: true` in
+  its hello) is handed the snapshot (RNG and pause state included), the event
+  log so far, the client fold state, and both seats' committed pending
+  commands with watermarks. The one protocol rule that makes this exact:
+  **uncommitted commands never happened** — the survivor prunes anything at
+  or above the peer's watermark, and the rejoiner resamples those ticks.
+- The loopback gate now also asserts, over the real relay: two live seats
+  (mid-run pause window included, mismatched input delays) byte-identical to
+  the headless reference, and a mid-pause death + rejoin + resync after which
+  **both** seats — the rejoined process included — still end byte-identical
+  to the reference. The sans-IO core (`lockstep.rs`) proves the same
+  properties in unit tests over an in-memory wire, staggered delivery and
+  orphan-command pruning included.
+
+The relay is untouched — still relay-only ADR-0005, no new events, no state;
+everything above is client-side vocabulary on the existing `"event"`
+pass-through. Slices 2–3 (`BurbleTransport`, gossamer wrap) remain gated on
+the unchanged §5 unblock conditions.

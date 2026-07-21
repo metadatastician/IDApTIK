@@ -120,9 +120,14 @@ pub fn decode_command(payload: &Value) -> Result<(u64, Command), NetError> {
 /// Control-message tags (values of the `"event"` key on the event relay).
 pub const HELLO_TAG: &str = "net:hello";
 pub const DIGEST_TAG: &str = "net:digest";
+pub const COMMIT_TAG: &str = "net:commit";
+pub const RESYNC_TAG: &str = "net:resync";
 
-/// The lockstep protocol version inside `net:hello`.
-pub const NET_PROTO: u64 = 1;
+/// The lockstep protocol version inside `net:hello`. v2 added the live-seat
+/// vocabulary: per-tick `net:commit` watermarks, the `rejoin` hello flag and
+/// `net:resync` snapshot hand-off. A v1 (batch) seat and a v2 seat would talk
+/// past each other, so the version gate refuses the pairing up front.
+pub const NET_PROTO: u64 = 2;
 
 /// The session handshake (ADR-0006 §3): announce who you are, the run config
 /// you intend (fixture-style — the script header), and how many scheduled
@@ -138,8 +143,13 @@ pub struct Hello {
     pub difficulty: String,
     pub reduced_motion: bool,
     pub max_ticks: u64,
-    /// How many `"command"` pushes this seat will make.
+    /// How many `"command"` pushes this seat will make. Meaningful for batch
+    /// (scripted) seats; a live seat does not know its future and says `0`.
     pub commands: u64,
+    /// A live seat re-entering a session it lost: it expects a `net:resync`
+    /// from the surviving seat instead of a fresh tick-0 start.
+    #[serde(default)]
+    pub rejoin: bool,
 }
 
 impl Hello {
@@ -153,17 +163,52 @@ impl Hello {
             reduced_motion: script.reduced_motion,
             max_ticks: script.max_ticks,
             commands,
+            rejoin: false,
         }
     }
 
-    /// The seats must be playing the same run. `role`/`commands` legitimately
-    /// differ; everything else must not.
+    /// The seats must be playing the same run. `role`/`commands`/`rejoin`
+    /// legitimately differ; everything else must not. (Input delay is absent on
+    /// purpose: it is per-seat local — every command carries its own `at` and
+    /// every commit its own watermark, so seats with different delays
+    /// interoperate.)
     pub fn compatible_with(&self, other: &Hello) -> bool {
         self.proto == other.proto
             && self.seed == other.seed
             && self.difficulty == other.difficulty
             && self.reduced_motion == other.reduced_motion
             && self.max_ticks == other.max_ticks
+    }
+}
+
+/// The per-tick completeness watermark (live seats only): "every command of
+/// mine scheduled `at <= through` has been pushed". Over an ordered transport
+/// its arrival proves those commands already arrived, which is exactly what a
+/// sparse command stream cannot say on its own — silence at tick T is
+/// otherwise indistinguishable from a command still in flight.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Commit {
+    pub role: Role,
+    pub through: u64,
+}
+
+impl Commit {
+    pub fn to_control(self) -> Value {
+        serde_json::json!({
+            "event": COMMIT_TAG,
+            "role": self.role,
+            "through": self.through,
+        })
+    }
+
+    pub fn from_control(payload: &Value) -> Option<Self> {
+        if event_tag(payload) != Some(COMMIT_TAG) {
+            return None;
+        }
+        Some(Self {
+            role: serde_json::from_value(payload.get("role")?.clone()).ok()?,
+            through: payload.get("through")?.as_u64()?,
+        })
     }
 }
 

@@ -22,16 +22,24 @@
 //!   deterministic run → digest cross-check, with the ADR-0006 §3 loss states
 //!   (`WaitingForPeer` → `Live` → `PeerLost` → clean `Ended`).
 //!
-//! Scope note (v1): the session client is *batch-scripted* — both seats know
-//! their own script up front, exchange all commands through the relay, then run
-//! the sim to completion. That is exactly the loopback gate ADR-0006 §4
-//! specifies. Real-time pacing (input-delay scheduling) and mid-run
-//! pause/resync on `PeerLost` attach to the same seams in the interactive
-//! client slice; the wire shapes here already carry what they need (`at`,
-//! `seq`, `net:` control messages).
+//! Two session machines share those seams:
+//!
+//! - [`session`] — the *batch-scripted* seat (v1, the ADR-0006 §4 loopback
+//!   gate): both seats know their script up front, exchange all commands, then
+//!   run the sim to completion.
+//! - [`lockstep`] + [`live`] — the *live* seat (the interactive-client slice):
+//!   delay-based lockstep with real-time pacing over `at`, per-tick
+//!   `net:commit` watermarks, and mid-run pause/resync — a lost peer can
+//!   rejoin and be handed the survivor's `RuntimeSnapshot` (`net:resync`).
+//!   [`lockstep`] is the sans-IO state machine (unit-proven deterministic);
+//!   [`live`] is the paced async driver; [`interactive`] is the terminal
+//!   frontend reusing `idaptik-tui`'s render/keymap/input pipeline.
 
 pub mod envelope;
 pub mod error;
+pub mod interactive;
+pub mod live;
+pub mod lockstep;
 pub mod phoenix;
 pub mod seat;
 pub mod session;

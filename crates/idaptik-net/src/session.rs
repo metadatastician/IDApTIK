@@ -181,7 +181,7 @@ pub async fn run_scripted_seat<T: SessionTransport>(
 }
 
 /// Serialize a control message and push it on the event relay.
-async fn push_control<T: SessionTransport, M: serde::Serialize>(
+pub(crate) async fn push_control<T: SessionTransport, M: serde::Serialize>(
     client: &mut PhoenixClient<T>,
     msg: &M,
 ) -> Result<(), NetError> {
@@ -297,7 +297,7 @@ async fn lingering_rejoin<T: SessionTransport>(
 }
 
 /// The peer's digest, if it arrives before the peer departs.
-async fn await_peer_digest<T: SessionTransport>(
+pub(crate) async fn await_peer_digest<T: SessionTransport>(
     client: &mut PhoenixClient<T>,
     own_role: Role,
 ) -> Result<Option<Digest>, NetError> {
