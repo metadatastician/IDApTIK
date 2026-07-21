@@ -9,13 +9,20 @@ use idaptik_core::scenario::{GhostLobbySim, RuntimeSnapshot, ghost_lobby};
 use serde::Serialize;
 use std::path::Path;
 
-/// The headless stdout payload.
+/// The wire format tag of [`HeadlessOutput`].
+pub const HEADLESS_FORMAT: &str = "idaptik-ghost-lobby-headless-v1";
+
+/// The headless stdout payload — the determinism artifact.
+///
+/// Public (with public fields) so a networked seat (`idaptik-net`) can emit the
+/// *same* blob: the loopback gate compares seat outputs to each other and to
+/// this runner's output byte-for-byte.
 #[derive(Serialize)]
-struct HeadlessOutput {
-    format: &'static str,
-    event_log: Vec<Event>,
-    debrief: Option<Debrief>,
-    final_snapshot: RuntimeSnapshot,
+pub struct HeadlessOutput {
+    pub format: &'static str,
+    pub event_log: Vec<Event>,
+    pub debrief: Option<Debrief>,
+    pub final_snapshot: RuntimeSnapshot,
 }
 
 /// Build a sim from a script's config and seed.
@@ -45,7 +52,7 @@ pub fn run(path: &Path) -> Result<(), String> {
     let script = load(path)?;
     let (sim, log) = simulate(&script)?;
     let out = HeadlessOutput {
-        format: "idaptik-ghost-lobby-headless-v1",
+        format: HEADLESS_FORMAT,
         debrief: sim.debrief().cloned(),
         final_snapshot: sim.snapshot(),
         event_log: log,

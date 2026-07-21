@@ -2,7 +2,7 @@
 //! (and matches any recorded `expected_event_log`). Prints PASS/FAIL; the caller
 //! turns the boolean into an exit code.
 
-use crate::headless::{load, simulate};
+use idaptik_tui::headless::{load, simulate};
 use std::path::Path;
 
 /// Re-run `path` twice and compare. Returns `Ok(true)` on a byte-identical
