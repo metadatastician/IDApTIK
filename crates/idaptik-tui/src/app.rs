@@ -1,9 +1,6 @@
 //! The interactive terminal loop: a real-time accumulator that steps the sim at
 //! a fixed 60 Hz regardless of render rate, with clean terminal teardown.
 
-use crate::input::InputState;
-use crate::keymap::map_key;
-use crate::render;
 use crossterm::event::{
     self, Event as CtEvent, KeyboardEnhancementFlags, PopKeyboardEnhancementFlags,
     PushKeyboardEnhancementFlags,
@@ -16,6 +13,9 @@ use crossterm::terminal::{
 use idaptik_core::RunConfig;
 use idaptik_core::scenario::event::{Event as SimEvent, LogLine};
 use idaptik_core::scenario::{GhostLobbySim, TICK_DT, ghost_lobby, log_view};
+use idaptik_tui::input::InputState;
+use idaptik_tui::keymap::map_key;
+use idaptik_tui::render;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use std::io;

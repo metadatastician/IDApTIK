@@ -16,7 +16,13 @@ clap = { workspace = true }
 tokio = { workspace = true }
 tokio-tungstenite = { workspace = true }
 futures-util = { workspace = true }
+ratatui = { workspace = true }
+crossterm = { workspace = true }
 
 [[bin]]
 name = "idaptik-loopback-seat"
 path = "src/bin/loopback_seat.rs"
+
+[[bin]]
+name = "idaptik-netplay"
+path = "src/bin/netplay.rs"

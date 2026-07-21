@@ -26,8 +26,9 @@ use crate::envelope::{Role, scripted_sender};
 use idaptik_core::scenario::command::{Button, Buttons, Command, TickInput, fold};
 use idaptik_tui::script::{ScriptFile, button_from, press_command};
 
-/// All held-button flags, in declaration order — the canonical diff order.
-const ALL_BUTTONS: [Button; 5] = [
+/// All held-button flags, in declaration order — the canonical diff order
+/// (shared by the script split and the live keyboard feed).
+pub const ALL_BUTTONS: [Button; 5] = [
     Button::Left,
     Button::Right,
     Button::Crouch,

@@ -118,6 +118,10 @@ pub fn press_command(name: &str) -> Option<Command> {
             target: PivotTarget::GridJump,
         }),
         "unpivot" | "x" => Some(Command::Unpivot),
+        // Session commands, spelt as explicit states rather than the keyboard's
+        // toggle so a script line means the same thing wherever it lands.
+        "pause" => Some(Command::Pause { on: true }),
+        "resume" => Some(Command::Pause { on: false }),
         _ => None,
     }
 }

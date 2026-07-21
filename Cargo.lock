@@ -4681,9 +4681,11 @@ name = "idaptik-net"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "crossterm",
  "futures-util",
  "idaptik-core",
  "idaptik-tui",
+ "ratatui",
  "serde",
  "serde_json",
  "tokio",
