@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Project Assurance Profile
+
+Subject/version:: IDApTIK, as of commit `be1369f` (2026-07-20)
+Assurance status:: draft
+Observation model and boundary:: Correctness claims are limited to what compiles, passes CI (CodeQL, existing test suites), and has been manually exercised by the maintainer. No independent testing, fuzzing, or audit has been performed. The FFI boundary (`crates/idaptik-ffi`) and the network-facing session relay (`server/`) are unverified beyond compilation and manual use — see `KNOWN-TENSIONS.adoc`-style tracking (none yet recorded for this repo).
+Assumptions and evidence:: Assumes Rust's memory-safety guarantees hold except across the explicit unsafe C-ABI boundary in `idaptik-ffi`, which is not yet independently verified (estate triage flagged `UNVERIFIED_RUST` and `DIRECT_FFI_NO_HEXADECA` for this repo). No formal evidence beyond passing CI.
+Known limitations/residual risk:: No security audit; no fuzzing of the FFI surface; single maintainer means bus-factor risk on review capacity.
+Responsible authority and review date:: `MAINTAINERS` (@metadatastician); 2027-01-20 (placeholder, first review since initial adoption)

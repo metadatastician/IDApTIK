@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MPL-2.0
+[binding]
+governance-upstream-hash = "2ccc38eaaf8787034ed099e0b72c9ca8b85dc563"
+applicable-profiles = ["a2ml-placement-convention", "descriptile-naming", "authority-separation", "evidence-status-honesty"]
+local-exceptions = []
+local-authority = "MAINTAINERS (@metadatastician)"
+assurance-status = "draft"
+sensitive-areas = ["crates/idaptik-ffi", "server/"]
+contribution-perimeter = "Core"
+security-route = "SECURITY.md"
+review-date = "2027-01-20"
