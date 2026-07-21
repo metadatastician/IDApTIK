@@ -112,3 +112,12 @@ also exchange `"event"`-relayed control messages namespaced `"net:*"`
 (handshake and event-log digest — the drift-detection mitigation above, made
 real); the namespace cannot collide with the sim's `Event` tags, and the relay
 treats them as ordinary events.
+
+The live client (interactive slice, same day) grew the `"net:*"` vocabulary
+without touching the relay: `net:commit` (a cumulative per-seat watermark —
+"every command of mine with `at <= through` has been pushed", which is what a
+sparse command stream cannot say on its own) and `net:resync` (a
+`RuntimeSnapshot` hand-off to a rejoining peer, with both seats' committed
+pending commands). `net:hello` gained a `rejoin` flag and its `proto` moved
+to 2. All of it rides the existing `"event"` pass-through; the relay still
+strips exactly `"seq"` and interprets nothing.

@@ -4,10 +4,7 @@
 
 mod app;
 mod export;
-mod input;
-mod keymap;
 mod net;
-mod render;
 mod replay;
 
 use idaptik_tui::{config, headless};
