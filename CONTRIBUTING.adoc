@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Contributing to IDApTIK
+
+Thanks for your interest in IDApTIK. This document covers the mechanics of
+contributing; see `CODE_OF_CONDUCT.md` for community expectations and
+`MAINTAINERS` for who reviews and merges.
+
+== Developer Certificate of Origin
+
+All commits must be signed off under the Developer Certificate of Origin
+(DCO) 1.1:
+
+[source,shell]
+----
+git commit -s
+----
+
+This certifies that you wrote the change, or otherwise have the right to
+submit it under the project's licence. Unsigned commits will not be merged.
+
+== Licensing of contributions
+
+IDApTIK uses layered licensing — do not submit changes that flatten or
+relicense a layer without maintainer sign-off:
+
+* Engine and code: AGPL-3.0-or-later
+* Game content: CC-BY-SA-4.0
+* Names/marks (IDApTIK, Moletaire): trademarked, not covered by the above
+
+== Sensitive areas
+
+Changes to `crates/idaptik-ffi` (the C-ABI surface for Zig/Idris2 consumers)
+and `server/` (the network-facing Elixir/OTP session relay) receive extra
+review — see `PROJECT-GOVERNANCE-BINDING.adoc` for the current sensitive-area
+list and review authority.
+
+== Review and decision authority
+
+Pull requests are reviewed and merged by the maintainers listed in
+`MAINTAINERS`. Decision-making tiers (minor/major/breaking changes) are
+described in `GOVERNANCE.md`.

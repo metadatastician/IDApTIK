@@ -5,10 +5,18 @@
 
 This is the root AI-assistant manifest for IDApTIK, an asymmetric two-player
 infiltration game (attempt four): Rust owns gameplay truth, Elixir owns
-multiplayer/session life. Read this first, then
-`.machine_readable/6a2/STATE.a2ml`.
+multiplayer/session life. Read this first, then `AGENTS.md`,
+`PROJECT-GOVERNANCE-BINDING.adoc`, and `.machine_readable/6a2/STATE.a2ml`.
 
 ## Where Things Live
+
+- `AGENTS.md`            — AI-agent instructions and read-first order.
+- `PROJECT-GOVERNANCE-BINDING.adoc`, `PROJECT-ASSURANCE-PROFILE.adoc`,
+  `PROJECT-CONTRIBUTION-PROFILE.adoc` — this repo's completed local binding to
+  The Metadatastician estate's governance profile (`metadatastician-governance`);
+  machine-readable counterpart at `.machine_readable/PROJECT-BINDING.a2ml`.
+- `CONTRIBUTING.adoc`, `SECURITY.md` — contribution mechanics and vulnerability
+  disclosure route.
 
 - `crates/idaptik-core`  — engine-agnostic gameplay truth (network sim + scenario); no rendering.
 - `crates/idaptik-ffi`   — C-ABI surface for Zig/Idris2 consumers (ADR-0001).
