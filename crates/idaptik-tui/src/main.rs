@@ -3,15 +3,14 @@
 //! `idaptik-core`.
 
 mod app;
-mod config;
 mod export;
-mod headless;
 mod input;
 mod keymap;
 mod net;
 mod render;
 mod replay;
-mod script;
+
+use idaptik_tui::{config, headless};
 
 use clap::Parser;
 use export::ExportKind;

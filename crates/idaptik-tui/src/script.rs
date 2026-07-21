@@ -54,7 +54,26 @@ pub enum TestHook {
     ForceFail { reason: String },
 }
 
-fn button_from(name: &str) -> Option<Button> {
+impl TestHook {
+    /// The immediate [`Command`] this hook injects — the one mapping shared by
+    /// [`expand`] and the per-seat split in `idaptik-net`.
+    pub fn command(&self) -> Command {
+        match self {
+            TestHook::ForceCrisis => Command::ForceCrisis,
+            TestHook::ForceExtract { method } => Command::ForceExtract {
+                method: extract_method(method),
+            },
+            TestHook::ForceFail { reason } => Command::ForceFail {
+                reason: fail_reason(reason),
+            },
+        }
+    }
+}
+
+/// Resolve a script `hold` token to a [`Button`]. Public because the token
+/// vocabulary is a contract: `idaptik-net` splits one script across two seats
+/// and must resolve tokens exactly as [`expand`] does.
+pub fn button_from(name: &str) -> Option<Button> {
     match name.trim().to_ascii_lowercase().as_str() {
         "left" | "a" => Some(Button::Left),
         "right" | "d" => Some(Button::Right),
@@ -65,7 +84,9 @@ fn button_from(name: &str) -> Option<Button> {
     }
 }
 
-fn press_command(name: &str) -> Option<Command> {
+/// Resolve a script `press` token to a [`Command`]. Public for the same reason
+/// as [`button_from`]: one token vocabulary, resolved identically everywhere.
+pub fn press_command(name: &str) -> Option<Command> {
     match name.trim().to_ascii_lowercase().as_str() {
         "jump" | "w" | "space" => Some(Command::Jump),
         "interact" | "e" => Some(Command::Interact),
@@ -161,15 +182,7 @@ pub fn expand(script: &ScriptFile) -> Vec<TickInput> {
                 }
             }
             if let Some(test) = &line.test {
-                immediates.push(match test {
-                    TestHook::ForceCrisis => Command::ForceCrisis,
-                    TestHook::ForceExtract { method } => Command::ForceExtract {
-                        method: extract_method(method),
-                    },
-                    TestHook::ForceFail { reason } => Command::ForceFail {
-                        reason: fail_reason(reason),
-                    },
-                });
+                immediates.push(test.command());
             }
             cursor += 1;
         }

@@ -97,3 +97,18 @@ alongside matchmaking/presence, where a server-held world is needed anyway).
   fixtures/session_relay/capture_script.json` (take `event_log`) whenever the
   `Event` wire format changes, and keep `commands.json` covering the full
   `Command` alphabet (a Rust test enforces this).
+
+## Amendment (2026-07-21): the `at` scheduling envelope
+
+The consequence above predicted the `seq` envelope is "the seam where lockstep
+input-delay scheduling will attach when real clients arrive". The first real
+client (`crates/idaptik-net`) landed scheduling client-side as a second
+envelope key instead: `"at"` — the lockstep tick a command is scheduled for.
+Clients author and consume it; the relay's behaviour is unchanged (it strips
+exactly `"seq"` and relays the rest verbatim), so `"at"` passes through
+untouched, and serde's internally-tagged `Command` decoding ignores it.
+Neither envelope key is ever part of the Rust `Command` JSON itself. Clients
+also exchange `"event"`-relayed control messages namespaced `"net:*"`
+(handshake and event-log digest — the drift-detection mitigation above, made
+real); the namespace cannot collide with the sim's `Event` tags, and the relay
+treats them as ordinary events.
