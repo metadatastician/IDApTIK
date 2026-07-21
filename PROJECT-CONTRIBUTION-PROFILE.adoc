@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Project Contribution Profile
+
+Contribution perimeter:: Core (single maintainer today; no Trusted-contributor or Community-sandbox tier established yet)
+Review authority:: `MAINTAINERS` (@metadatastician)
+Transition criteria:: As described in `MAINTAINERS`: consistent high-quality contributions, demonstrated understanding of project goals/architecture, active participation in review, nomination and consensus approval by existing maintainers.
+IP/licence route:: Contributions certified under DCO 1.1 (`git commit -s`, see `CONTRIBUTING.adoc`); engine/code under AGPL-3.0-or-later, content under CC-BY-SA-4.0, names/marks trademarked and excluded from both.
+Provenance requirements:: DCO sign-off on every commit; no anonymous or unsigned contributions accepted.
+Challenge route and review date:: Disputes over review decisions are raised with the maintainer listed in `MAINTAINERS`; this profile is reviewed 2027-01-20 (placeholder, first review since initial adoption).

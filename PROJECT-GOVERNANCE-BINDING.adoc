@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+= Project Governance Binding
+
+Governance upstream hash:: `6d87eefefeea9c1a8ef24ac3b45861c158233ac0` (`metadatastician-governance`, the estate's governance layer — decision-making, authority, contribution process. `hyperpolymath/standards`, pinned by that repo at `2ccc38eaaf8787034ed099e0b72c9ca8b85dc563`, covers estate *content* standards rather than governance and is not the referent of this field.)
+Applicable profiles:: A2ML placement convention; descriptile naming for new metadata; separation of authority, profiles, local bindings, and evidence; evidence-status honesty (draft/designed/assumed/tested/audited/proven are not interchangeable). Language/toolchain and MAA profiles are not adopted — no project binding selects them at this time.
+Local exceptions and expiry:: None
+Local decision authority:: `MAINTAINERS` (currently @metadatastician, sole maintainer)
+Sensitive areas:: `crates/idaptik-ffi` (C-ABI surface for Zig/Idris2 consumers); `server/` (network-facing Elixir/OTP session relay)
+Security route:: `SECURITY.md`
+Review date:: 2027-01-20 (placeholder — first review since initial adoption, not yet performed)
+
+This becomes policy only because it has been completed and adopted in this
+target repository.
