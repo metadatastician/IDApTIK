@@ -71,11 +71,18 @@ replay FILE:
 test:
     cargo test --workspace
 
-# The Ghost Lobby scenario gate: core + tui + ffi (does NOT build bevy/fyrox).
+# The Ghost Lobby scenario gate: core + tui + ffi + net (does NOT build bevy/fyrox).
 test-ghost:
-    cargo test -p idaptik-core -p idaptik-tui -p idaptik-ffi
-    cargo clippy -p idaptik-core -p idaptik-tui --all-targets -- -D warnings
+    cargo test -p idaptik-core -p idaptik-tui -p idaptik-ffi -p idaptik-net
+    cargo clippy -p idaptik-core -p idaptik-tui -p idaptik-net --all-targets -- -D warnings
     cargo fmt --all -- --check
+
+# The ADR-0006 §4 loopback gate: throwaway relay + two seat processes; asserts
+# byte-identical artifacts (vs each other AND the headless reference) and a
+# clean PeerLost end when a seat is killed. Needs Elixir (hard requirement —
+# the gate fails, never skips, when mix is missing).
+loopback-check SCRIPT="fixtures/session_relay/capture_script.json":
+    bash scripts/loopback_check.sh {{SCRIPT}}
 
 # Regenerate the C header for the FFI crate (needs the cbindgen CLI:
 # `cargo install cbindgen`).

@@ -1,9 +1,9 @@
 //! The three Exchange-House-style JSON export surfaces: definition, runtime
 //! snapshot, and after-action debrief.
 
-use crate::headless::{load, simulate};
 use idaptik_core::RunConfig;
 use idaptik_core::scenario::{GhostLobbySim, ghost_lobby};
+use idaptik_tui::headless::{load, simulate};
 use std::path::Path;
 
 /// Which export surface to print.

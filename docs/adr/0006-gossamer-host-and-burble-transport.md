@@ -243,3 +243,27 @@ amended to say so.
   WebSocket + loopback test first (useful immediately, fallback forever), then
   `BurbleTransport`, then the gossamer wrap — glue last, just as issue #7
   demands, even within its own layer.
+
+## Status note (2026-07-21): slice 1 landed; unblock conditions re-verified
+
+- The §5 fallback slice is now real: `crates/idaptik-net` (`SessionTransport`,
+  one Phoenix Channels client over it, `PlainWebSocketTransport`), the
+  two-seat scripted session client, and the §4 loopback gate
+  (`scripts/loopback_check.sh`; CI job `session-loopback`). Determinism is
+  asserted byte-for-byte — both seats' artifacts against each other *and*
+  against the `idaptik-tui --headless` reference — and loss is asserted by
+  killing a seat mid-stream and requiring the survivor to end cleanly through
+  `PeerLost`. v1 is batch-scripted: both seats exchange their scripted
+  commands through the relay, then run the deterministic sim; real-time
+  pacing (input delay) and mid-run pause/resync belong to the
+  interactive-client slice, on the same wire shapes (`at`, `seq`, `net:*`).
+- Recon (2026-07-21) re-verified both §5 unblock conditions remain unmet:
+  gossamer is webview-only (no native child-surface hosting, no versioned
+  wasm-hosting surface; its local build depends on the unreleased Ephapax
+  compiler), and burble ships no embeddable non-voice data channel (no Rust
+  surface; no `Phoenix.Socket.Transport` adapter; QUIC NIFs disabled in the
+  default build). `BurbleTransport` and the gossamer wrap stay deferred.
+- One bring-up detail the implementation fixed: the §3 handshake is a
+  *barrier* — a seat streams commands only after holding the peer's
+  `net:hello`, re-sent on `peer_joined`, because a relay-only topic has no
+  history and anything sent before both seats are joined is unobservable.

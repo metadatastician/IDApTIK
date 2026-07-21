@@ -1,0 +1,22 @@
+[package]
+name = "idaptik-net"
+description = "Client-side session transport (ADR-0006): SessionTransport seam, Phoenix Channels client, PlainWebSocketTransport, and the two-seat lockstep loopback client."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+idaptik-core = { workspace = true }
+idaptik-tui = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+
+[[bin]]
+name = "idaptik-loopback-seat"
+path = "src/bin/loopback_seat.rs"
