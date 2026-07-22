@@ -15,6 +15,7 @@
 
 pub mod companion;
 pub mod device;
+pub mod interp;
 pub mod netsim;
 pub mod network;
 pub mod scenario;
@@ -25,6 +26,10 @@ pub use companion::{
     MoletaireSnapshot, moletaire,
 };
 pub use device::{Device, DeviceId, DeviceKind, SecurityLevel};
+pub use interp::{
+    Blend, Blending, DoorBuffer, DoubleBuffer, Pose, PoseBuffer, VisualSlot, door_opens_of,
+    poses_of,
+};
 pub use network::{Network, Range, Zone};
 pub use scenario::{
     ACTORS_JSON, ActorArchetype, ActorRegistry, BuildingDefinition, BuildingSim, Buttons, Command,
