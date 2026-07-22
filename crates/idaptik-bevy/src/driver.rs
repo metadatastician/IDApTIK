@@ -7,6 +7,7 @@
 
 use bevy::prelude::*;
 use idaptik_core::RunConfig;
+use idaptik_core::interp::{DoorBuffer, PoseBuffer, door_opens_of, poses_of};
 use idaptik_core::scenario::command::{Buttons, Command, fold};
 use idaptik_core::scenario::event::{Event as SimEvent, LogLine};
 use idaptik_core::scenario::{GhostLobbySim, ghost_lobby, log_view};
@@ -60,6 +61,53 @@ impl SimState {
     }
 }
 
+/// The last two simulated ticks of visual state, for render interpolation.
+///
+/// The sim advances at [`SIM_HZ`]; the display refreshes at whatever rate it
+/// likes. Reading live sim state every frame would show each position for a
+/// varying number of frames — visible judder on anything that is not exactly
+/// 60 Hz. Keeping tick *N* alongside tick *N+1* lets [`crate::scene`] draw
+/// between them.
+///
+/// This is a pure view. Nothing here is read by the simulation.
+#[derive(Resource)]
+pub struct VisualBuffers {
+    /// Actor and prop poses, indexed by `VisualSlot`.
+    pub poses: PoseBuffer,
+    /// Door openness, indexed to match `state().doors`.
+    pub doors: DoorBuffer,
+}
+
+impl VisualBuffers {
+    /// Both ticks seeded from the run's starting state, so the first rendered
+    /// interval is stationary rather than a slide from the origin.
+    #[must_use]
+    pub fn primed(sim: &GhostLobbySim) -> Self {
+        let mut poses = PoseBuffer::new();
+        let mut doors = DoorBuffer::new();
+        poses.prime(&poses_of(sim.state()));
+        doors.prime(&door_opens_of(sim.state()));
+        Self { poses, doors }
+    }
+
+    /// Record the tick that just completed.
+    ///
+    /// `discontinuous` marks a tick the actors did not *travel* through — a
+    /// restart. The fresh state is committed either way, so it always enters
+    /// the buffer; the extra `snap` then discards the stale previous tick that
+    /// would otherwise render as a slide across the jump. Committing first is
+    /// the whole point: snapping alone would leave the new state out of the
+    /// buffer and keep drawing the pre-restart position.
+    pub fn commit(&mut self, sim: &GhostLobbySim, discontinuous: bool) {
+        self.poses.commit(&poses_of(sim.state()));
+        self.doors.commit(&door_opens_of(sim.state()));
+        if discontinuous {
+            self.poses.snap();
+            self.doors.snap();
+        }
+    }
+}
+
 /// Commands queued by the frontend between ticks, plus the persistent
 /// held-button set [`fold`] mutates — the exact seam the TUI's `InputState`
 /// occupies.
@@ -91,7 +139,9 @@ impl Plugin for SimDriverPlugin {
     fn build(&self, app: &mut App) {
         let state = SimState::new(self.cfg, self.seed)
             .expect("the canonical Ghost Lobby definition is valid");
+        let visual = VisualBuffers::primed(&state.sim);
         app.insert_resource(state)
+            .insert_resource(visual)
             .init_resource::<CommandQueue>()
             .insert_resource(Time::<Fixed>::from_hz(SIM_HZ))
             .add_systems(FixedUpdate, step_sim);
@@ -99,16 +149,22 @@ impl Plugin for SimDriverPlugin {
 }
 
 /// One fixed tick: drain the queued commands, fold them into a `TickInput`,
-/// advance the sim, and ingest the events it emitted.
-pub fn step_sim(mut queue: ResMut<CommandQueue>, mut state: ResMut<SimState>) {
+/// advance the sim, ingest the events it emitted, and record the new state for
+/// render interpolation.
+pub fn step_sim(
+    mut queue: ResMut<CommandQueue>,
+    mut state: ResMut<SimState>,
+    mut visual: ResMut<VisualBuffers>,
+) {
     let cmds = std::mem::take(&mut queue.pending);
     let input = fold(&cmds, &mut queue.held);
     let events = state.sim.tick(&input);
-    if events
+    let restarted = events
         .iter()
-        .any(|e| matches!(e, SimEvent::Restarted { .. }))
-    {
+        .any(|e| matches!(e, SimEvent::Restarted { .. }));
+    if restarted {
         state.log.clear();
     }
+    visual.commit(&state.sim, restarted);
     state.ingest(events);
 }
