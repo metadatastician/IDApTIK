@@ -10,11 +10,26 @@
 
 use bevy::camera::ScalingMode;
 use bevy::prelude::*;
+use idaptik_core::interp::VisualSlot;
 use idaptik_core::scenario::camera_node_id;
 use idaptik_core::scenario::common::BillyMode;
 use idaptik_core::scenario::constants as c;
 
-use crate::driver::SimState;
+use crate::driver::{SimState, VisualBuffers};
+
+/// How far through the current simulation tick this frame is drawn.
+///
+/// `0.0` is the tick that just completed, `1.0` the one about to. Bevy keeps
+/// the leftover time that has not yet accumulated into a fixed step, which is
+/// exactly the fraction we want; `_f64` because the simulation is `f64`
+/// throughout and rounding to `f32` here would reintroduce the judder we are
+/// removing.
+///
+/// This is the only place render timing enters the scene, and it is the seam to
+/// cut when this lifts into a standalone engine — see `ENGINE_EXTRACTION_NOTES.md`.
+fn render_alpha(fixed: &Time<Fixed>) -> f64 {
+    fixed.overstep_fraction_f64()
+}
 
 /// World-y (canvas, downwards) of the room ceiling line for a floor row.
 pub const CEILING_Y: f64 = 230.0;
@@ -286,14 +301,19 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
 pub fn sync_doors(
     sim: Res<SimState>,
     map: Res<SceneMap>,
+    visual: Res<VisualBuffers>,
+    fixed: Res<Time<Fixed>>,
     mut doors: Query<(&DoorMarker, &mut Transform, &mut Sprite)>,
 ) {
     let s = sim.sim.state();
+    let alpha = render_alpha(&fixed);
     for (marker, mut tf, mut sprite) in &mut doors {
         let Some(door) = s.doors.get(marker.0) else {
             continue;
         };
-        let open = door.open.clamp(0.0, 1.0) as f32;
+        // The slab slides open over several ticks, so its openness interpolates
+        // like a position. Colour keys off the live tick.
+        let open = visual.doors.sample(marker.0, alpha).clamp(0.0, 1.0) as f32;
         let base = map.point(
             door.x,
             sim.sim.definition().world.floor - f64::from(DOOR_H) * 0.5,
@@ -339,11 +359,18 @@ fn place_body(
 pub fn sync_player(
     sim: Res<SimState>,
     map: Res<SceneMap>,
+    visual: Res<VisualBuffers>,
+    fixed: Res<Time<Fixed>>,
     mut body: Query<(&mut Transform, &mut Sprite), With<PlayerMarker>>,
     mut nose: Query<&mut Transform, (With<PlayerNose>, Without<PlayerMarker>)>,
 ) {
     let def = sim.sim.definition();
+    // Position is interpolated; every discrete flag is read live from the
+    // current tick. Blending `crouching` or `hidden` would be meaningless.
     let p = &sim.sim.state().player;
+    let pose = visual
+        .poses
+        .sample(VisualSlot::Player.index(), render_alpha(&fixed));
     let Ok((mut tf, mut sprite)) = body.single_mut() else {
         return;
     };
@@ -353,8 +380,8 @@ pub fn sync_player(
         &mut tf,
         &mut sprite,
         BodyBox {
-            x: p.x,
-            y_top: p.y,
+            x: pose.x,
+            y_top: pose.y,
             w: def.player.w,
             h: def.player.h,
         },
@@ -362,7 +389,7 @@ pub fn sync_player(
     );
     sprite.color = sprite.color.with_alpha(if p.hidden { 0.35 } else { 1.0 });
     if let Ok(mut nose_tf) = nose.single_mut() {
-        nose_tf.translation.x = p.facing as f32 * (def.player.w as f32 * 0.5 + 5.0);
+        nose_tf.translation.x = pose.facing as f32 * (def.player.w as f32 * 0.5 + 5.0);
         nose_tf.translation.y = def.player.h as f32 * crouch as f32 * 0.22;
     }
 }
@@ -371,11 +398,17 @@ pub fn sync_player(
 pub fn sync_billy(
     sim: Res<SimState>,
     map: Res<SceneMap>,
+    visual: Res<VisualBuffers>,
+    fixed: Res<Time<Fixed>>,
     mut body: Query<(&mut Transform, &mut Sprite, &mut Visibility), With<BillyMarker>>,
     mut nose: Query<&mut Transform, (With<BillyNose>, Without<BillyMarker>)>,
 ) {
     let def = sim.sim.definition();
+    // `mode` is discrete and read live; only the pose interpolates.
     let b = &sim.sim.state().billy;
+    let pose = visual
+        .poses
+        .sample(VisualSlot::Billy.index(), render_alpha(&fixed));
     let Ok((mut tf, mut sprite, mut vis)) = body.single_mut() else {
         return;
     };
@@ -389,25 +422,30 @@ pub fn sync_billy(
         &mut tf,
         &mut sprite,
         BodyBox {
-            x: b.x,
-            y_top: b.y,
+            x: pose.x,
+            y_top: pose.y,
             w: def.billy.w,
             h: def.billy.h,
         },
         1.0,
     );
     if let Ok(mut nose_tf) = nose.single_mut() {
-        nose_tf.translation.x = b.facing as f32 * (def.billy.w as f32 * 0.5 + 5.0);
+        nose_tf.translation.x = pose.facing as f32 * (def.billy.w as f32 * 0.5 + 5.0);
         nose_tf.translation.y = def.billy.h as f32 * 0.25;
     }
 }
 
 /// Props: the note and USB track their state positions and vanish when
 /// carried; the chute darkens open when revealed; the vacuum lights up active.
-#[allow(clippy::type_complexity)]
+// A Bevy system takes one parameter per resource and per query, so arity here
+// tracks how many things the prop layer draws, not how complex it is. Bundling
+// them into a `SystemParam` would satisfy the lint and tell the reader less.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn sync_props(
     sim: Res<SimState>,
     map: Res<SceneMap>,
+    visual: Res<VisualBuffers>,
+    fixed: Res<Time<Fixed>>,
     mut note: Query<
         (&mut Transform, &mut Visibility),
         (With<NoteMarker>, Without<UsbMarker>, Without<VacuumMarker>),
@@ -423,9 +461,13 @@ pub fn sync_props(
     >,
 ) {
     let s = sim.sim.state();
+    let alpha = render_alpha(&fixed);
+    // Positions interpolate; `held`/`billy_has`/`wiped`/`fallen` are discrete
+    // and read live.
 
     if let Ok((mut tf, mut vis)) = note.single_mut() {
-        let p = map.point(s.note.x, s.note.y);
+        let pose = visual.poses.sample(VisualSlot::Note.index(), alpha);
+        let p = map.point(pose.x, pose.y);
         tf.translation.x = p.x;
         tf.translation.y = p.y;
         *vis = if s.note.held || s.note.billy_has {
@@ -436,7 +478,8 @@ pub fn sync_props(
     }
 
     if let Ok((mut tf, mut vis, mut sprite)) = usb.single_mut() {
-        let p = map.point(s.usb.x, s.usb.y);
+        let pose = visual.poses.sample(VisualSlot::Usb.index(), alpha);
+        let p = map.point(pose.x, pose.y);
         tf.translation.x = p.x;
         tf.translation.y = p.y;
         *vis = if s.usb.held || s.usb.billy_has {
@@ -460,7 +503,8 @@ pub fn sync_props(
     }
 
     if let Ok((mut tf, mut vis, mut sprite)) = vacuum.single_mut() {
-        let p = map.point(s.vacuum.x, s.vacuum.y + 6.0);
+        let pose = visual.poses.sample(VisualSlot::Vacuum.index(), alpha);
+        let p = map.point(pose.x, pose.y + 6.0);
         tf.translation.x = p.x;
         tf.translation.y = p.y;
         *vis = if s.vacuum.fallen {
