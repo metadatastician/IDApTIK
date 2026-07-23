@@ -32,4 +32,3 @@ erl_crash.dump
 # mise / local tooling
 .mise.local.toml
 scripts/tmp/
-.claude/
