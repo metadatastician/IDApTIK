@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MPL-2.0
+# STATE.a2ml — IDApTIK
+#
+# Current project state, phase, and route to the next milestone.
+# Machine-readable snapshot; keep in sync with README.md and docs/adr/.
+
+[metadata]
+project = "IDApTIK"
+version = "0.1.0"
+type = "game"
+last-updated = "2026-07-20"
+branch = "main"
+build-status = "early"
+test-status = "core + frontends carry Rust unit/parity tests; server (Elixir) tests land with the relay"
+
+[project-context]
+description = "Asymmetric two-player infiltration game (attempt four). One player infiltrates a physical space; the other hacks a grounded network sim to keep them alive. Rust owns gameplay truth; Elixir owns multiplayer/session life."
+subtitle = "Invisible Door: Action Point Trauma Inc. Kickers"
+truth-language = "rust"
+session-language = "elixir"
+ffi-language = "zig"
+abi-model-language = "idris2"
+config-language = "nickel"
+host = "gossamer"
+transport = "burble"
+depends-on = ["bevy", "fyrox", "bandit", "phoenix_channels", "nickel", "gossamer", "burble"]
+
+[roadmap]
+# Vehicle-named phases, smallest viable thing first (README "Roadmap").
+phases = "Envelope > Wheel > Skateboard > Bicycle > Chassis > Motorcycle > Computer Game"
+current-phase = "Envelope"
+phase-goal = "Minimum viable game: core movement, basic hacker interactions (doors, elevators, overrides), first art, documented mechanics."
+
+[component-status]
+core = { percent = 40, notes = "crates/idaptik-core — engine-agnostic gameplay truth: netsim (topology/addressing/dns/route/reach/session/access/effect), companion sim, scenario (Ghost Lobby). No rendering." }
+ffi = { percent = 20, notes = "crates/idaptik-ffi — C-ABI surface for Zig/Idris2 consumers (ADR-0001)." }
+tui = { percent = 35, notes = "crates/idaptik-tui — ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)." }
+bevy-frontend = { percent = 20, notes = "crates/idaptik-bevy — Bevy rendering frontend, evaluation only (ADR-0003)." }
+fyrox-frontend = { percent = 20, notes = "crates/idaptik-fyrox — Fyrox rendering frontend, evaluation only (ADR-0003)." }
+server = { percent = 10, notes = "server/ — Elixir/OTP: Bandit + Phoenix Channels session relay, relay-only lockstep (ADR-0002, ADR-0005)." }
+config = { percent = 45, notes = "config/ — Nickel schema (schema.ncl, scenario-schema.ncl) + default/ghost_lobby scenarios; validated with just config-check. Includes negative fixtures under config/scenario-fixtures/." }
+
+[open-decisions]
+# Recorded as ADRs when settled; still open (README "Still open").
+remaining = [
+  { item = "Renderer choice between Bevy and Fyrox", resolve-by = "end of Envelope", ref = "ADR-0003" },
+  { item = "Persistence strategy", resolve-by = "post-Envelope" },
+  { item = "Rust <-> Elixir wire format", resolve-by = "post-Envelope", ref = "ADR-0005" },
+]
+
+[route-to-mvp]
+remaining = [
+  { item = "Land the Envelope playable slice (movement + door/elevator/override interactions)", priority = "critical" },
+  { item = "Wire the gossamer host window + burble transport two-player slice", priority = "high", ref = "ADR-0006" },
+  { item = "Stand up the Elixir relay (Bandit + Phoenix Channels) with typed Command/Event", priority = "high", ref = "ADR-0005" },
+  { item = "First art pass + documented mechanics", priority = "medium" },
+  { item = "Settle the renderer decision and drop the non-chosen frontend to non-blocking", priority = "medium", ref = "ADR-0003" },
+]
