@@ -18,10 +18,7 @@ elixir = "1.19.5-otp-28"
 # --- Systems / FFI + config + task runner
 zig    = "0.14.0"    # C ABI + cross-compilation for FFI/APIs (see ADR-0001)
 just   = "1.46.0"    # task runner (this repo's justfile)
-# Nickel has no bare registry shortname; build the CLI from crates.io (reliable
-# everywhere Rust is present, which is always here). For a prebuilt binary
-# instead, swap to: "aqua:nickel-lang/nickel" = "1.16.0"
-"cargo:nickel-lang-cli" = "1.16.0"  # typed config for game/level/network
+"aqua:nickel-lang/nickel" = "1.16.0"  # typed config for game/level/network
 
 # --- Idris2 is intentionally NOT auto-installed here.
 # It bootstraps through Chez Scheme + GMP (no clean prebuilt), so a bare
