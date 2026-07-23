@@ -1,0 +1,20 @@
+{
+  "seed": 987654,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 60,
+  "commands": [
+    { "at": 0, "hold": ["right"] },
+    { "at": 2, "press": ["jump"] },
+    { "at": 4, "press": ["camera"] },
+    { "at": 6, "press": ["pause"] },
+    { "at": 10, "press": ["resume"] },
+    { "at": 12, "press": ["grid"] },
+    { "at": 14, "press": ["isp"] },
+    { "at": 16, "press": ["unpivot"] },
+    { "at": 20, "hold": ["right", "sprint"] },
+    { "at": 26, "hold": [] },
+    { "at": 30, "press": ["door"] },
+    { "at": 40, "test": { "hook": "force_extract", "method": "chute" } }
+  ]
+}

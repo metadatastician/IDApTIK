@@ -9,6 +9,7 @@ members = [
     "crates/idaptik-core",
     "crates/idaptik-ffi",
     "crates/idaptik-tui",
+    "crates/idaptik-net",
     "crates/idaptik-bevy",
     "crates/idaptik-fyrox",
 ]
@@ -22,6 +23,7 @@ repository = "https://github.com/JoshuaJewell/IDApTIK"
 
 [workspace.dependencies]
 idaptik-core = { path = "crates/idaptik-core" }
+idaptik-tui = { path = "crates/idaptik-tui" }
 serde = { version = "1", features = ["derive"] }
 # `float_roundtrip` guarantees bit-exact f64 JSON round-trips (snapshots/exports).
 serde_json = { version = "1", features = ["float_roundtrip"] }
@@ -31,3 +33,7 @@ crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
 bevy = "0.19"
 fyrox = "1.0"
+# The client-side session transport (ADR-0006 §2): async runtime + WebSocket.
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio-tungstenite = "0.30"
+futures-util = "0.3"

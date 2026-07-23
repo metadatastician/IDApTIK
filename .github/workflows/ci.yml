@@ -43,6 +43,30 @@ jobs:
       - name: just test-ghost
         run: just test-ghost
 
+  session-loopback:
+    name: session-loopback (relay mix test + two-seat determinism gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Provision Erlang/Elixir (versions mirror mise.toml)
+        uses: erlef/setup-beam@0f75c29430f34bb5af4cce5e3b7f6a8860fca236 # v1
+        with:
+          otp-version: "28.3.1"
+          elixir-version: "1.19.5"
+      - name: Install just (task runner, same recipe as local)
+        run: cargo install just --version 1.46.0 --locked
+      - name: Relay unit tests (mix test — first time these run in CI)
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+          just server-setup
+          just server-test
+      - name: just loopback-check (ADR-0006 §4 gate)
+        run: just loopback-check
+
   config-scenario-check:
     name: config-scenario-check (Nickel negative fixtures + round-trip)
     runs-on: ubuntu-latest

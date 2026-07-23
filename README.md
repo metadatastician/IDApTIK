@@ -22,19 +22,6 @@ Control is not shared. It is asymmetric. The infiltrator moves; the hacker watch
 
 > *"Breaking in is easy. Getting back out is harder. Especially when your escape route depends on a hacker who swears he knows what he's doing, right up until he accidentally reboots the entire security grid."*
 
-## A new era (attempt four)
-
-This is the fourth incarnation of the project. The lineage:
-
-| # | Codebase | Stack |
-|---|----------|-------|
-| 1 | IDApTIK | TypeScript / Excalibur |
-| 2 | IDApixiTIK | AffineScript / PixiJS |
-| 3 | idaptik | AffineScript / PixiJS |
-| 4 | **IDApTIK** | **Rust** / **Elixir** |
-
-Rust owns gameplay truth; Elixir owns multiplayer/session life.
-
 ## How it plays
 
 Underneath the platforming sits a grounded network simulation, so the hacker is solving a real, legible network rather than pressing a "hack" button.
