@@ -42,13 +42,6 @@ case "$MODE" in
         ~/.local/bin/mise exec -- just doctor || just doctor
         echo "[launcher] Launching game..."
         
-        # WSLg Wayland (sctk_adwaita) crashes/hangs Bevy on some setups.
-        # We detect WSL dynamically and force the stable X11 fallback if present.
-        if grep -qi microsoft /proc/version 2>/dev/null; then
-            echo "[launcher] WSL detected: Forcing X11 backend to prevent Wayland window crashes..."
-            export WINIT_UNIX_BACKEND=x11
-            export WAYLAND_DISPLAY=""
-        fi
 
         # Launching in foreground so you can play the game!
         exec ~/.local/bin/mise exec -- just run-bevy || exec just run-bevy
