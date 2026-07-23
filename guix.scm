@@ -1,0 +1,22 @@
+(use-modules (guix packages)
+             (guix download)
+             (guix build-system gnu)
+             (guix licenses)
+             (gnu packages)
+             (gnu packages rust)
+             (gnu packages zig)
+             (gnu packages build-tools)
+             (gnu packages elixir)
+             (gnu packages erlang))
+
+(package
+  (name "idaptik-env")
+  (version "0.1.0")
+  (source #f)
+  (build-system gnu-build-system)
+  (native-inputs
+   (list rust zig just elixir erlang))
+  (synopsis "Development environment for IDApTIK")
+  (description "Provides toolchains required by IDApTIK.")
+  (home-page "https://github.com/metadatastician/IDApTIK")
+  (license gpl3+))
