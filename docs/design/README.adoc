@@ -1,0 +1,23 @@
+= Interface design references
+:toc:
+
+SPDX-FileCopyrightText: 2026 IDApTIK contributors
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+`idaptik-landing-page.html` is the standalone IDApTIK startup-interface outline
+provided on 2026-07-25. It is retained as an executable HTML design reference.
+Its menus, status values, package counts, UMS hand-off, multiplayer controls,
+and operation-launch actions are simulated in the browser; they are not wired
+to IDApTIK, Universal Modding Studio, or Enaction Engine.
+
+This page belongs to the IDApTIK game experience. Package and profile status
+must eventually come from the game-owned package loader; launch operations
+must use engine-neutral application data; and "UMS Workshop" must hand off to
+the independent Universal Modding Studio rather than embedding the editor into
+the game.
+
+IDApTIK retains Bevy and Fyrox as thin interchangeable frontends over
+`idaptik-core`. The first package round trip remains headless. The current
+Gossamer-hosted client design makes Bevy the closest initial graphical target,
+while Fyrox remains an evaluation and parity frontend unless a later ADR
+changes that decision.
