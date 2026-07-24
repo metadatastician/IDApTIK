@@ -18,6 +18,7 @@ pub mod device;
 pub mod interp;
 pub mod netsim;
 pub mod network;
+pub mod package;
 pub mod scenario;
 pub mod trace;
 
@@ -31,6 +32,10 @@ pub use interp::{
     poses_of,
 };
 pub use network::{Network, Range, Zone};
+pub use package::{
+    CacTrace, GamePackage, GuardTraceStage, LoadedPackage, PackageError, RoundTripResult,
+    load_package, run_package,
+};
 pub use scenario::{
     ACTORS_JSON, ActorArchetype, ActorRegistry, BuildingDefinition, BuildingSim, Buttons, Command,
     ComposedActor, Debrief, DifficultyId, EXCHANGE_HOUSE_JSON, Event, GHOST_LOBBY_JSON,

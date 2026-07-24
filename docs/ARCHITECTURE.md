@@ -43,6 +43,16 @@ The authoritative simulation. It is **engine-agnostic** (no rendering or I/O),
 Determinism is enforced by tests: `replay_determinism`, `snapshot_equivalence`,
 `rng_vectors`, `no_panic_fuzz`, and the negative Nickel fixtures.
 
+### Versioned package boundary
+
+IDApTIK publishes and owns `contracts/idaptik/v1`. The loader in
+`idaptik-core::package` deserializes the real `ScenarioDefinition`, applies the
+game's semantic validation, executes the scheduled commands, snapshots,
+restores and compares the replay tail. UMS consumes this contract but is never
+a runtime or UI dependency. See
+[`architecture/ums-package-contract.md`](architecture/ums-package-contract.md)
+and ADR-0007.
+
 ## The FFI boundary (`crates/idaptik-ffi`)
 
 A C ABI that drives the core over a **JSON-in/JSON-out** surface

@@ -8,8 +8,8 @@
 project = "IDApTIK"
 version = "0.1.0"
 type = "game"
-last-updated = "2026-07-20"
-branch = "main"
+last-updated = "2026-07-25"
+branch = "agent/ums-profile-contract"
 build-status = "early"
 test-status = "core + frontends carry Rust unit/parity tests; server (Elixir) tests land with the relay"
 
@@ -39,6 +39,8 @@ bevy-frontend = { percent = 20, notes = "crates/idaptik-bevy — Bevy rendering 
 fyrox-frontend = { percent = 20, notes = "crates/idaptik-fyrox — Fyrox rendering frontend, evaluation only (ADR-0003)." }
 server = { percent = 10, notes = "server/ — Elixir/OTP: Bandit + Phoenix Channels session relay, relay-only lockstep (ADR-0002, ADR-0005)." }
 config = { percent = 45, notes = "config/ — Nickel schema (schema.ncl, scenario-schema.ncl) + default/ghost_lobby scenarios; validated with just config-check. Includes negative fixtures under config/scenario-fixtures/." }
+ums-package = { percent = 60, notes = "contracts/idaptik/v1 + idaptik-core::package own the v1 envelope, semantic loader, deterministic execution, snapshot/restore and replay. UMS round trip is executable; migrations beyond v1 remain unimplemented." }
+enaction = { percent = 20, notes = "Extracted DoubleBuffer parity is proven. Bevy still owns the game clock; Enaction FixedStep and enaction-cognition are not linked." }
 
 [open-decisions]
 # Recorded as ADRs when settled; still open (README "Still open").

@@ -26,7 +26,8 @@ pub const SCENARIO_ID: &str = "envelope-001-ghost-lobby";
 /// A committed pretty-printed JSON of [`ghost_lobby`]. Regenerate with the
 /// ignored `regenerate_golden_json` test if the definition ever changes; the
 /// `json_roundtrip` test proves it parses back equal to [`ghost_lobby`].
-pub const GHOST_LOBBY_JSON: &str = include_str!("ghost_lobby.json");
+pub const GHOST_LOBBY_JSON: &str =
+    include_str!("../../../../contracts/idaptik/v1/fixtures/ghost-lobby-scenario.json");
 
 fn tuning() -> TuningConstants {
     TuningConstants {
@@ -610,7 +611,10 @@ mod tests {
     fn regenerate_golden_json() {
         let def = ghost_lobby();
         let json = serde_json::to_string_pretty(&def).expect("serialize");
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/src/scenario/ghost_lobby.json");
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../contracts/idaptik/v1/fixtures/ghost-lobby-scenario.json"
+        );
         std::fs::write(path, json.as_bytes()).expect("write golden json");
     }
 

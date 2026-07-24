@@ -75,6 +75,23 @@ docs/adr/                  architecture decision records
 
 `just` runs the common tasks (`just doctor`, `just test`, `just run-bevy`, `just server`, `just config-check`); toolchains are pinned in `mise.toml` + `rust-toolchain.toml`.
 
+## UMS-authored package proof
+
+The game owns the versioned package and gameplay contracts in
+`contracts/idaptik/v1`; Universal Modding Studio consumes them without the game
+depending on the UMS UI. From the sibling UMS repository, run:
+
+```sh
+just roundtrip-idaptik
+```
+
+That command compiles the UMS Ghost Lobby profile source, hands the exact
+temporary artifact to IDApTIK's real package loader, executes a grounded camera
+uplink, snapshots, restores, replays, and fails unless events and final state
+match. The current Enaction evidence covers extracted interpolation parity;
+IDApTIK still uses Bevy's fixed-step accumulator, so no broader timing adoption
+is claimed.
+
 ## Licensing
 
 IDApTIK is layered, and each layer is licensed for what it is. The whole project is open and is built to stay open.
