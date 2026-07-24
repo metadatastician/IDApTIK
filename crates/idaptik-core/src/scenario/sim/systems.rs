@@ -38,6 +38,7 @@ impl GhostLobbySim {
         for a in s.actions.values_mut() {
             a.cd = (a.cd - dt).max(0.0);
         }
+        s.net_hack_cd = (s.net_hack_cd - dt).max(0.0);
         let mut hold_events: Vec<Event> = Vec::new();
         for door in &mut s.doors {
             door.open = (door.open - dt).max(0.0);

@@ -71,7 +71,11 @@ pub fn seat_for(cmd: &Command) -> Seat {
         Command::SetButton { .. } | Command::Jump | Command::Interact | Command::ThrowUsb => {
             Seat::Infiltrator
         }
-        Command::Uplink { .. } | Command::Pivot { .. } | Command::Unpivot => Seat::Hacker,
+        Command::Uplink { .. }
+        | Command::Pivot { .. }
+        | Command::Unpivot
+        | Command::NetSsh { .. }
+        | Command::NetHack { .. } => Seat::Hacker,
         Command::ForceCrisis
         | Command::ForceExtract { .. }
         | Command::ForceFail { .. }

@@ -1,18 +1,34 @@
 //! Reachability from a given origin, evaluated by the access matrix from that
 //! origin's segment. Pivoting changes the origin, which is how bouncing crosses
 //! more than one boundary.
-use crate::netsim::access::can_reach;
+use crate::netsim::access::segment_can_reach;
+use crate::netsim::addressing::segment_of;
 use crate::netsim::graph::GroundedGraph;
 use std::net::Ipv4Addr;
 
 /// Every node reachable from `from` (excluding `from`), in declaration order.
-pub fn reachable_from(graph: &GroundedGraph, from: Ipv4Addr) -> Vec<Ipv4Addr> {
+///
+/// The origin's segment is resolved once here rather than once per node: the
+/// answer is the same for every destination, and resolving it is the expensive
+/// half of the decision.
+fn reachable_iter(graph: &GroundedGraph, from: Ipv4Addr) -> impl Iterator<Item = Ipv4Addr> + '_ {
+    let src = segment_of(graph, from);
     graph
         .nodes
         .iter()
         .map(|n| n.ip)
-        .filter(|&ip| ip != from && can_reach(graph, from, ip))
-        .collect()
+        .filter(move |&ip| ip != from && segment_can_reach(graph, src, ip))
+}
+
+/// Every node reachable from `from` (excluding `from`), in declaration order.
+pub fn reachable_from(graph: &GroundedGraph, from: Ipv4Addr) -> Vec<Ipv4Addr> {
+    reachable_iter(graph, from).collect()
+}
+
+/// How many nodes are reachable from `from`, for a caller that wants the tally
+/// and not the list: it counts without collecting them.
+pub fn reachable_count_from(graph: &GroundedGraph, from: Ipv4Addr) -> usize {
+    reachable_iter(graph, from).count()
 }
 
 #[cfg(test)]

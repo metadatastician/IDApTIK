@@ -6,7 +6,7 @@ use crate::netsim::addressing::segment_of;
 use crate::netsim::dns::resolve;
 use crate::netsim::effect::{Effect, apply_actuation};
 use crate::netsim::graph::{GroundedGraph, VantageDef};
-use crate::netsim::reach::reachable_from;
+use crate::netsim::reach::{reachable_count_from, reachable_from};
 use crate::trace::Trace;
 use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
@@ -63,7 +63,11 @@ fn trace_cost(sec: SecurityLevel) -> u32 {
 
 impl AgentSession {
     /// Open a session from `vantage`; the active trace trips at `trace_threshold`.
-    pub fn new(_graph: &GroundedGraph, vantage: VantageDef, trace_threshold: u32) -> Self {
+    ///
+    /// No graph is taken: a session is not bound to one. Every operation on it
+    /// (`ssh`, `hack`, `is_local`, `reachable`) is handed the graph afresh, which
+    /// is what lets one session be read against the floor it is played on.
+    pub fn new(vantage: VantageDef, trace_threshold: u32) -> Self {
         Self {
             vantage,
             stack: Vec::new(),
@@ -97,6 +101,12 @@ impl AgentSession {
     /// Nodes reachable from the current active host.
     pub fn reachable(&self, graph: &GroundedGraph) -> Vec<Ipv4Addr> {
         reachable_from(graph, self.vantage_ip())
+    }
+
+    /// How many nodes are reachable from the current active host. For a readout
+    /// that wants only the tally, this counts them without collecting the list.
+    pub fn reachable_count(&self, graph: &GroundedGraph) -> usize {
+        reachable_count_from(graph, self.vantage_ip())
     }
 
     /// How many hops the active trace should divide its rate by right now.
@@ -267,7 +277,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 40,
         };
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         // From the DMZ foothold the internal db is reachable; ssh into web first is a no-op
         // (already there), so pivot straight to db via web's segment.
         assert!(s.reachable(&g).contains(&Ipv4Addr::new(10, 0, 1, 50)));
@@ -304,7 +314,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 40,
         };
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         s.ssh(&g, "10.0.1.50")
             .expect("db is reachable and pivotable");
         assert_eq!(
@@ -330,10 +340,10 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 2),
             physical_risk: 40,
         };
-        let mut weak = AgentSession::new(&g, v.clone(), 1000);
+        let mut weak = AgentSession::new(v.clone(), 1000);
         weak.hack(&g, "db")
             .expect("dmz reaches the weak internal db");
-        let mut strong = AgentSession::new(&g, v, 1000);
+        let mut strong = AgentSession::new(v, 1000);
         strong
             .hack(&g, "vault")
             .expect("dmz reaches the strong internal vault");
@@ -353,7 +363,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 40,
         };
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         s.ssh(&g, "10.0.1.50")
             .expect("db is reachable and pivotable");
         assert_eq!(s.vantage_ip(), Ipv4Addr::new(10, 0, 1, 50));
@@ -376,7 +386,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 40,
         };
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         s.ssh(&g, "10.0.1.50")
             .expect("db is reachable and pivotable");
         let json = serde_json::to_string(&s).expect("session serialises");
@@ -402,7 +412,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 85,
         };
-        let mut s = AgentSession::new(&g, v, 100);
+        let mut s = AgentSession::new(v, 100);
         assert!(s.is_local(&g, "door"), "same segment as the vantage");
         s.hack(&g, "door").expect("a local door is hackable");
         assert_eq!(
@@ -432,7 +442,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 40,
         };
-        let mut s = AgentSession::new(&g, v, 100);
+        let mut s = AgentSession::new(v, 100);
         assert!(!s.is_local(&g, "door"), "the door is on another segment");
         s.hack(&g, "door").expect("dmz can reach internal");
         assert!(
@@ -461,7 +471,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 40,
         };
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         s.ssh(&g, "10.0.1.50")
             .expect("db is reachable and pivotable");
         // Standing on `internal` via a pivot, the door is on that segment. It is only
@@ -500,7 +510,7 @@ mod tests {
             entry_ip: Ipv4Addr::new(10, 0, 0, 25),
             physical_risk: 85,
         };
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         assert!(
             s.is_local(&g, "home-door"),
             "at home, the door on your segment is yours"

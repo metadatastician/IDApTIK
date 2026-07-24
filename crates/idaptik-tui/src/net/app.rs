@@ -16,7 +16,7 @@ pub fn run(kind: VantageKind) -> io::Result<()> {
         .find(|v| v.kind == kind)
         .cloned()
         .unwrap_or_else(|| graph.vantages[0].clone());
-    let mut session = AgentSession::new(&graph, vantage, 1000);
+    let mut session = AgentSession::new(vantage, 1000);
 
     let stdin = io::stdin();
     loop {

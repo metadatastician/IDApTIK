@@ -620,7 +620,7 @@ fn the_infiltrator_can_reach_the_van_by_pivoting() {
     // outside by exactly the rules that let the peer outside reach in.
     let def = ghost_lobby();
     let g = floor_graph(&def);
-    let mut s = AgentSession::new(&g, inside_vantage(&g, "hall").unwrap(), 10_000);
+    let mut s = AgentSession::new(inside_vantage(&g, "hall").unwrap(), 10_000);
     let ap = resolve(&g, "ap.local").expect("the van's AP resolves");
     assert!(!s.reachable(&g).contains(&ap), "not without pivoting");
     s.ssh(&g, "bridge.local")

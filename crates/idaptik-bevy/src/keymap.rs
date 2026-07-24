@@ -11,6 +11,7 @@ use idaptik_core::scenario::ActionKind;
 use idaptik_core::scenario::command::{Button, Command, PivotTarget};
 
 use crate::driver::CommandQueue;
+use crate::net_view::AppMode;
 
 const LEFT: &[KeyCode] = &[KeyCode::KeyA, KeyCode::ArrowLeft];
 const RIGHT: &[KeyCode] = &[KeyCode::KeyD, KeyCode::ArrowRight];
@@ -103,12 +104,22 @@ fn sync_hold(
     }
 }
 
-/// The windowed input system: decode the keyboard into the command queue.
+/// The windowed input system: decode the keyboard into the command queue,
+/// and toggle Net View on `N` (a screen switch, not a gameplay `Command`, so
+/// it bypasses `CommandQueue` entirely).
 pub fn keyboard_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut queue: ResMut<CommandQueue>,
     mut exit: MessageWriter<AppExit>,
+    mode: Res<State<AppMode>>,
+    mut next_mode: ResMut<NextState<AppMode>>,
 ) {
+    if keys.just_pressed(KeyCode::KeyN) {
+        next_mode.set(match mode.get() {
+            AppMode::GhostLobby => AppMode::NetView,
+            AppMode::NetView => AppMode::GhostLobby,
+        });
+    }
     if decode(&keys, &mut queue) {
         exit.write(AppExit::Success);
     }

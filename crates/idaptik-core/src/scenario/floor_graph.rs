@@ -415,7 +415,7 @@ mod tests {
         let g = floor_graph(&def);
         let substation = g.node("substation").expect("the substation exists").ip;
 
-        let mut building = AgentSession::new(&g, van_vantage(&g), 10_000);
+        let mut building = AgentSession::new(van_vantage(&g), 10_000);
         building
             .ssh(&g, pivot_host(PivotTarget::Bridge))
             .expect("the bridge is one hop from the van");
@@ -426,7 +426,7 @@ mod tests {
             "the building line opens the floor in one hop"
         );
 
-        let mut upstream = AgentSession::new(&g, van_vantage(&g), 10_000);
+        let mut upstream = AgentSession::new(van_vantage(&g), 10_000);
         upstream
             .ssh(&g, pivot_host(PivotTarget::IspOps))
             .expect("the ISP ops host is one hop from the van");
@@ -444,7 +444,7 @@ mod tests {
     fn the_van_must_pivot_to_reach_any_fixture() {
         let def = ghost_lobby();
         let g = floor_graph(&def);
-        let mut s = AgentSession::new(&g, van_vantage(&g), 10_000);
+        let mut s = AgentSession::new(van_vantage(&g), 10_000);
         let hall_light = g
             .node(&light_node_id("hall"))
             .expect("hall light exists")
@@ -467,7 +467,7 @@ mod tests {
         let g = floor_graph(&def);
         let substation = resolve(&g, "substation.grid.local").expect("substation resolves");
         let grid_jump = resolve(&g, "jump.grid.local").expect("grid jump host resolves");
-        let mut s = AgentSession::new(&g, van_vantage(&g), 10_000);
+        let mut s = AgentSession::new(van_vantage(&g), 10_000);
         assert!(!s.reachable(&g).contains(&substation), "not reachable cold");
 
         s.ssh(&g, "ops.isp.net")
@@ -500,7 +500,7 @@ mod tests {
         let def = ghost_lobby();
         let g = floor_graph(&def);
         let v = inside_vantage(&g, "hall").expect("the hall has a vantage");
-        let s = AgentSession::new(&g, v, 10_000);
+        let s = AgentSession::new(v, 10_000);
         assert!(
             s.is_local(&g, &light_node_id("hall")),
             "the hall light is theirs"

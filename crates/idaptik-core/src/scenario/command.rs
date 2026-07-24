@@ -90,6 +90,14 @@ pub enum PivotTarget {
     GridJump,
 }
 
+/// A node in the grounded network graph, addressed by its position in
+/// `GroundedGraph::nodes` rather than by id or hostname. This keeps `Command`
+/// `Copy`, exactly as `PivotTarget` keeps pivoting off a named enum rather
+/// than a `String` host; the index is stable because the graph is built once,
+/// deterministically, from the scenario definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct NetNodeIndex(pub u32);
+
 /// A single wire command.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "cmd")]
@@ -110,6 +118,15 @@ pub enum Command {
     /// Immediate: back out of one pivot, handing the link back what the reach
     /// was costing it.
     Unpivot,
+    /// Immediate: pivot the hacker onto an arbitrary graph node (Net View
+    /// click). Costs exactly what a named pivot costs today: trace advance,
+    /// nothing more.
+    NetSsh { node: NetNodeIndex },
+    /// Immediate: hack an arbitrary graph node (Net View click). A node that
+    /// already belongs to one of the four uplink actions runs that action's
+    /// exact economy; every other actuatable node runs a new, separate flat
+    /// cost/cooldown gate.
+    NetHack { node: NetNodeIndex },
     /// Immediate test hook: force the crisis phase.
     ForceCrisis,
     /// Immediate test hook: force an extraction.
@@ -148,6 +165,8 @@ pub fn fold(cmds: &[Command], held: &mut Buttons) -> TickInput {
             Command::Uplink { .. }
             | Command::Pivot { .. }
             | Command::Unpivot
+            | Command::NetSsh { .. }
+            | Command::NetHack { .. }
             | Command::ForceCrisis
             | Command::ForceExtract { .. }
             | Command::ForceFail { .. }
@@ -269,6 +288,39 @@ mod tests {
             })
             .expect("serialises"),
             r#"{"cmd":"Pivot","target":"GridJump"}"#
+        );
+    }
+
+    #[test]
+    fn the_net_view_verbs_round_trip_on_the_wire() {
+        // Net View addresses a node by its position in `GroundedGraph::nodes`
+        // rather than by a `String` host or id, so `Command` stays `Copy`:
+        // exactly the reason `PivotTarget` is a named enum and not a raw host.
+        for cmd in [
+            Command::NetSsh {
+                node: NetNodeIndex(0),
+            },
+            Command::NetHack {
+                node: NetNodeIndex(3),
+            },
+        ] {
+            let json = serde_json::to_string(&cmd).expect("serialises");
+            let back: Command = serde_json::from_str(&json).expect("deserialises");
+            assert_eq!(back, cmd, "{json}");
+        }
+        assert_eq!(
+            serde_json::to_string(&Command::NetSsh {
+                node: NetNodeIndex(0)
+            })
+            .expect("serialises"),
+            r#"{"cmd":"NetSsh","node":0}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&Command::NetHack {
+                node: NetNodeIndex(3)
+            })
+            .expect("serialises"),
+            r#"{"cmd":"NetHack","node":3}"#
         );
     }
 }

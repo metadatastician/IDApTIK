@@ -18,7 +18,7 @@ fn vantage(g: &GroundedGraph, kind: VantageKind) -> VantageDef {
 fn inside_vantage_opens_the_door_locally() {
     let g = grounded_slice();
     let v = vantage(&g, VantageKind::Inside);
-    let mut s = AgentSession::new(&g, v, 1000);
+    let mut s = AgentSession::new(v, 1000);
     let effects = s
         .hack(&g, "door-hall-office")
         .expect("door reachable from inside");
@@ -30,7 +30,7 @@ fn inside_vantage_opens_the_door_locally() {
 fn wide_area_power_line_disables_the_maglock_door() {
     let g = grounded_slice();
     let v = vantage(&g, VantageKind::Base);
-    let mut s = AgentSession::new(&g, v, 1000);
+    let mut s = AgentSession::new(v, 1000);
     // From the remote base the substation is reachable over the ISP hop; hacking it
     // cascades power loss down to the building's maglock door and lights.
     let effects = s
@@ -50,7 +50,7 @@ fn base_vantage_reaches_raw_public_ips_through_the_isp() {
     // vantage could ever reach the open internet.
     let g = grounded_slice();
     let v = vantage(&g, VantageKind::Base);
-    let s = AgentSession::new(&g, v, 1000);
+    let s = AgentSession::new(v, 1000);
     assert!(
         idaptik_core::netsim::ping(&g, s.vantage_ip(), Ipv4Addr::new(203, 0, 113, 9)),
         "the base vantage must reach a raw public IP"
@@ -68,7 +68,7 @@ fn identical_command_sequences_are_deterministic() {
     let g = grounded_slice();
     let run = || {
         let v = vantage(&g, VantageKind::Van);
-        let mut s = AgentSession::new(&g, v, 1000);
+        let mut s = AgentSession::new(v, 1000);
         let pivot = s.ssh(&g, "bridge.local");
         let hack = s.hack(&g, "door-hall-office");
         (pivot, hack, s.logs().to_vec(), s.trace_fraction())
@@ -80,7 +80,7 @@ fn identical_command_sequences_are_deterministic() {
 fn van_must_pivot_through_the_bridge_to_reach_the_building() {
     let g = grounded_slice();
     let v = vantage(&g, VantageKind::Van);
-    let mut s = AgentSession::new(&g, v, 1000);
+    let mut s = AgentSession::new(v, 1000);
     let door = Ipv4Addr::new(10, 20, 0, 12);
     let bridge = Ipv4Addr::new(10, 20, 5, 2);
     // From the van's perimeter foothold the building door is not directly reachable;

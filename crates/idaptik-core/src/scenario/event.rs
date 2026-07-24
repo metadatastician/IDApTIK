@@ -60,6 +60,11 @@ pub enum Event {
         kind: ActionKind,
         reason: DenyReason,
     },
+    /// Telemetry: an arbitrary graph node (not one of the four uplinks) was
+    /// hacked directly through Net View.
+    NetHackAction { node_id: String },
+    /// A direct Net View hack was denied.
+    NetHackDenied { node_id: String, reason: DenyReason },
     /// A door hold became active.
     DoorHoldActive { door: DoorId, duration: f64 },
     /// The contact note was secured.
@@ -241,6 +246,23 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
                 Log,
             )
         }
+        Event::NetHackDenied { node_id, reason } => {
+            let why = match reason {
+                DenyReason::Cooldown => "on cooldown",
+                DenyReason::Bandwidth => "not enough bandwidth",
+                DenyReason::VacuumFallen => "vacuum already gone",
+                DenyReason::NoRoute => "no route to target",
+            };
+            line(
+                format!("Net hack on {node_id} denied: {why}."),
+                if matches!(reason, DenyReason::VacuumFallen | DenyReason::NoRoute) {
+                    Bad
+                } else {
+                    Warn
+                },
+                Log,
+            )
+        }
         Event::DoorHoldActive { door, duration } => line(
             format!("{door} hold active for {} seconds.", dec1(*duration)),
             Hacker,
@@ -311,6 +333,7 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
         // not rendered as log lines.
         Event::PhaseChanged { .. }
         | Event::UplinkAction { .. }
+        | Event::NetHackAction { .. }
         | Event::NoteExposed
         | Event::BillyStateChanged { .. }
         | Event::ObjectivesUpdated { .. }
@@ -372,5 +395,32 @@ mod tests {
         assert_eq!(l.tick, 42);
         assert_eq!(l.channel, Channel::Log);
         assert!(l.text.contains("0001E240"));
+    }
+
+    #[test]
+    fn a_net_hack_action_has_no_log_line_but_a_denial_does() {
+        // NetHackAction is telemetry, exactly like UplinkAction; the denial is
+        // the thing a player needs to read.
+        assert!(
+            log_view(
+                &Event::NetHackAction {
+                    node_id: "substation".into()
+                },
+                0,
+                0.0
+            )
+            .is_none()
+        );
+        let denied = log_view(
+            &Event::NetHackDenied {
+                node_id: "substation".into(),
+                reason: DenyReason::Cooldown,
+            },
+            0,
+            0.0,
+        )
+        .expect("a denial reads as a log line");
+        assert!(denied.text.contains("substation"));
+        assert!(denied.text.contains("cooldown"));
     }
 }
