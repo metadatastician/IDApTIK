@@ -16,8 +16,7 @@ must use engine-neutral application data; and "UMS Workshop" must hand off to
 the independent Universal Modding Studio rather than embedding the editor into
 the game.
 
-IDApTIK retains Bevy and Fyrox as thin interchangeable frontends over
-`idaptik-core`. The first package round trip remains headless. The current
-Gossamer-hosted client design makes Bevy the closest initial graphical target,
-while Fyrox remains an evaluation and parity frontend unless a later ADR
-changes that decision.
+IDApTIK uses Bevy as its thin graphical frontend over `idaptik-core`
+(ADR-0008). The first package round trip remains headless. The current
+Gossamer-hosted client design makes Bevy the target for implementing this
+outline without moving package or simulation authority into the renderer.

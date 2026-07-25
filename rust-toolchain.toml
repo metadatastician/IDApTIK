@@ -9,6 +9,6 @@
 [toolchain]
 channel = "1.95.0"
 components = ["rustfmt", "clippy", "rust-src", "rust-analyzer"]
-# wasm32 target kept ready: both Bevy and Fyrox ship WebAssembly backends, and a
-# browser build is a plausible distribution target for an infiltration game.
+# wasm32 target kept ready: Bevy ships a WebAssembly backend, and a browser
+# build is the design-of-record route into the Gossamer host.
 targets = ["wasm32-unknown-unknown"]

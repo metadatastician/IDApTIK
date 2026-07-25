@@ -1,8 +1,8 @@
 # IDApTIK Cargo workspace.
 #
 # Layout follows ADR-0003: gameplay truth lives in an engine-agnostic `core`
-# crate; `bevy` and `fyrox` are thin, interchangeable rendering frontends over
-# it; `ffi` is the C-ABI surface that Zig/Idris2 bind to (ADR-0001).
+# crate; `bevy` is the selected rendering frontend over it; `ffi` is the C-ABI
+# surface that Zig/Idris2 bind to (ADR-0001, ADR-0008).
 [workspace]
 resolver = "2"
 members = [
@@ -11,7 +11,6 @@ members = [
     "crates/idaptik-tui",
     "crates/idaptik-net",
     "crates/idaptik-bevy",
-    "crates/idaptik-fyrox",
 ]
 
 [workspace.package]
@@ -32,7 +31,6 @@ ratatui = "0.30"
 crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
 bevy = "0.19"
-fyrox = "1.0"
 # The client-side session transport (ADR-0006 §2): async runtime + WebSocket.
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 tokio-tungstenite = "0.30"

@@ -2,8 +2,8 @@
 //!
 //! This crate holds the authoritative simulation the two roles share: the
 //! network the hacker navigates, the devices they compromise, and the trace
-//! clock they race. It has **no rendering dependency** — Bevy and Fyrox are
-//! frontends over this (ADR-0003), and the Elixir session layer coordinates it
+//! clock they race. It has **no rendering dependency** — Bevy is a frontend
+//! over this (ADR-0008), and the Elixir session layer coordinates it
 //! (ADR-0002). Keep game logic here, not in a frontend.
 //!
 //! The [`scenario`] module ports the "Envelope 001 – Ghost Lobby" prototype as a

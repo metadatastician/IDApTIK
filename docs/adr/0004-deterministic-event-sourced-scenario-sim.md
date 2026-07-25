@@ -13,7 +13,7 @@ gameplay *truth*: it renders while it simulates, its timing is frame-rate
 dependent, and its state is trapped inside DOM and closures.
 
 Per ADR-0003, gameplay truth must live in the engine-agnostic `idaptik-core`
-crate so Bevy/Fyrox stay thin and the Elixir session layer (ADR-0002) can
+crate so graphical frontends stay thin and the Elixir session layer (ADR-0002) can
 coordinate it. The prototype also needs to slot, later, into the "Exchange
 House / UMS building runtime" pattern: content declared as data, validated into
 a model, simulated, and exported as JSON (definition, runtime snapshot,
@@ -70,7 +70,7 @@ definition-as-data** scenario.
 The playable frontend is a new `idaptik-tui` crate (ratatui + crossterm) with
 the HTML key bindings, **plus** TTY-free `--headless --script`, `--replay`, and
 `--export` modes — the headless path is how the scenario is verified in CI and
-in constrained environments. Bevy/Fyrox are untouched.
+in constrained environments. The graphical frontend is untouched.
 
 ## Consequences
 

@@ -15,8 +15,7 @@ For the reasoning behind each choice, see the ADRs in [`docs/adr/`](docs/adr/).
 │   ├── idaptik-core/  #   engine-agnostic sim: netsim + scenario + Moletaire companion
 │   ├── idaptik-ffi/   #   C ABI surface (JSON in / JSON out) over the core
 │   ├── idaptik-tui/   #   ratatui/crossterm frontend + --headless/--replay/--export verifier
-│   ├── idaptik-bevy/  #   Bevy side-on 2.5D frontend (evaluation)
-│   └── idaptik-fyrox/ #   Fyrox frontend (evaluation; ADR-0003)
+│   └── idaptik-bevy/  #   selected Bevy side-on 2.5D frontend (ADR-0008)
 ├── server/            # Elixir/Phoenix session relay (Bandit + Phoenix Channels)
 ├── config/            # Nickel typed config: scenario-schema.ncl + fixtures (incl. bad_*.ncl)
 ├── docs/adr/          # Architecture Decision Records
@@ -64,10 +63,10 @@ equivalence. Intended host bridge is Zig (ADR-0001).
 
 ## Frontends
 
-`idaptik-tui` (the reference frontend and headless verifier), `idaptik-bevy`
-(side-on 2.5D), and `idaptik-fyrox` are all thin drivers: they read input, push
-`Command`s, and render the `Event`/snapshot stream. The core never depends on
-them (ADR-0003, engine-agnostic strategy).
+`idaptik-tui` is the reference frontend and headless verifier.
+`idaptik-bevy` is the selected side-on 2.5D graphical frontend. Both are thin
+drivers: they read input, push `Command`s, and render the `Event`/snapshot
+stream. The core never depends on them (ADR-0003 and ADR-0008).
 
 ## Multiplayer (`server/`)
 

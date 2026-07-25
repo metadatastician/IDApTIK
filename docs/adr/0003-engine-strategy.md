@@ -1,6 +1,6 @@
 # ADR-0003: Engine strategy — engine-agnostic core, Bevy + Fyrox as frontends
 
-- Status: Accepted (evaluation phase)
+- Status: Accepted core boundary; dual-frontend evaluation superseded by ADR-0008
 - Date: 2026-07-09
 
 ## Context
