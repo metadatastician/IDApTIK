@@ -164,6 +164,7 @@ pub struct GhostLobbySupervisor {
     pub director: VsmDirector,
     pub evidence: Option<EvidenceLedger>,
     pub team: OperatorTeam,
+    pub coverage_target: Option<String>,
     pub observed_events: u64,
 }
 
@@ -173,6 +174,7 @@ impl GhostLobbySupervisor {
             director: VsmDirector::new(0, 1),
             evidence: None,
             team: OperatorTeam { id: team_id.into(), operators: vec![], attention: 0 },
+            coverage_target: None,
             observed_events: 0,
         }
     }
@@ -185,7 +187,9 @@ impl GhostLobbySupervisor {
             else { self.evidence = Some(next); }
         }
         if let Some(evidence) = &self.evidence {
-            self.director.allocate_from_evidence(&mut self.team, evidence, &["usb".into()]);
+            let target = ["usb".into()];
+            self.director.allocate_from_evidence(&mut self.team, evidence, &target);
+            if self.team.attention > 0 { self.coverage_target = target.into_iter().next(); }
         }
     }
 }
@@ -518,5 +522,6 @@ mod tests {
         assert_eq!(supervisor.observed_events, 1);
         assert!(supervisor.evidence.is_some());
         assert!(supervisor.team.attention > 0);
+        assert_eq!(supervisor.coverage_target.as_deref(), Some("usb"));
     }
 }
