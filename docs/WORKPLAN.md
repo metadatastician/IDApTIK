@@ -12,14 +12,15 @@ private canonical UMS repository.
 - [x] Publish the shared ESM and repository-boundary contract.
 - [x] Add the first VSM-shaped deterministic supervisor prototype.
 - [x] Add bounded, provenance-bearing scalar hypothesis tests.
-- [ ] Add a deterministic DST-style evidence ledger using fixed-point masses.
-- [ ] Add USB/fridge-note and front-door/vent conformance fixtures.
-- [ ] Preserve conflict, ignorance, source reliability, and replay traces.
+- [x] Add a deterministic DST-style evidence ledger using fixed-point masses.
+- [x] Add USB/fridge-note and front-door/vent conformance fixtures.
+- [x] Preserve conflict, ignorance, fixed-point replay, and focal-set queries.
+- [x] Connect evidence plausibility to bounded patrol attention allocation.
 
 ## Next: first playable proving slice
 
-- [ ] Connect evidence updates to a small Ghost Lobby team.
-- [ ] Model NPC operators, patrol coordination, and attention allocation.
+- [x] Model the first NPC operator-team type and attention trace event.
+- [ ] Connect the team allocation to actual Ghost Lobby world coverage.
 - [ ] Add a bounded adaptive intervention with an explicit policy check.
 - [ ] Expose developer telemetry in TUI/replay output.
 - [ ] Verify that the player can create a rational but false NPC hypothesis.
@@ -41,3 +42,13 @@ profile compilation. The Enaction Engine owns shared semantics. Multiplayer
 relays events but does not become semantic authority. Private AI details remain
 in the canonical private UMS repository unless a public interface requires
 their disclosure.
+
+## Current stopping point
+
+The public branch `docs/vsm-esm-framework` contains the first deterministic
+evidence/VSM prototype and is open as PR #61. The core tests cover scalar
+hypotheses, fixed-point focal masses, conflict, USB/fridge-note revision,
+vent/front-door deception, and evidence-driven patrol attention. Nothing yet
+changes the live Ghost Lobby simulation or Bevy presentation. Start the next
+session by connecting `EvidenceLedger::recommended_attention` and
+`VsmDirector::allocate_from_evidence` to a real scenario event stream.
