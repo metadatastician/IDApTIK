@@ -20,6 +20,7 @@ jobs:
     steps:
       - name: Checkout Site
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init .
           git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
           git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
