@@ -17,6 +17,7 @@ private canonical UMS repository.
 - [x] Preserve conflict, ignorance, fixed-point replay, and focal-set queries.
 - [x] Connect evidence plausibility to bounded patrol attention allocation.
 - [x] Translate selected Ghost Lobby events into observer-relative evidence.
+- [x] Add an opt-in supervised headless runner path.
 
 ## Next: first playable proving slice
 
@@ -52,5 +53,5 @@ hypotheses, fixed-point focal masses, conflict, USB/fridge-note revision,
 vent/front-door deception, and evidence-driven patrol attention. Nothing yet
 changes the live Ghost Lobby simulation or Bevy presentation. The event adapter
 now exists, but it is still opt-in; start the next session by invoking it from
-the real simulation event stream and applying the resulting team allocation to
-world coverage.
+the interactive TUI and applying the resulting team allocation to world
+coverage.
