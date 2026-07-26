@@ -33,9 +33,8 @@ impl Agents {
     /// than panicking, since `RuntimeState::initial` is driven by the fuzz test.
     pub fn initial(graph: &GroundedGraph, start_room: &str, trace_threshold: u32) -> Self {
         Self {
-            hacker: AgentSession::new(graph, van_vantage(graph), trace_threshold),
+            hacker: AgentSession::new(van_vantage(graph), trace_threshold),
             infiltrator: AgentSession::new(
-                graph,
                 inside_vantage(graph, start_room).unwrap_or_else(|| van_vantage(graph)),
                 trace_threshold,
             ),

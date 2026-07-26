@@ -32,12 +32,19 @@ fn can_route_via_isp(src: &Segment, dst: &Segment) -> bool {
     }
 }
 
-/// Whether `src` may reach `dst` from its current segment.
-pub fn can_reach(graph: &GroundedGraph, src: Ipv4Addr, dst: Ipv4Addr) -> bool {
-    if src == dst {
-        return true;
-    }
-    match (segment_of(graph, src), segment_of(graph, dst)) {
+/// Whether a source already resolved to `src` may reach `dst`. `src` is `None`
+/// when the origin sits on no segment (a raw public IP), which reaches nothing.
+///
+/// Split out from [`can_reach`] so that a caller judging many destinations from
+/// one origin resolves the source segment once rather than once per destination.
+/// It does not carry the identity shortcut, since there is no source address here
+/// to compare against; [`can_reach`] applies that before calling in.
+pub(crate) fn segment_can_reach(
+    graph: &GroundedGraph,
+    src: Option<&Segment>,
+    dst: Ipv4Addr,
+) -> bool {
+    match (src, segment_of(graph, dst)) {
         (Some(s), Some(d)) => can_zone_access_zone(s, d) || can_route_via_isp(s, d),
         (Some(s), None) => {
             // dest is a raw public IP: reachable iff the source has a way out.
@@ -45,6 +52,14 @@ pub fn can_reach(graph: &GroundedGraph, src: Ipv4Addr, dst: Ipv4Addr) -> bool {
         }
         _ => false,
     }
+}
+
+/// Whether `src` may reach `dst` from its current segment.
+pub fn can_reach(graph: &GroundedGraph, src: Ipv4Addr, dst: Ipv4Addr) -> bool {
+    if src == dst {
+        return true;
+    }
+    segment_can_reach(graph, segment_of(graph, src), dst)
 }
 
 #[cfg(test)]

@@ -153,6 +153,15 @@ pub struct Throttles {
     pub support_fray: f64,
     /// Per-door badge throttle.
     pub badge: [f64; 4],
+    /// Per-action route-denial throttle, indexed by [`ActionKind::index`].
+    /// Kept apart from `cd`: a cooldown denial and a later no-route denial for
+    /// the same action are different news, and sharing a slot let firing one
+    /// silently swallow the other for a throttle window.
+    pub route: [f64; 4],
+    /// Net View direct-hack denial throttle. A single slot, not indexed by
+    /// `ActionKind`: today there is genuinely only one direct-hack target
+    /// (the substation), so one slot is all the state this needs.
+    pub net_hack_denial: f64,
 }
 
 impl Default for Throttles {
@@ -162,6 +171,8 @@ impl Default for Throttles {
             bw: [-999.0; 4],
             support_fray: -999.0,
             badge: [-999.0; 4],
+            route: [-999.0; 4],
+            net_hack_denial: -999.0,
         }
     }
 }
@@ -216,6 +227,10 @@ pub struct RuntimeState {
     pub vacuum: VacuumState,
     pub actions: BTreeMap<ActionKind, ActionState>,
     pub throttles: Throttles,
+    /// Cooldown remaining on Net View's direct-hack gate (shared across every
+    /// non-uplink actuatable node; today, in practice, only the substation).
+    /// Original addition, not a ported prototype field: see `constants.rs`.
+    pub net_hack_cd: f64,
     pub stats: Stats,
     /// The two players' network sessions.
     pub agents: Agents,
@@ -371,6 +386,7 @@ impl RuntimeState {
             },
             actions,
             throttles: Throttles::default(),
+            net_hack_cd: 0.0,
             stats: Stats::default(),
             agents,
             camera_looped: vec![0.0; def.cameras.len()],

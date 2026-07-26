@@ -376,3 +376,13 @@ pub const OPERATOR_ALERT_GAIN: f64 = 1.2;
 pub const OPERATOR_SCORE_MULT: f64 = 1.25;
 pub const OPERATOR_RESCUE: bool = false;
 pub const OPERATOR_TRACE_THRESHOLD: u32 = 400;
+
+//## Net View direct-hack
+// Original addition -- not ported from the HTML prototype; every other
+// constant in this file is. Flagged for review: this is a new capability
+// (hacking e.g. the substation directly was previously reachable only from a
+// raw test call, never from any Command), and these two numbers have no
+// canonical source to check against. Starting point is parity with the most
+// expensive existing uplink action (Vacuum).
+pub const NET_HACK_COST: f64 = 25.0;
+pub const NET_HACK_COOLDOWN: f64 = 8.0;

@@ -84,6 +84,10 @@ pub struct LogText;
 /// Marker: the end-of-run overlay.
 #[derive(Component)]
 pub struct ResultText;
+/// Marker: the Ghost Lobby HUD's top-level entities, shown/hidden as a block
+/// alongside `scene::GhostLobbySceneMarker`.
+#[derive(Component)]
+pub struct GhostLobbyHudMarker;
 
 fn hud_text(size: f32) -> (TextFont, TextColor) {
     (
@@ -96,14 +100,17 @@ fn hud_text(size: f32) -> (TextFont, TextColor) {
 /// bottom, the (initially empty) result overlay in the centre.
 pub fn setup_hud(mut commands: Commands) {
     commands
-        .spawn(Node {
-            position_type: PositionType::Absolute,
-            top: Val::Px(8.0),
-            left: Val::Px(10.0),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(4.0),
-            ..Default::default()
-        })
+        .spawn((
+            GhostLobbyHudMarker,
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(8.0),
+                left: Val::Px(10.0),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(4.0),
+                ..Default::default()
+            },
+        ))
         .with_children(|root| {
             root.spawn((Text::new(""), hud_text(13.0), StatusText));
             for meter in Meter::ALL {
@@ -146,6 +153,7 @@ pub fn setup_hud(mut commands: Commands) {
         });
 
     commands.spawn((
+        GhostLobbyHudMarker,
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(46.0),
@@ -158,6 +166,7 @@ pub fn setup_hud(mut commands: Commands) {
     ));
 
     commands.spawn((
+        GhostLobbyHudMarker,
         Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(8.0),
@@ -173,6 +182,7 @@ pub fn setup_hud(mut commands: Commands) {
     ));
 
     commands.spawn((
+        GhostLobbyHudMarker,
         Node {
             position_type: PositionType::Absolute,
             top: Val::Percent(40.0),
@@ -221,7 +231,7 @@ pub fn update_status_text(sim: Res<SimState>, mut text: Query<&mut Text, With<St
         paused,
         hacker.vantage().kind,
         hacker.hops(),
-        hacker.reachable(sim.sim.graph()).len(),
+        hacker.reachable_count(sim.sim.graph()),
     );
 }
 

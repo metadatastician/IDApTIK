@@ -38,6 +38,12 @@ impl InputState {
                     Command::Uplink { .. } | Command::Pivot { .. } | Command::Unpivot => {
                         self.immediates.push(cmd)
                     }
+                    // Deliberately non-exhaustive: SetButton/ForceCrisis/ForceExtract/
+                    // ForceFail/Pause/Restart are handled elsewhere in `apply`, and
+                    // NetSsh/NetHack are Net View's Bevy-only click commands, which
+                    // this TUI never constructs -- safe to drop here today, but see
+                    // `idaptik-net::envelope::seat_for` for the exhaustive-match
+                    // alternative if that ever needs to change.
                     _ => {}
                 },
                 Intent::TogglePause => {

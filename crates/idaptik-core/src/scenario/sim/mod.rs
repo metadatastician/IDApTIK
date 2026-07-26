@@ -14,7 +14,7 @@ mod systems;
 use crate::netsim::graph::GroundedGraph;
 use crate::scenario::actor::{ComposedActor, billy_actor};
 use crate::scenario::agents::apply_effects;
-use crate::scenario::command::{PivotTarget, RunConfig, TickInput};
+use crate::scenario::command::{NetNodeIndex, PivotTarget, RunConfig, TickInput};
 use crate::scenario::common::{
     BillyMode, CrisisReason, DenyReason, ExtractMethod, FailReason, Outcome, Phase, ReportedTarget,
     Tone,
@@ -335,6 +335,12 @@ impl GhostLobbySim {
                     crate::scenario::command::Command::Unpivot => {
                         self.unpivot();
                     }
+                    crate::scenario::command::Command::NetSsh { node } => {
+                        self.net_ssh(*node);
+                    }
+                    crate::scenario::command::Command::NetHack { node } => {
+                        self.net_hack(*node);
+                    }
                     crate::scenario::command::Command::ForceCrisis => {
                         self.begin_crisis(CrisisReason::Test);
                     }
@@ -595,6 +601,37 @@ impl GhostLobbySim {
         }
     }
 
+    /// Which `ActionKind`, if any, `node_id` belongs to -- independent of the
+    /// player's current position, unlike `action_target` (which names only
+    /// the contextually nearest fixture for Camera/Door/Lights). A Net View
+    /// click on a specific node must run that node's action economy
+    /// regardless of where the player happens to be standing.
+    fn action_kind_of_node(&self, node_id: &str) -> Option<ActionKind> {
+        if node_id == VACUUM_NODE_ID {
+            return Some(ActionKind::Vacuum);
+        }
+        if (0..self.def.cameras.len()).any(|i| camera_node_id(i) == node_id) {
+            return Some(ActionKind::Camera);
+        }
+        if self
+            .state
+            .doors
+            .iter()
+            .any(|d| door_node_id(d.id.clone()) == node_id)
+        {
+            return Some(ActionKind::Door);
+        }
+        if self
+            .def
+            .rooms
+            .iter()
+            .any(|r| light_node_id(r.id.as_str()) == node_id)
+        {
+            return Some(ActionKind::Lights);
+        }
+        None
+    }
+
     /// Pivot the hacker onto a named foothold (immediate; self-guards on
     /// paused/ended).
     ///
@@ -611,19 +648,21 @@ impl GhostLobbySim {
         if self.paused || self.state.ended {
             return;
         }
-        let host = pivot_host(target);
-        match self.state.agents.hacker.ssh(&self.graph, host) {
+        self.ssh_and_report(pivot_host(target).to_owned());
+    }
+
+    /// Shared tail of `pivot`/`net_ssh`: attempt the ssh, report whichever of
+    /// `PivotOpened`/`PivotDenied` results. `host` is owned because one caller
+    /// only has a borrow to hand over (`pivot_host` is `&'static str`) while
+    /// the other already owns a freshly-formatted `String`; taking ownership
+    /// here lets both move it straight into the event instead of cloning.
+    fn ssh_and_report(&mut self, host: String) {
+        match self.state.agents.hacker.ssh(&self.graph, &host) {
             Ok(_) => {
                 let hops = self.state.agents.hacker.hops();
-                self.events.push(Event::PivotOpened {
-                    host: host.to_owned(),
-                    hops,
-                });
+                self.events.push(Event::PivotOpened { host, hops });
             }
-            Err(reason) => self.events.push(Event::PivotDenied {
-                host: host.to_owned(),
-                reason,
-            }),
+            Err(reason) => self.events.push(Event::PivotDenied { host, reason }),
         }
     }
 
@@ -639,6 +678,81 @@ impl GhostLobbySim {
         }
     }
 
+    /// Pivot the hacker onto an arbitrary graph node by index (Net View
+    /// click; immediate, self-guards on paused/ended). Generalises `pivot`
+    /// from a fixed `PivotTarget`-resolved host to any node in the graph.
+    /// Costs exactly what a named pivot costs: nothing beyond the trace
+    /// advance `ssh` already charges.
+    pub(crate) fn net_ssh(&mut self, node: NetNodeIndex) {
+        if self.paused || self.state.ended {
+            return;
+        }
+        let Some(target) = self.graph.nodes.get(node.0 as usize) else {
+            return;
+        };
+        self.ssh_and_report(target.ip.to_string());
+    }
+
+    /// Hack an arbitrary graph node by index (Net View click; immediate,
+    /// self-guards on paused/ended). A node already reachable through one of
+    /// the four uplink actions (judged by identity via `action_kind_of_node`,
+    /// not by the player's current position) runs through the exact same
+    /// economy as that action. Every other actuatable node -- today, only the
+    /// substation -- runs a new, separate flat-cost gate: a genuine new
+    /// capability, since nothing before this reached it from any `Command`.
+    pub(crate) fn net_hack(&mut self, node: NetNodeIndex) {
+        if self.paused || self.state.ended {
+            return;
+        }
+        let Some(target) = self.graph.nodes.get(node.0 as usize) else {
+            return;
+        };
+        let node_id = target.id.clone();
+        if let Some(kind) = self.action_kind_of_node(&node_id) {
+            self.perform_action_on(kind, Some(node_id));
+            return;
+        }
+
+        let t = self.state.t;
+        // Denials are throttled like every other repeated-press event in this
+        // sim (`Throttles`' whole purpose): a click that keeps landing on a
+        // cooling-down or unaffordable target must not flood the log the way
+        // a held key on the keyboard path never could.
+        let throttled_deny = |sim: &mut Self, node_id: String, reason: DenyReason| {
+            sim.state.stats.failed_actions += 1;
+            let slot = &mut sim.state.throttles.net_hack_denial;
+            if t - *slot >= c::THROTTLE_CDBW {
+                *slot = t;
+                sim.events.push(Event::NetHackDenied { node_id, reason });
+            }
+        };
+
+        if self.state.net_hack_cd > 0.0 {
+            throttled_deny(self, node_id, DenyReason::Cooldown);
+            return;
+        }
+        if self.state.bandwidth < c::NET_HACK_COST {
+            throttled_deny(self, node_id, DenyReason::Bandwidth);
+            return;
+        }
+        let effects = match self.state.agents.hacker.hack(&self.graph, &node_id) {
+            Ok(effects) => effects,
+            Err(_) => {
+                throttled_deny(self, node_id, DenyReason::NoRoute);
+                return;
+            }
+        };
+
+        self.state.bandwidth -= c::NET_HACK_COST;
+        self.state.net_hack_cd = c::NET_HACK_COOLDOWN;
+        self.state.stats.hacker_actions += 1;
+        self.events.push(Event::NetHackAction {
+            node_id: node_id.clone(),
+        });
+        let events = apply_effects(&self.def, &mut self.state, self.cfg, &effects);
+        self.events.extend(events);
+    }
+
     /// Perform an uplink action (immediate; self-guards on paused/ended).
     ///
     /// An action is no longer a direct mutation of the floor: it resolves to a
@@ -650,6 +764,17 @@ impl GhostLobbySim {
         if self.paused || self.state.ended {
             return;
         }
+        let target = self.action_target(kind);
+        self.perform_action_on(kind, target);
+    }
+
+    /// The economics and effect-application shared by every uplink action,
+    /// against an explicit `target` node id rather than one `action_target`
+    /// derives from the player's current position. `perform_action` (the
+    /// keyboard path) derives `target` from position; the Net View path
+    /// (Task 7) passes the exact node the player clicked, which may not be the
+    /// contextually nearest one.
+    fn perform_action_on(&mut self, kind: ActionKind, target: Option<String>) {
         let spec = match self.def.actions.get(&kind) {
             Some(s) => *s,
             None => return,
@@ -690,7 +815,7 @@ impl GhostLobbySim {
         // The route is consulted last: after both gates, so their throttling is
         // untouched, and before any charge, so a route never had costs nothing.
         // A fixture the floor does not carry is a content gap, not a denial.
-        let Some(target) = self.action_target(kind) else {
+        let Some(target) = target else {
             return;
         };
         let effects = match self.state.agents.hacker.hack(&self.graph, &target) {
@@ -700,7 +825,7 @@ impl GhostLobbySim {
             // content bug; it denies identically rather than panicking.
             Err(_) => {
                 self.state.stats.failed_actions += 1;
-                if let Some(slot) = self.state.throttles.cd.get_mut(i)
+                if let Some(slot) = self.state.throttles.route.get_mut(i)
                     && t - *slot >= c::THROTTLE_CDBW
                 {
                     *slot = t;
@@ -1137,6 +1262,266 @@ mod tests {
     }
 
     #[test]
+    fn action_kind_of_node_classifies_by_identity_not_position() {
+        // Unlike `action_target`, which names only the contextually nearest
+        // fixture, this must recognise every camera/door/light/vacuum node
+        // regardless of where the player currently stands.
+        let sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        assert_eq!(
+            sim.action_kind_of_node(crate::scenario::floor_graph::VACUUM_NODE_ID),
+            Some(ActionKind::Vacuum)
+        );
+        assert_eq!(
+            sim.action_kind_of_node(&crate::scenario::floor_graph::camera_node_id(0)),
+            Some(ActionKind::Camera)
+        );
+        let door_id = sim.def.doors[0].id.clone();
+        assert_eq!(
+            sim.action_kind_of_node(&crate::scenario::floor_graph::door_node_id(door_id)),
+            Some(ActionKind::Door)
+        );
+        let room_id = sim.def.rooms[0].id.clone();
+        assert_eq!(
+            sim.action_kind_of_node(&crate::scenario::floor_graph::light_node_id(
+                room_id.as_str()
+            )),
+            Some(ActionKind::Lights)
+        );
+        assert_eq!(sim.action_kind_of_node("substation"), None);
+        assert_eq!(sim.action_kind_of_node("no-such-node"), None);
+    }
+
+    #[test]
+    fn net_ssh_opens_a_reachable_pivotable_node_by_index() {
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let bridge_index = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "bms-bridge")
+            .expect("the bridge is on the floor graph");
+        sim.net_ssh(NetNodeIndex(bridge_index as u32));
+        assert!(
+            sim.drain_events()
+                .iter()
+                .any(|e| matches!(e, Event::PivotOpened { .. })),
+            "the van can reach the maintenance bridge by index exactly as by name"
+        );
+        assert_eq!(sim.state.agents.hacker.hops(), 1);
+    }
+
+    #[test]
+    fn net_ssh_denies_an_unreachable_node_and_reports_why() {
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let substation_index = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "substation")
+            .expect("the substation is on the floor graph");
+        sim.net_ssh(NetNodeIndex(substation_index as u32));
+        let events = sim.drain_events();
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::PivotDenied { .. })),
+            "cold from the van the substation is not yet reachable: {events:?}"
+        );
+        assert_eq!(
+            sim.state.agents.hacker.hops(),
+            0,
+            "a refused pivot buys no depth"
+        );
+    }
+
+    #[test]
+    fn net_ssh_out_of_range_index_is_a_no_op() {
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let before = sim.state.clone();
+        sim.net_ssh(NetNodeIndex(u32::MAX));
+        assert!(sim.drain_events().is_empty());
+        assert_eq!(sim.state, before);
+    }
+
+    #[test]
+    fn net_hack_on_a_camera_node_delegates_to_the_existing_uplink_economy() {
+        // Clicking the same node id a keyboard `1` would target must produce
+        // the identical event and charge the identical cost.
+        let mut sim = pivoted();
+        sim.net_ssh(NetNodeIndex(
+            sim.graph
+                .nodes
+                .iter()
+                .position(|n| n.id == "isp-ops")
+                .expect("ops host exists") as u32,
+        ));
+        let _ = sim.drain_events();
+        let camera_index = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == crate::scenario::floor_graph::camera_node_id(0))
+            .expect("camera-0 is on the floor graph");
+        let bandwidth_before = sim.state.bandwidth;
+        sim.net_hack(NetNodeIndex(camera_index as u32));
+        let events = sim.drain_events();
+        assert!(
+            events.iter().any(|e| matches!(
+                e,
+                Event::UplinkAction {
+                    kind: ActionKind::Camera
+                }
+            )),
+            "a camera-node click must read as the Camera uplink: {events:?}"
+        );
+        assert!(
+            sim.state.bandwidth < bandwidth_before,
+            "the uplink cost was charged"
+        );
+    }
+
+    #[test]
+    fn net_hack_on_the_substation_is_a_new_direct_capability() {
+        // The substation sits two pivots deep from the van: out to the ISP ops
+        // host, then on through the grid jump host. The maintenance bridge opens
+        // the floor fixtures but is a dead end for the upstream power line (the
+        // bms segment cannot reach the isp segment), so the path to the
+        // substation runs straight from the van, not through the bridge.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let ops = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "isp-ops")
+            .expect("ops host exists");
+        sim.net_ssh(NetNodeIndex(ops as u32));
+        assert_eq!(
+            sim.state.agents.hacker.hops(),
+            1,
+            "the van reaches the ISP ops host"
+        );
+        let jump = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "grid-jump")
+            .expect("grid jump host exists");
+        sim.net_ssh(NetNodeIndex(jump as u32));
+        assert_eq!(
+            sim.state.agents.hacker.hops(),
+            2,
+            "the ISP reaches the grid jump host"
+        );
+        let _ = sim.drain_events();
+
+        let substation = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "substation")
+            .expect("substation exists");
+        let bandwidth_before = sim.state.bandwidth;
+        sim.net_hack(NetNodeIndex(substation as u32));
+        let events = sim.drain_events();
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::NetHackAction { node_id } if node_id == "substation")),
+            "the substation must report through NetHackAction: {events:?}"
+        );
+        assert!(sim.state.dead_nodes.contains("substation"), "the cut lands");
+        assert_eq!(
+            sim.state.bandwidth,
+            bandwidth_before - crate::scenario::constants::NET_HACK_COST
+        );
+        assert_eq!(
+            sim.state.net_hack_cd,
+            crate::scenario::constants::NET_HACK_COOLDOWN
+        );
+
+        // A second click while the cooldown is live must be denied, not free.
+        sim.net_hack(NetNodeIndex(substation as u32));
+        let events = sim.drain_events();
+        assert!(
+            events.iter().any(|e| matches!(
+                e,
+                Event::NetHackDenied {
+                    reason: DenyReason::Cooldown,
+                    ..
+                }
+            )),
+            "a second click under cooldown must be denied: {events:?}"
+        );
+    }
+
+    #[test]
+    fn net_hack_on_an_unreachable_node_denies_with_no_route() {
+        // Cold from the van: the substation is not reachable without pivoting
+        // through the ISP first.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let substation = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "substation")
+            .expect("substation exists");
+        sim.net_hack(NetNodeIndex(substation as u32));
+        let events = sim.drain_events();
+        assert!(
+            events.iter().any(|e| matches!(
+                e,
+                Event::NetHackDenied {
+                    reason: DenyReason::NoRoute,
+                    ..
+                }
+            )),
+            "{events:?}"
+        );
+        assert!(!sim.state.dead_nodes.contains("substation"));
+    }
+
+    #[test]
+    fn the_net_view_commands_reach_the_sim_through_a_tick() {
+        // Unlike the direct `sim.net_ssh(...)` calls above (which exercise the
+        // method in isolation, mirroring how `pivoted()` already calls
+        // `sim.pivot(...)` directly), this drives the exact path a real Net
+        // View click takes: through `Command` and `tick`.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let bridge_index = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "bms-bridge")
+            .expect("the bridge is on the floor graph") as u32;
+        let input = TickInput {
+            immediates: vec![crate::scenario::command::Command::NetSsh {
+                node: NetNodeIndex(bridge_index),
+            }],
+            ..Default::default()
+        };
+        let events = sim.tick(&input);
+        assert!(
+            events
+                .iter()
+                .any(|e| matches!(e, Event::PivotOpened { .. })),
+            "{events:?}"
+        );
+    }
+
+    #[test]
     fn the_lights_escalation_sizes_itself_on_the_use_it_is_charging_for() {
         // The escalation reads `lights_uses` AFTER the effect counts this use, as
         // the direct mutation this replaces did: it incremented, then sized the
@@ -1203,6 +1588,47 @@ mod tests {
     }
 
     #[test]
+    fn a_missing_fixture_does_not_swallow_the_cooldown_gate() {
+        // Regression: the cooldown and bandwidth gates must run, and may emit
+        // their throttled denial, REGARDLESS of whether `action_target` finds a
+        // fixture. A content gap (here, a floor authored with no cameras, so
+        // `action_target(Camera)` is None) coinciding with that same kind being
+        // on cooldown must still deny on cooldown and count a failed action;
+        // the null-check belongs after the gates, never before them.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        sim.def.cameras.clear();
+        assert_eq!(
+            sim.action_target(ActionKind::Camera),
+            None,
+            "with no cameras authored, the camera uplink resolves to no node"
+        );
+        let _ = sim.drain_events();
+        sim.state
+            .actions
+            .get_mut(&ActionKind::Camera)
+            .expect("the definition tunes the camera")
+            .cd = 5.0;
+
+        sim.perform_action(ActionKind::Camera);
+
+        assert_eq!(
+            sim.state.stats.failed_actions, 1,
+            "the cooldown gate ran and counted the failure despite the missing fixture"
+        );
+        assert!(
+            sim.events.iter().any(|e| matches!(
+                e,
+                Event::UplinkDenied {
+                    kind: ActionKind::Camera,
+                    reason: DenyReason::Cooldown,
+                }
+            )),
+            "the cooldown denial still fires though the fixture is absent"
+        );
+    }
+
+    #[test]
     fn driving_a_fallen_vacuum_still_charges_but_denies_the_effect() {
         // The retune moved the fallen check into `apply_effects`, so the player
         // pays for the attempt in full; only its effect on the world is refused.
@@ -1233,6 +1659,97 @@ mod tests {
                 }
             )),
             "the player learns the robot did not move"
+        );
+    }
+
+    #[test]
+    fn a_cooldown_denial_does_not_swallow_a_later_route_denial() {
+        // Regression: `route` used to share `cd`'s throttle slot, so a
+        // cooldown denial (which stamps the slot) could silently swallow a
+        // route denial for the same action moments later. They are different
+        // news to the player and must not compete for one slot.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+
+        // First call: force the action onto cooldown so it denies on Cooldown
+        // and stamps `throttles.cd`.
+        sim.state
+            .actions
+            .get_mut(&ActionKind::Lights)
+            .expect("the definition tunes the lights")
+            .cd = 5.0;
+        sim.perform_action(ActionKind::Lights);
+        assert!(
+            sim.events.iter().any(|e| matches!(
+                e,
+                Event::UplinkDenied {
+                    kind: ActionKind::Lights,
+                    reason: DenyReason::Cooldown,
+                }
+            )),
+            "the first call denies on cooldown: {:?}",
+            sim.events
+        );
+
+        // Second call, same tick: the cooldown clears, but cold from the van
+        // the room's lights are not yet reachable, so this must deny on
+        // NoRoute -- and it must still fire, not be swallowed by `cd`'s
+        // just-stamped slot.
+        sim.state
+            .actions
+            .get_mut(&ActionKind::Lights)
+            .expect("the definition tunes the lights")
+            .cd = 0.0;
+        sim.perform_action(ActionKind::Lights);
+        assert!(
+            sim.events.iter().any(|e| matches!(
+                e,
+                Event::UplinkDenied {
+                    kind: ActionKind::Lights,
+                    reason: DenyReason::NoRoute,
+                }
+            )),
+            "the second call must still report NoRoute, not be swallowed by \
+             the cooldown denial's slot: {:?}",
+            sim.events
+        );
+    }
+
+    #[test]
+    fn repeated_net_hack_denials_collapse_to_one_event() {
+        // net_hack's denials are throttled exactly like perform_action_on's:
+        // a click that keeps landing on a cooling-down or unreachable target
+        // must not flood the log the way a held key on the keyboard path
+        // never could.
+        let mut sim = GhostLobbySim::new(ghost_lobby(), RunConfig::standard(), 123456)
+            .expect("the definition is valid");
+        let _ = sim.drain_events();
+        let substation = sim
+            .graph
+            .nodes
+            .iter()
+            .position(|n| n.id == "substation")
+            .expect("substation exists") as u32;
+
+        // Cold from the van: every one of these denies on NoRoute, same tick.
+        sim.net_hack(NetNodeIndex(substation));
+        sim.net_hack(NetNodeIndex(substation));
+        sim.net_hack(NetNodeIndex(substation));
+
+        let denials = sim
+            .events
+            .iter()
+            .filter(|e| matches!(e, Event::NetHackDenied { .. }))
+            .count();
+        assert_eq!(
+            denials, 1,
+            "three denials inside one throttle window must collapse to one event: {:?}",
+            sim.events
+        );
+        assert_eq!(
+            sim.state.stats.failed_actions, 3,
+            "every attempt still counts as a failure, even when its event is throttled"
         );
     }
 }

@@ -16,6 +16,7 @@ use idaptik_core::scenario::common::BillyMode;
 use idaptik_core::scenario::constants as c;
 
 use crate::driver::{SimState, VisualBuffers};
+use crate::sprites;
 
 /// How far through the current simulation tick this frame is drawn.
 ///
@@ -115,6 +116,11 @@ pub struct ChuteMarker;
 /// Marker: the robot vacuum.
 #[derive(Component)]
 pub struct VacuumMarker;
+/// Marker: every entity the Ghost Lobby scene spawns except the camera --
+/// shown/hidden as a block when Net View toggles on/off, so the two screens
+/// never render on top of each other.
+#[derive(Component)]
+pub struct GhostLobbySceneMarker;
 
 fn label(text: &str, size: f32, at: Vec2) -> impl Bundle {
     (
@@ -128,7 +134,12 @@ fn label(text: &str, size: f32, at: Vec2) -> impl Bundle {
 /// Spawn the whole static scene from the scenario definition, plus the dynamic
 /// entities the sync systems drive. Everything is data-driven: rooms, doors,
 /// cameras, hide spots and props come from the definition, never from names.
-pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
+pub fn setup_scene(
+    mut commands: Commands,
+    sim: Res<SimState>,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
     let def = sim.sim.definition();
     let map = SceneMap::new(def.world.width, def.world.floor, def.floor_id);
     let floor = def.world.floor;
@@ -148,6 +159,7 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
 
     // The walk line the whole row stands on.
     commands.spawn((
+        GhostLobbySceneMarker,
         Sprite::from_color(
             Color::srgb(0.35, 0.37, 0.42),
             Vec2::new(map.width + 8.0, 8.0),
@@ -168,22 +180,27 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
             Color::srgb(0.15, 0.17, 0.22)
         };
         commands.spawn((
+            GhostLobbySceneMarker,
             Sprite::from_color(color, Vec2::new(room.w as f32 - 6.0, room_h as f32)),
             Transform::from_translation(
                 map.box_center(room.x, CEILING_Y, room.w, room_h)
                     .extend(Z_ROOM),
             ),
         ));
-        commands.spawn(label(
-            &room.name,
-            13.0,
-            map.point(room.x + room.w * 0.5, CEILING_Y + 22.0),
+        commands.spawn((
+            GhostLobbySceneMarker,
+            label(
+                &room.name,
+                13.0,
+                map.point(room.x + room.w * 0.5, CEILING_Y + 22.0),
+            ),
         ));
     }
 
     // Hide spots: faint bands at the walk line.
     for spot in &def.hide_spots {
         commands.spawn((
+            GhostLobbySceneMarker,
             Sprite::from_color(
                 Color::srgba(0.25, 0.35, 0.55, 0.35),
                 Vec2::new(spot.radius as f32 * 2.0, 44.0),
@@ -194,15 +211,27 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
 
     // Camera mounts at the ceiling; the sweep cones are drawn with gizmos.
     for cam in &def.cameras {
-        commands.spawn((
-            Sprite::from_color(Color::srgb(0.55, 0.58, 0.65), Vec2::new(18.0, 10.0)),
-            Transform::from_translation(map.point(cam.x, CEILING_Y + 10.0).extend(Z_PROP)),
-        ));
+        commands
+            .spawn((
+                GhostLobbySceneMarker,
+                Transform::from_translation(map.point(cam.x, CEILING_Y + 10.0).extend(Z_PROP))
+                    .with_scale(Vec3::splat(0.18)),
+                Visibility::Inherited,
+            ))
+            .with_children(|parent| {
+                sprites::spawn_device_icon(
+                    parent,
+                    &mut meshes,
+                    &mut materials,
+                    idaptik_core::device::DeviceKind::IotCamera,
+                );
+            });
     }
 
     // Door slabs (positions/colours are synced from state every frame).
     for (i, _door) in def.doors.iter().enumerate() {
         commands.spawn((
+            GhostLobbySceneMarker,
             DoorMarker(i),
             Sprite::from_color(Color::srgb(0.5, 0.5, 0.55), Vec2::new(DOOR_W, DOOR_H)),
             Transform::from_translation(Vec3::new(0.0, 0.0, Z_DOOR)),
@@ -211,6 +240,7 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
 
     // The extraction edge: the right end of the row.
     commands.spawn((
+        GhostLobbySceneMarker,
         Sprite::from_color(
             Color::srgba(0.2, 0.9, 0.4, 0.5),
             Vec2::new(8.0, room_h as f32),
@@ -220,24 +250,46 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
                 .extend(Z_DOOR),
         ),
     ));
-    commands.spawn(label(
-        "EXIT",
-        13.0,
-        map.point(def.world.width - 30.0, CEILING_Y + 40.0),
+    commands.spawn((
+        GhostLobbySceneMarker,
+        label(
+            "EXIT",
+            13.0,
+            map.point(def.world.width - 30.0, CEILING_Y + 40.0),
+        ),
     ));
 
     // Props.
+    commands
+        .spawn((
+            GhostLobbySceneMarker,
+            NoteMarker,
+            Sprite::from_color(Color::srgb(0.95, 0.85, 0.35), Vec2::new(12.0, 9.0)),
+            Transform::from_translation(Vec3::new(0.0, 0.0, Z_PROP)),
+        ))
+        .with_children(|parent| {
+            // A single fold line, so the note reads as paper rather than a tile.
+            parent.spawn((
+                Sprite::from_color(Color::srgb(0.8, 0.72, 0.3), Vec2::new(10.0, 1.0)),
+                Transform::from_translation(Vec3::new(0.0, 0.0, 0.1)),
+            ));
+        });
+    commands
+        .spawn((
+            GhostLobbySceneMarker,
+            UsbMarker,
+            Sprite::from_color(Color::srgb(0.3, 0.85, 0.9), Vec2::new(10.0, 7.0)),
+            Transform::from_translation(Vec3::new(0.0, 0.0, Z_PROP)),
+        ))
+        .with_children(|parent| {
+            // The connector end.
+            parent.spawn((
+                Sprite::from_color(Color::srgb(0.7, 0.7, 0.72), Vec2::new(4.0, 4.0)),
+                Transform::from_translation(Vec3::new(6.0, 0.0, 0.1)),
+            ));
+        });
     commands.spawn((
-        NoteMarker,
-        Sprite::from_color(Color::srgb(0.95, 0.85, 0.35), Vec2::new(12.0, 9.0)),
-        Transform::from_translation(Vec3::new(0.0, 0.0, Z_PROP)),
-    ));
-    commands.spawn((
-        UsbMarker,
-        Sprite::from_color(Color::srgb(0.3, 0.85, 0.9), Vec2::new(10.0, 7.0)),
-        Transform::from_translation(Vec3::new(0.0, 0.0, Z_PROP)),
-    ));
-    commands.spawn((
+        GhostLobbySceneMarker,
         ChuteMarker,
         Sprite::from_color(
             Color::srgb(0.1, 0.1, 0.12),
@@ -254,6 +306,7 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
         ),
     ));
     commands.spawn((
+        GhostLobbySceneMarker,
         VacuumMarker,
         Sprite::from_color(Color::srgb(0.45, 0.45, 0.5), Vec2::new(30.0, 12.0)),
         Transform::from_translation(Vec3::new(0.0, 0.0, Z_PROP)),
@@ -262,9 +315,10 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
     // The infiltrator and Billy, with small facing-indicator noses.
     commands
         .spawn((
+            GhostLobbySceneMarker,
             PlayerMarker,
             Sprite::from_color(
-                Color::srgb(0.9, 0.92, 0.98),
+                sprites::player_colours(false, false).0,
                 Vec2::new(def.player.w as f32, def.player.h as f32),
             ),
             Transform::from_translation(Vec3::new(0.0, 0.0, Z_ACTOR)),
@@ -275,9 +329,11 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
                 Sprite::from_color(Color::srgb(0.35, 0.75, 1.0), Vec2::new(7.0, 7.0)),
                 Transform::from_translation(Vec3::new(0.0, 0.0, 0.5)),
             ));
+            sprites::spawn_player_children(parent, &mut meshes, &mut materials);
         });
     commands
         .spawn((
+            GhostLobbySceneMarker,
             BillyMarker,
             Sprite::from_color(
                 Color::srgb(0.95, 0.6, 0.25),
@@ -291,6 +347,7 @@ pub fn setup_scene(mut commands: Commands, sim: Res<SimState>) {
                 Sprite::from_color(Color::srgb(1.0, 0.35, 0.25), Vec2::new(8.0, 8.0)),
                 Transform::from_translation(Vec3::new(0.0, 0.0, 0.5)),
             ));
+            sprites::spawn_billy_children(parent, &mut meshes, &mut materials);
         });
 
     commands.insert_resource(map);
@@ -355,7 +412,9 @@ fn place_body(
     sprite.custom_size = Some(Vec2::new(body.w as f32, dh as f32));
 }
 
-/// The infiltrator: body, crouch squash, hidden fade, facing nose.
+/// The infiltrator: body, crouch squash, hidden fade, facing nose, plus the
+/// head/laptop/screen composite whose colour and visibility track player state.
+#[allow(clippy::type_complexity, clippy::too_many_arguments)]
 pub fn sync_player(
     sim: Res<SimState>,
     map: Res<SceneMap>,
@@ -363,6 +422,22 @@ pub fn sync_player(
     fixed: Res<Time<Fixed>>,
     mut body: Query<(&mut Transform, &mut Sprite), With<PlayerMarker>>,
     mut nose: Query<&mut Transform, (With<PlayerNose>, Without<PlayerMarker>)>,
+    mut laptop: Query<
+        &mut Visibility,
+        (
+            With<sprites::PlayerLaptop>,
+            Without<PlayerMarker>,
+            Without<sprites::PlayerLaptopScreen>,
+        ),
+    >,
+    mut laptop_screen: Query<
+        &mut Visibility,
+        (
+            With<sprites::PlayerLaptopScreen>,
+            Without<PlayerMarker>,
+            Without<sprites::PlayerLaptop>,
+        ),
+    >,
 ) {
     let def = sim.sim.definition();
     // Position is interpolated; every discrete flag is read live from the
@@ -387,10 +462,22 @@ pub fn sync_player(
         },
         crouch,
     );
-    sprite.color = sprite.color.with_alpha(if p.hidden { 0.35 } else { 1.0 });
     if let Ok(mut nose_tf) = nose.single_mut() {
         nose_tf.translation.x = pose.facing as f32 * (def.player.w as f32 * 0.5 + 5.0);
         nose_tf.translation.y = def.player.h as f32 * crouch as f32 * 0.22;
+    }
+    let (body_colour, laptop_shows) = sprites::player_colours(p.crouching, p.sprinting);
+    sprite.color = body_colour.with_alpha(if p.hidden { 0.35 } else { 1.0 });
+    let laptop_vis = if laptop_shows {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if let Ok(mut vis) = laptop.single_mut() {
+        *vis = laptop_vis;
+    }
+    if let Ok(mut vis) = laptop_screen.single_mut() {
+        *vis = laptop_vis;
     }
 }
 

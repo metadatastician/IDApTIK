@@ -14,15 +14,19 @@ const STRIP_WIDTH: usize = 72;
 /// Draw the whole frame.
 pub fn draw(frame: &mut Frame, sim: &GhostLobbySim, log: &[LogLine], hint: Option<&str>) {
     let area = frame.area();
+    // The footer takes the rows its bindings actually need at this width, which is
+    // more of them the narrower the terminal is. The log yields them, because it is
+    // the one pane that can: it already tails to whatever height it is given.
+    let footer = footer_lines(hint, area.width as usize);
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3), // HUD
-            Constraint::Length(3), // room strip
-            Constraint::Length(6), // meters
-            Constraint::Length(6), // belief + objectives
-            Constraint::Min(4),    // log
-            Constraint::Length(4), // key hints: body / uplink / session / hint
+            Constraint::Length(3),                   // HUD
+            Constraint::Length(3),                   // room strip
+            Constraint::Length(6),                   // meters
+            Constraint::Length(6),                   // belief + objectives
+            Constraint::Min(4),                      // log
+            Constraint::Length(footer.len() as u16), // key hints
         ])
         .split(area);
 
@@ -31,7 +35,7 @@ pub fn draw(frame: &mut Frame, sim: &GhostLobbySim, log: &[LogLine], hint: Optio
     draw_meters(frame, rows[2], sim);
     draw_belief_and_objectives(frame, rows[3], sim);
     draw_log(frame, rows[4], log);
-    draw_footer(frame, rows[5], hint);
+    draw_footer(frame, rows[5], footer);
 
     if sim.is_ended() {
         draw_result_overlay(frame, area, sim);
@@ -129,14 +133,25 @@ fn draw_meters(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
 /// the floor answers them there. Cold from the van that last number is what says
 /// why every uplink is being refused, so it is the readout the pivot keys exist
 /// to move.
+///
+/// The panel is one row tall, so a line too long for it cannot wrap: it truncates
+/// from the right, which is exactly where the reachable count sits. The readout
+/// therefore spends its width on the numbers and gives up the prose, taking the
+/// widest of three forms that fits. The terse form fits any panel worth drawing.
 fn draw_uplink(frame: &mut Frame, area: Rect, sim: &GhostLobbySim) {
     let hacker = &sim.state().agents.hacker;
-    let text = format!(
-        "vantage {:?}     pivot depth {}     nodes reachable {}",
-        hacker.vantage().kind,
-        hacker.hops(),
-        hacker.reachable(sim.graph()).len(),
-    );
+    let kind = format!("{:?}", hacker.vantage().kind);
+    let hops = hacker.hops();
+    let reach = hacker.reachable_count(sim.graph());
+    let wide = format!("vantage {kind}     pivot depth {hops}     nodes reachable {reach}");
+    let middling = format!("vantage {kind} | depth {hops} | reachable {reach}");
+    let terse = format!("{kind} d{hops} r{reach}");
+    // The bordered block spends two columns on its own frame.
+    let inner = area.width.saturating_sub(2) as usize;
+    let fits = |form: &String| form.chars().count() <= inner;
+    // The widest form that fits, falling back to the terse one, which fits any
+    // panel worth drawing.
+    let text = [wide, middling].into_iter().find(fits).unwrap_or(terse);
     frame.render_widget(
         Paragraph::new(text).block(
             Block::default()
@@ -238,26 +253,114 @@ fn draw_log(frame: &mut Frame, area: Rect, log: &[LogLine]) {
     frame.render_widget(list, area);
 }
 
-/// The key hints, one line per audience: the body, the uplink, the session.
+/// The column an audience's bindings begin at, leaving room for its label.
+const FOOTER_LABEL_WIDTH: usize = 9;
+
+/// One audience's bindings, packed into as few rows of `width` as they need.
+/// The break falls only between whole bindings, never inside one, and a
+/// continuation row lines up under the label column.
+fn footer_rows(label: &str, bindings: &[&str], width: usize) -> Vec<String> {
+    let budget = width.saturating_sub(FOOTER_LABEL_WIDTH).max(1);
+    let mut packed: Vec<String> = Vec::new();
+    let mut row = String::new();
+    for binding in bindings {
+        let candidate = if row.is_empty() {
+            (*binding).to_owned()
+        } else {
+            format!("{row} | {binding}")
+        };
+        if !row.is_empty() && candidate.chars().count() > budget {
+            packed.push(std::mem::take(&mut row));
+            row = (*binding).to_owned();
+        } else {
+            row = candidate;
+        }
+    }
+    packed.push(row);
+    packed
+        .into_iter()
+        .enumerate()
+        .map(|(index, row)| {
+            let head = if index == 0 {
+                format!("{label:<w$}", w = FOOTER_LABEL_WIDTH)
+            } else {
+                " ".repeat(FOOTER_LABEL_WIDTH)
+            };
+            format!("{head}{row}")
+        })
+        .collect()
+}
+
+/// `text` greedily wrapped to `width` columns, breaking only at spaces.
+fn wrap_words(text: &str, width: usize) -> Vec<String> {
+    let mut rows: Vec<String> = Vec::new();
+    let mut row = String::new();
+    for word in text.split_whitespace() {
+        let candidate = if row.is_empty() {
+            word.to_owned()
+        } else {
+            format!("{row} {word}")
+        };
+        if !row.is_empty() && candidate.chars().count() > width {
+            rows.push(std::mem::take(&mut row));
+            row = word.to_owned();
+        } else {
+            row = candidate;
+        }
+    }
+    if !row.is_empty() {
+        rows.push(row);
+    }
+    rows
+}
+
+/// The key hints, one audience at a time: the session, the uplink, the body, and
+/// last the hint.
 ///
-/// One line per audience rather than one line for all of them, because the pivot
-/// verbs pushed the old single line past 150 columns and a `Paragraph` truncates
-/// at its width without a word of complaint: on an 80-column terminal every key
-/// from the pivots rightwards simply vanished. Split this way each line clears 80
-/// on its own, so nothing is cut and no binding is broken across a wrap. The hint
-/// takes a line of its own for the same reason: appended, it used to shove the
-/// bindings off the right edge the moment a player asked for help.
-fn draw_footer(frame: &mut Frame, area: Rect, hint: Option<&str>) {
-    let lines = vec![
-        Line::from("BODY     A/D move | Shift sprint | W jump | S hide | E interact | Q throw"),
-        Line::from("UPLINK   1-4 actions | p bridge | P isp | g grid | x back"),
-        Line::from("SESSION  Tab pause | R restart | H hint | Esc quit"),
-        Line::from(hint.unwrap_or_default().to_owned()),
-    ];
+/// The bindings are packed here rather than left to `Wrap`, because the footer
+/// used to be a fixed four rows and a `Paragraph` drops what will not fit without
+/// a word of complaint. At 80 columns each audience still takes the single row it
+/// always did; at 50, an ordinary tmux split, BODY and UPLINK each need two, and
+/// the fixed budget silently ate the SESSION line whole -- `Esc quit` among it.
+/// Pre-wrapped, the row count is known, so the footer can ask the layout for the
+/// height it actually needs.
+///
+/// The session leads for the same reason: should a terminal ever be too short to
+/// honour that height, the rows lost are the last drawn, and the way out of the
+/// game is not a thing to lose. The hint trails for the converse reason, and
+/// takes a row of its own because appended it used to shove the bindings off the
+/// right edge the moment a player asked for help.
+fn footer_lines(hint: Option<&str>, width: usize) -> Vec<Line<'static>> {
+    let width = width.max(1);
+    let mut rows = footer_rows(
+        "SESSION",
+        &["Tab pause", "R restart", "H hint", "Esc quit"],
+        width,
+    );
+    rows.extend(footer_rows(
+        "UPLINK",
+        &["1-4 actions", "p bridge", "P isp", "g grid", "x back"],
+        width,
+    ));
+    rows.extend(footer_rows(
+        "BODY",
+        &[
+            "A/D move",
+            "Shift sprint",
+            "W jump",
+            "S hide",
+            "E interact",
+            "Q throw",
+        ],
+        width,
+    ));
+    rows.extend(wrap_words(hint.unwrap_or_default(), width));
+    rows.into_iter().map(Line::from).collect()
+}
+
+fn draw_footer(frame: &mut Frame, area: Rect, lines: Vec<Line<'static>>) {
     frame.render_widget(
-        Paragraph::new(lines)
-            .wrap(Wrap { trim: true })
-            .style(Style::default().fg(Color::DarkGray)),
+        Paragraph::new(lines).style(Style::default().fg(Color::DarkGray)),
         area,
     );
 }
@@ -336,13 +439,14 @@ mod tests {
         });
     }
 
-    /// The reachable count the uplink panel is showing.
+    /// The reachable count the uplink panel is showing, in whichever of the
+    /// readout's forms the panel was wide enough for.
     fn reachable_shown(screen: &str) -> usize {
         let line = screen
             .lines()
-            .find(|l| l.contains("nodes reachable"))
+            .find(|l| l.contains("reachable"))
             .expect("the uplink panel names its reachable count");
-        line.split("nodes reachable")
+        line.split("reachable")
             .nth(1)
             .and_then(|rest| rest.split_whitespace().next())
             .and_then(|n| n.parse().ok())
@@ -404,21 +508,54 @@ mod tests {
 
     #[test]
     fn the_footer_survives_a_narrow_terminal() {
-        // The regression this guards is the one the pivot keys caused: they pushed
-        // the old single-line footer past 150 columns, and a `Paragraph` truncates
-        // silently. Wrapped, every key must still be legible at 80 columns -- and
-        // `Esc quit`, the rightmost of them, is the canary.
-        let s = screen_at(&sim(), 80, None);
-        for hint in [
-            "p bridge",
-            "P isp",
-            "g grid",
-            "x back",
-            "Tab pause",
-            "R restart",
-            "Esc quit",
-        ] {
-            assert!(s.contains(hint), "{hint} was cut off at 80 columns: {s}");
+        // Two regressions, one test. The pivot keys pushed the old single-line
+        // footer past 150 columns and a `Paragraph` truncates silently; splitting
+        // it per audience only moved the threshold, because four fixed rows cannot
+        // hold three audiences once two of them wrap. 50 columns is an ordinary
+        // tmux split, and `Esc quit` is the canary: it was the first thing lost.
+        for width in [80, 50] {
+            let s = screen_at(&sim(), width, None);
+            for hint in [
+                "p bridge",
+                "P isp",
+                "g grid",
+                "x back",
+                "Tab pause",
+                "R restart",
+                "H hint",
+                "Esc quit",
+                "A/D move",
+                "Q throw",
+            ] {
+                assert!(
+                    s.contains(hint),
+                    "{hint} was cut off at {width} columns: {s}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_uplink_readout_keeps_its_count_in_a_narrow_terminal() {
+        // The reachable count sits at the right end of a line that cannot wrap, so
+        // it is the first thing a narrow panel truncates -- and it is the one number
+        // the panel exists to answer. It must survive, in some form, at any width a
+        // player might reasonably use.
+        let mut sim = sim();
+        immediate(
+            &mut sim,
+            vec![Command::Pivot {
+                target: PivotTarget::Bridge,
+            }],
+        );
+        let wide = reachable_shown(&screen(&sim));
+        for width in [80, 60, 50, 40] {
+            let s = screen_at(&sim, width, None);
+            assert_eq!(
+                reachable_shown(&s),
+                wide,
+                "the reachable count was lost at {width} columns: {s}"
+            );
         }
     }
 
