@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use super::Event;
 
 /// Functional VSM roles. These are roles, not required processes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -122,6 +123,10 @@ impl EvidenceLedger {
         result
     }
 
+    pub fn combine_in_place(&mut self, evidence: Self) {
+        *self = self.combine_conjunctive(&evidence);
+    }
+
     pub fn belief(&self, proposition: &[String]) -> u32 {
         self.focal_masses.iter().filter(|f| f.hypotheses.iter().all(|h| proposition.binary_search(h).is_ok())).map(|f| f.mass).sum()
     }
@@ -135,6 +140,21 @@ impl EvidenceLedger {
     pub fn recommended_attention(&self, proposition: &[String]) -> u8 {
         (self.plausibility(proposition).saturating_mul(100) / MASS_TOTAL).min(100) as u8
     }
+}
+
+/// Translate existing Ghost Lobby events into observer-relative evidence.
+pub fn ghost_lobby_evidence(event: &Event, event_id: &str) -> Option<EvidenceLedger> {
+    let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
+    let focal = match event {
+        Event::UsbThrown | Event::UsbTaken { seen: true } | Event::BillyTookUsb =>
+            FocalMass { hypotheses: vec!["usb".into()], mass: 2_500 },
+        Event::NoteExposed | Event::NoteSecured { seen: true } | Event::BillyTookNote =>
+            FocalMass { hypotheses: vec!["fridge_note".into()], mass: 2_500 },
+        _ => return None,
+    };
+    let mut ledger = EvidenceLedger::from_evidence(frame.clone(), vec![focal, FocalMass { hypotheses: frame, mass: 7_500 }]);
+    ledger.conflict_mass = event_id.len() as u32 % 2;
+    Some(ledger)
 }
 
 impl HypothesisLedger {
@@ -449,5 +469,12 @@ mod tests {
         director.allocate_from_evidence(&mut team, &ledger, &["ventilation".into()]);
         assert_eq!(team.attention, 100);
         assert!(matches!(director.trace.last(), Some(VsmEvent::TeamAttentionAllocated { team_id, attention: 100 }) if team_id == "patrol-a"));
+    }
+
+    #[test]
+    fn ghost_lobby_events_feed_the_evidence_ledger() {
+        let evidence = ghost_lobby_evidence(&Event::UsbThrown, "usb-1").expect("USB event evidence");
+        assert!(evidence.plausibility(&["usb".into()]) > 0);
+        assert!(ghost_lobby_evidence(&Event::LightsFlickered { third_use: false }, "noise").is_none());
     }
 }
