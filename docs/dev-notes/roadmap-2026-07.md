@@ -28,7 +28,7 @@ already real:
 | Nickel config schema + scenario fixtures | **[DONE]** |
 | **UMS**: Idris2 ABI (17 modules) + Zig FFI, level JSON extractors for *every* section (devices, zones, guards, dogs, drones, assassins, items, wiring, defences) | **[DONE]** — extractors landed 2026-07-21 (UMS PR #14), 40/40 runtime checks |
 | UMS ↔ game taxonomy map (device kinds 1:1, zone tier→segment ratified) | **[DONE]** |
-| UMS ai_edit engine (miniKanren, Kautz-6 verbs, 49 tests) | **[DONE]** as prototype — **[OPEN]**: Python is undeclared in the UMS language plan (affinescript/idris2/zig); declare it or schedule an Idris2 rewrite |
+| UMS ai_edit engine (miniKanren, Kautz-6 verbs, 49 tests) | **[DONE]** as quarantined prototype — **[DECIDED]**: Python is banned; preserve its behavioural tests as migration evidence and rewrite the runtime in an approved language |
 | UMS AffineScript shell; dlc/vm reversible VM | **[UNSTARTED]** / port written but **never compiled** (toolchain not installable yet — honestly declared in-repo) |
 | Items/inventory *data model* (cables, adapters, tools, keycards, consumables, condition, containers) | **[DONE]** in the ABI — note: "items" as a workstream below means gameplay + presentation, not the data model |
 
@@ -184,9 +184,11 @@ multiplayer is gated integration glue, not design work.
   Suggested order: rooms → buildings → regions, because the **region
   layer is where H's per-region tropes attach** — give regions a
   `trope` field from day one.
-- **ai_edit engine** **[DONE as prototype / OPEN ruling]** — Python
-  miniKanren engine works and is tested; the language ruling (declare
-  Python vs Idris2 rewrite) is with Jonathan.
+- **ai_edit engine** **[DONE as quarantined prototype / REWRITE REQUIRED]** —
+  the existing Python miniKanren engine works and is tested, but Python is
+  banned. Preserve the 49 tests as behavioural evidence and port the runtime
+  to an approved language; Idris2 is the current candidate, not a settled
+  implementation choice.
 - **AffineScript shell + dlc/vm** **[GATED]** on an installable
   AffineScript toolchain.
 - **UMS as the modding surface** *(not discussed)* — UMS is
@@ -292,7 +294,7 @@ now ─────────────────────────�
 | 1 | Era/style: single canonical era or switchable tropes? | Build era ledger either way; decision can wait until P2 · both |
 | 2 | Which era *is* canon (if single)? Drives every asset. | Before any sprite is commissioned · both |
 | 3 | Coprocessor support: define workloads/APIs | One-pager first · Jonathan |
-| 4 | UMS ai_edit language: declare Python or rewrite in Idris2? | Declare now, rewrite later at will · Jonathan |
+| 4 | UMS ai_edit replacement: Idris2 relational core, or another approved implementation? | Python is ruled out; choose from the allowed stack before runtime integration · Jonathan |
 | 5 | Relay hosting: public relay? matchmaking? | After GUI, before any public playtest · both |
 | 6 | Shared-screen co-op (one keyboard) vs netplay-only? | Not discussed — decide cheaply · both |
 | 7 | Playtesting: who, when, what NDA-ish etiquette pre-reveal? | P2 boundary · both |
