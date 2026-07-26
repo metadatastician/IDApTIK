@@ -86,6 +86,6 @@ pub use tuning::{
     ActionKind, ActionSpec, DifficultyId, DifficultyPreset, GradeBands, ScoringDef, TuningConstants,
 };
 pub use vsm::{
-    DifficultyProposal, Hypothesis, HypothesisEvidence, HypothesisLedger, Operator, OperatorTeam,
-    PlayerTacticObservation, VsmDirector, VsmEvent, VsmSystem,
+    DifficultyProposal, EvidenceLedger, FocalMass, Hypothesis, HypothesisEvidence, HypothesisLedger,
+    Operator, OperatorTeam, PlayerTacticObservation, VsmDirector, VsmEvent, VsmSystem, MASS_TOTAL,
 };

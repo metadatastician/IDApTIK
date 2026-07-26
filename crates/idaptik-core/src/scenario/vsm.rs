@@ -77,6 +77,60 @@ pub struct HypothesisLedger {
     pub hypotheses: Vec<Hypothesis>,
 }
 
+pub const MASS_TOTAL: u32 = 10_000;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FocalMass {
+    pub hypotheses: Vec<String>,
+    pub mass: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceLedger {
+    pub frame: Vec<String>,
+    pub focal_masses: Vec<FocalMass>,
+    pub conflict_mass: u32,
+}
+
+impl EvidenceLedger {
+    pub fn from_evidence(frame: Vec<String>, focal_masses: Vec<FocalMass>) -> Self {
+        let mut ledger = Self { frame, focal_masses: vec![], conflict_mass: 0 };
+        for focal in focal_masses { ledger.add_focal(focal); }
+        ledger
+    }
+
+    fn add_focal(&mut self, mut focal: FocalMass) {
+        focal.hypotheses.sort();
+        focal.hypotheses.dedup();
+        if focal.mass == 0 { return; }
+        if let Some(existing) = self.focal_masses.iter_mut().find(|f| f.hypotheses == focal.hypotheses) {
+            existing.mass = existing.mass.saturating_add(focal.mass).min(MASS_TOTAL);
+        } else { self.focal_masses.push(focal); }
+        self.focal_masses.sort_by(|a, b| a.hypotheses.cmp(&b.hypotheses));
+    }
+
+    pub fn combine_conjunctive(&self, other: &Self) -> Self {
+        let mut result = Self { frame: self.frame.clone(), focal_masses: vec![], conflict_mass: self.conflict_mass.saturating_add(other.conflict_mass) };
+        for left in &self.focal_masses {
+            for right in &other.focal_masses {
+                let intersection: Vec<String> = left.hypotheses.iter().filter(|h| right.hypotheses.binary_search(h).is_ok()).cloned().collect();
+                let mass = ((left.mass as u64 * right.mass as u64) / MASS_TOTAL as u64) as u32;
+                if intersection.is_empty() { result.conflict_mass = result.conflict_mass.saturating_add(mass); }
+                else { result.add_focal(FocalMass { hypotheses: intersection, mass }); }
+            }
+        }
+        result
+    }
+
+    pub fn belief(&self, proposition: &[String]) -> u32 {
+        self.focal_masses.iter().filter(|f| f.hypotheses.iter().all(|h| proposition.binary_search(h).is_ok())).map(|f| f.mass).sum()
+    }
+
+    pub fn plausibility(&self, proposition: &[String]) -> u32 {
+        self.focal_masses.iter().filter(|f| f.hypotheses.iter().any(|h| proposition.binary_search(h).is_ok())).map(|f| f.mass).sum()
+    }
+}
+
 impl HypothesisLedger {
     pub fn new(propositions: impl IntoIterator<Item = String>) -> Self {
         Self {
@@ -321,5 +375,33 @@ mod tests {
         assert_eq!(ledger.most_likely().unwrap().proposition, "player_wants_fridge_note");
         assert_eq!(ledger.hypotheses[0].supporting_events.len(), 2);
         assert_eq!(ledger.hypotheses[0].contrary_events, vec!["fridge-note-found"]);
+    }
+
+    #[test]
+    fn evidence_fixture_preserves_unknown_and_conflict() {
+        let frame = vec!["front_door".into(), "ventilation".into(), "unknown".into()];
+        let first = EvidenceLedger::from_evidence(frame.clone(), vec![
+            FocalMass { hypotheses: vec!["ventilation".into()], mass: 4_000 },
+            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into()], mass: 4_000 },
+            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()], mass: 2_000 },
+        ]);
+        let second = EvidenceLedger::from_evidence(frame, vec![
+            FocalMass { hypotheses: vec!["front_door".into()], mass: 7_000 },
+            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()], mass: 3_000 },
+        ]);
+        let combined = first.combine_conjunctive(&second);
+        let front = vec!["front_door".into()];
+        assert!(combined.plausibility(&front) >= combined.belief(&front));
+        assert!(combined.conflict_mass > 0);
+    }
+
+    #[test]
+    fn evidence_fixture_supports_usb_then_note_revision() {
+        let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
+        let usb = EvidenceLedger::from_evidence(frame.clone(), vec![FocalMass { hypotheses: vec!["usb".into()], mass: 6_000 }, FocalMass { hypotheses: frame.clone(), mass: 4_000 }]);
+        let note = EvidenceLedger::from_evidence(frame.clone(), vec![FocalMass { hypotheses: vec!["fridge_note".into()], mass: 7_000 }, FocalMass { hypotheses: frame, mass: 3_000 }]);
+        let revised = usb.combine_conjunctive(&note);
+        assert!(revised.conflict_mass > 0);
+        assert!(revised.plausibility(&["fridge_note".into()]) > 0);
     }
 }
