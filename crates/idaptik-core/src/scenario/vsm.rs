@@ -129,6 +129,12 @@ impl EvidenceLedger {
     pub fn plausibility(&self, proposition: &[String]) -> u32 {
         self.focal_masses.iter().filter(|f| f.hypotheses.iter().any(|h| proposition.binary_search(h).is_ok())).map(|f| f.mass).sum()
     }
+
+    /// Convert an evidence query into a bounded present-time attention value.
+    /// Policy stays outside the ledger: this is the first VSM regulation seam.
+    pub fn recommended_attention(&self, proposition: &[String]) -> u8 {
+        (self.plausibility(proposition).saturating_mul(100) / MASS_TOTAL).min(100) as u8
+    }
 }
 
 impl HypothesisLedger {
@@ -403,5 +409,22 @@ mod tests {
         let revised = usb.combine_conjunctive(&note);
         assert!(revised.conflict_mass > 0);
         assert!(revised.plausibility(&["fridge_note".into()]) > 0);
+    }
+
+    #[test]
+    fn ghost_lobby_deception_loop_reallocates_patrol_attention() {
+        let frame = vec!["front_door".into(), "ventilation".into(), "unknown".into()];
+        let staged_vent = EvidenceLedger::from_evidence(frame.clone(), vec![
+            FocalMass { hypotheses: vec!["ventilation".into()], mass: 7_000 },
+            FocalMass { hypotheses: frame.clone(), mass: 3_000 },
+        ]);
+        assert_eq!(staged_vent.recommended_attention(&["ventilation".into()]), 100);
+
+        let direct_front = EvidenceLedger::from_evidence(frame.clone(), vec![
+            FocalMass { hypotheses: vec!["front_door".into()], mass: 8_000 },
+            FocalMass { hypotheses: frame, mass: 2_000 },
+        ]);
+        assert!(direct_front.recommended_attention(&["front_door".into()]) > 70);
+        assert!(staged_vent.recommended_attention(&["front_door".into()]) < 70);
     }
 }
