@@ -1,2 +1,6 @@
 merge_protections_settings:
-  auto_merge_conditions: true
+  # Routine dependency updates may enter the queue automatically. Human-authored
+  # work requires an explicit merge decision after GitHub's protected-branch
+  # checks have passed.
+  auto_merge_conditions:
+    - author = dependabot[bot]
