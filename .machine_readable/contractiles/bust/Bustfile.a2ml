@@ -42,7 +42,7 @@ day-to-day gates.
 - recovery_probe: "cargo test -p idaptik-bevy --test parity"
 - expected_recovery_time_seconds: 120
 - status: declared
-- notes: The Bevy/Fyrox frontends carry parity tests against core (ADR-0003).
+- notes: The selected Bevy frontend carries parity tests against core (ADR-0003, ADR-0008).
 
 ### determinism-break
 - class: gameplay-truth

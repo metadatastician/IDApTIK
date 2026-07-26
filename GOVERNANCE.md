@@ -31,13 +31,14 @@ Contributors are expected to:
 - Include bug fixes, documentation updates, dependency updates
 
 ### Major Changes
-- Require discussion in issues or pull requests
+- Require discussion in issues, discussions, or pull requests
 - Include new features, architectural changes, API changes
-- Need approval from at least 2 maintainers
+- Require an ADR when they settle an architectural decision
+- Require approval from the active maintainer(s)
 
 ### Breaking Changes
 - Require RFC (Request for Comments) process
-- Need approval from majority of maintainers
+- Need approval from the active maintainer(s)
 - Must include migration guide
 
 ## Code of Conduct
@@ -52,9 +53,10 @@ All participants are expected to follow our Code of Conduct. Violations can be r
 
 ## Licensing
 
-All contributions are made under the terms of the repository's LICENSE file.
-By submitting a pull request, you agree to license your contributions accordingly.
+Contributions preserve the project's declared licence layer: engine and code
+are AGPL-3.0-or-later; game content is CC-BY-SA-4.0; names and marks are not
+relicensed. Contributions are certified under DCO 1.1.
 
 ---
 
-*Last updated: 2026-07-18*
+*Last updated: 2026-07-26*

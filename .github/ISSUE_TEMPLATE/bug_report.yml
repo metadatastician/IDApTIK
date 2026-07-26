@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Bug report issue template for metadatastician/paint-type
+# Bug report issue template for metadatastician/IDApTIK
 name: Bug Report
 description: Create a report to help us improve
 title: "[Bug]: "
-labels: ["bug", "priority: unset", "triage"]
+labels: ["bug"]
 assignees: []
 body:
   - type: markdown
@@ -74,7 +74,7 @@ body:
         - Low (cosmetic, minor inconvenience)
         - Medium (functionality impaired but workaround exists)
         - High (major functionality broken)
-        - Critical (data loss, security issue, complete failure)
+        - Critical (data loss or complete failure; report security issues privately)
     validations:
       required: true
 
@@ -101,7 +101,7 @@ body:
     attributes:
       label: Runtime / toolchain
       description: Relevant runtime or toolchain version, if applicable.
-      placeholder: "e.g. Deno 2.1, Rust nightly 2026-02-10, Gleam 1.8"
+      placeholder: "e.g. Rust 1.95.0, Elixir 1.19.5 / OTP 28"
     validations:
       required: false
 

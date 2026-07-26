@@ -1,60 +1,24 @@
-# EditorConfig helps developers define and maintain consistent
-# coding styles between different editors and IDEs
+# EditorConfig for the Rust/Elixir/Nickel IDApTIK workspace.
 # https://editorconfig.org
 
 root = true
 
-# Default settings for all files
 [*]
 charset = utf-8
 end_of_line = lf
 indent_style = space
-indent_size = 4
+indent_size = 2
 insert_final_newline = true
 trim_trailing_whitespace = true
 
-# Matched file extensions
-[*.{py,js,ts,jsx,tsx,json,yml,yaml,toml,md,html,css,scss,less,sass,sh,zsh,bash,fish,rst,txt,ql,sql,csv,tsv,xml,svg,rs,go,java,kt,kts,scala,rb,php,swift,dart,elm,lua,zig,coq,v,agda,idr,purs}]
+[*.{rs,zig}]
 indent_size = 4
 
-# Makefile requires tabs
-[Makefile]
-indent_style = tab
-
-# Dockerfile
-[Dockerfile]
-indent_style = space
-indent_size = 4
-
-# Shell scripts
-[*.{sh,zsh,bash,fish}]
+[*.{ex,exs,ncl,yml,yaml,json,toml,nix,scm,idr}]
 indent_size = 2
 
-# Haskell
-[*.hs]
-indent_size = 2
-
-# Nix
-[*.nix]
-indent_size = 2
-
-# Rust
-[*.rs]
-indent_size = 4
-
-# Go
-[*.go]
-indent_style = tab
-
-# Zig
-[*.zig]
-tab_width = 4
-indent_style = space
-
-# Markdown - preserve line breaks
-[*.md]
+[*.{md,adoc}]
 trim_trailing_whitespace = false
 
-# Configuration files
-[*.{json,yml,yaml,toml,xml,svg}]
-indent_size = 2
+[justfile]
+indent_size = 4

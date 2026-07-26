@@ -1,47 +1,39 @@
 # SPDX-License-Identifier: MPL-2.0
-# 0-AI-MANIFEST.a2ml — Root AI manifest for IDApTIK
+# 0-AI-MANIFEST.a2ml — root AI manifest for IDApTIK
 
 ## Purpose
 
-This is the root AI-assistant manifest for IDApTIK, an asymmetric two-player
-infiltration game (attempt four): Rust owns gameplay truth, Elixir owns
-multiplayer/session life. Read this first, then `AGENTS.md`,
-`PROJECT-GOVERNANCE-BINDING.adoc`, and `.machine_readable/6a2/STATE.a2ml`.
+IDApTIK is an asymmetric two-player infiltration game (attempt four). Rust owns
+deterministic gameplay truth, Elixir/OTP owns multiplayer session life, and
+Bevy is the selected graphical frontend.
 
-## Where Things Live
+Read `AGENTS.md`, `README.md`, `GOVERNANCE.md`,
+`docs/PROJECT-GOVERNANCE-BINDING.adoc`, and
+`.machine_readable/descriptiles/STATE.a2ml` before editing.
 
-- `AGENTS.md`            — AI-agent instructions and read-first order.
-- `PROJECT-GOVERNANCE-BINDING.adoc`, `PROJECT-ASSURANCE-PROFILE.adoc`,
-  `PROJECT-CONTRIBUTION-PROFILE.adoc` — this repo's completed local binding to
-  The Metadatastician estate's governance profile (`metadatastician-governance`);
-  machine-readable counterpart at `.machine_readable/PROJECT-BINDING.a2ml`.
-- `CONTRIBUTING.adoc`, `SECURITY.md` — contribution mechanics and vulnerability
-  disclosure route.
+## Where things live
 
-- `crates/idaptik-core`  — engine-agnostic gameplay truth (network sim + scenario); no rendering.
-- `crates/idaptik-ffi`   — C-ABI surface for Zig/Idris2 consumers (ADR-0001).
-- `crates/idaptik-tui`   — ratatui/crossterm frontend + headless/replay/export verifier (ADR-0004).
-- `crates/idaptik-bevy`  — Bevy rendering frontend (evaluation, ADR-0003).
-- `crates/idaptik-fyrox` — Fyrox rendering frontend (evaluation, ADR-0003).
-- `server/`              — Elixir/OTP session relay: Bandit + Phoenix Channels (ADR-0002, ADR-0005).
-- `config/`              — Nickel typed, schema-checked game/level/network config.
-- `docs/adr/`            — architecture decision records (ADR-0001..0006).
-- `.machine_readable/`   — this manifest's detail: 6a2/ (six core A2ML files) + contractiles/.
+- `crates/idaptik-core` — engine-agnostic gameplay truth and package loader.
+- `crates/idaptik-net` — deterministic delay-lockstep client and resync.
+- `crates/idaptik-ffi` — C-ABI surface for non-Rust consumers.
+- `crates/idaptik-tui` — playable reference frontend and headless verifier.
+- `crates/idaptik-bevy` — selected graphical frontend (ADR-0008).
+- `server/` — Bandit + Phoenix Channels relay.
+- `config/` — typed Nickel configuration and negative fixtures.
+- `contracts/idaptik/v1/` — game-owned UMS package contract.
+- `docs/adr/` — ADR-0001 through ADR-0008.
+- `.machine_readable/descriptiles/` — project state and supporting metadata.
+- `.machine_readable/contractiles/` — machine-readable operating contracts.
 
-## Machine-Readable Standard
+## Invariants
 
-- `.machine_readable/6a2/`         — STATE, META, ECOSYSTEM, AGENTIC, NEUROSYM, PLAYBOOK (+ 0-AI-MANIFEST, README.adoc).
-- `.machine_readable/contractiles/` — Intentfile, Mustfile, Trustfile, Adjustfile, Justfile, dust/Dustfile, bust/Bustfile.
-- `k9iser.toml`                    — wraps IDApTIK's real TOML configs into self-validating K9 contracts.
-
-## Invariants (read before editing)
-
-- Licence layers are deliberate and layered: engine & code are
-  AGPL-3.0-or-later (strong copyleft, including hosted service), game content
-  is CC-BY-SA-4.0, and the names/marks (IDApTIK, Moletaire) are trademarked.
-  Do NOT relicense the engine or flatten the layers.
-- Gameplay truth lives in crates/idaptik-core and stays engine-agnostic and
-  deterministic; Bevy/Fyrox are thin, replaceable frontends.
+- Code is AGPL-3.0-or-later, game content is CC-BY-SA-4.0, and the IDApTIK and
+  Moletaire names/marks are trademarked. Do not flatten these layers.
+- Gameplay truth remains deterministic and independent of Bevy.
+- Render-derived state never feeds the simulation.
 - The session layer is Bandit + Phoenix Channels, not LiveView.
-- State/metadata belongs under .machine_readable/, not the repository root.
-- Contributions come in under the DCO 1.1 — sign commits with `git commit -s`.
+- Ruby, Python, and JavaScript are not implementation or project-tooling
+  languages in this repository.
+- UMS consumes IDApTIK-owned versioned packages; IDApTIK does not depend on
+  the UMS user interface.
+- Contributions use DCO 1.1 and signed-off commits.

@@ -3,12 +3,12 @@
 IDApTIK is an asymmetric two-player infiltration game: Rust owns gameplay
 truth, Elixir/OTP owns multiplayer session life. It is a member repository of
 The Metadatastician estate and adopts that estate's governance profile via
-`PROJECT-GOVERNANCE-BINDING.adoc`.
+`docs/PROJECT-GOVERNANCE-BINDING.adoc`.
 
-Read `0-AI-MANIFEST.a2ml`, `README.md`, `GOVERNANCE.md`, `MAINTAINERS`, and
-`PROJECT-GOVERNANCE-BINDING.adoc` before editing. Canonical policy for this
-repo lives in the root governance documents; `.machine_readable/` descriptiles
-mirror declared state and do not outrank them.
+Read `.machine_readable/0-AI-MANIFEST.a2ml`, `README.md`, `GOVERNANCE.md`,
+`.github/MAINTAINERS`, and `docs/PROJECT-GOVERNANCE-BINDING.adoc` before
+editing. Canonical policy lives in the governance documents; machine-readable
+descriptiles mirror declared state and do not outrank them.
 
 Invariants (see `0-AI-MANIFEST.a2ml` for the full list):
 
@@ -21,11 +21,11 @@ Invariants (see `0-AI-MANIFEST.a2ml` for the full list):
 - The session layer is Bandit + Phoenix Channels, not LiveView.
 - State/metadata belongs under `.machine_readable/`, not the repository root.
 - Contributions come in under DCO 1.1 — sign commits with `git commit -s`
-  (see `CONTRIBUTING.adoc`).
+  (see `CONTRIBUTING.md`).
 
 Do not edit generated files directly; none are currently declared. Do not
 change licences, upstream coined names, or evidence-status labels (in
-`PROJECT-ASSURANCE-PROFILE.adoc`) as a side effect of an unrelated change.
+`docs/PROJECT-ASSURANCE-PROFILE.adoc`) as a side effect of an unrelated change.
 
 ## The stack is Rust and Elixir — attempts 1–3 are dead
 
@@ -42,6 +42,20 @@ table as current and propose work against a codebase that no longer exists:
 There is no JavaScript runtime here: no browser, no Canvas, no
 `requestAnimationFrame`, no npm, no PixiJS, no Excalibur. A proposal written
 against any of those cannot be applied.
+
+Ruby and Python are also not implementation or project-tooling languages in
+this repository. Do not introduce Ruby/Python source, runtime dependencies,
+formatters, linters, package ecosystems, or workflow steps. A documentation
+reference to a separate repository's implementation does not make that
+language part of IDApTIK.
+
+GitHub's hosted service actions are an infrastructure boundary, not part of
+the project stack. Prefer direct commands when an action would add an avoidable
+language runtime (checkout uses `git` directly). A hosted action whose service
+protocol has no practical replacement, such as CodeQL analysis or Pages
+deployment, may use its own internal runtime; keep it SHA-pinned and do not
+extend that exception to repository code, scripts, dependencies, or general
+workflow tooling.
 
 Two further confusions worth pre-empting:
 

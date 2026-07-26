@@ -19,12 +19,17 @@ jobs:
       image: ghcr.io/stefan-hoeck/idris2-pack@sha256:f0758996a931fb35d9ecb1de273c4d59dabe2a09b433afc7e357f65a08b7e1ff
     steps:
       - name: Checkout Site
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_REF"
+          git checkout --detach --force FETCH_HEAD
       - name: Checkout Ddraig SSG
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4
-        with:
-          repository: hyperpolymath/ddraig-ssg
-          path: .ddraig-ssg
+        run: |
+          git init .ddraig-ssg
+          git -C .ddraig-ssg remote add origin https://github.com/hyperpolymath/ddraig-ssg.git
+          git -C .ddraig-ssg fetch --no-tags --depth=1 origin e1282f35e8999175e8d143436aa754367cc9800e
+          git -C .ddraig-ssg checkout --detach --force FETCH_HEAD
       - name: Compile Ddraig
         working-directory: .ddraig-ssg
         run: idris2 Ddraig.idr -o ddraig
@@ -36,7 +41,7 @@ jobs:
           elif [ ! -f src/index.md ]; then
             echo "# ${GITHUB_REPOSITORY}" > src/index.md
           fi
-          ./.ddraig-ssg/build/exec/ddraig build src _site https://hyperpolymath.github.io/${GITHUB_REPOSITORY#*/}
+          ./.ddraig-ssg/build/exec/ddraig build src _site https://idaptik.net
       - name: Upload artifact
         uses: actions/upload-pages-artifact@37887958984318f2416549b205437f2699699998 # v3
         with:

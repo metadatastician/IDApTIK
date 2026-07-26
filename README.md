@@ -60,7 +60,7 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
 - **Config:** **Nickel** (typed configuration).
 - **Toolchains:** pinned in `mise.toml` + `rust-toolchain.toml`; `just` runs tasks. Provision with `just setup` (or `just bootstrap` for a fast, prebuilt-only bring-up), and check with `just doctor`.
 
-Still open: persistence and the Rust↔Elixir wire format.
+Still open: persistence/versioning and the long-term Rust↔Elixir wire encoding.
 
 ## Layout
 
@@ -111,7 +111,11 @@ Contributions come in under the Developer Certificate of Origin (DCO 1.1); sign 
 
 ## Status
 
-Early. This is a `git init`-era repository for the Rust rewrite.
+Envelope-stage vertical slice. The deterministic Ghost Lobby simulation, TUI,
+typed session relay, delay-lockstep netplay, Bevy renderer, and UMS v1 package
+boundary are implemented and CI-gated. The next milestone is a coherent
+player-facing Bevy shell with first art, real-window validation, and documented
+mechanics.
 
 ---
 

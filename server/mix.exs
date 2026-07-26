@@ -31,7 +31,7 @@ defmodule IdaptikServer.MixProject do
       {:phoenix, "~> 1.7"},
       # Bandit is Phoenix's default HTTP/WebSocket adapter; declared explicitly so
       # the choice is visible and pinned.
-      {:bandit, "~> 1.11"},
+      {:bandit, "~> 1.12.3"},
       {:phoenix_pubsub, "~> 2.1"},
       {:jason, "~> 1.4"}
       # Deliberately NOT phoenix_live_view — the game UI is the Rust client.

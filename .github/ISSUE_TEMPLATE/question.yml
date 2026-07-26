@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Question issue template for metadatastician/paint-type
+# Question issue template for metadatastician/IDApTIK
 name: Question
 description: Ask a question about usage or behaviour
 title: "[Question]: "
-labels: ["question", "triage"]
+labels: ["question"]
 assignees: []
 body:
   - type: markdown
     attributes:
       value: |
         Have a question? You can also ask in
-        [Discussions](https://github.com/metadatastician/paint-type/discussions)
+        [Discussions](https://github.com/metadatastician/IDApTIK/discussions)
         for broader conversations.
 
   - type: textarea
