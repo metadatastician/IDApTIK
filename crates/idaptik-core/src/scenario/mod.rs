@@ -36,6 +36,7 @@ pub mod sim;
 pub mod snapshot;
 pub mod state;
 pub mod tuning;
+pub mod vsm;
 
 pub use actor::{
     ACTORS_FORMAT, ACTORS_JSON, ActorArchetype, ActorCheck, ActorPackError, ActorRegistry,
@@ -83,4 +84,8 @@ pub use snapshot::{
 pub use state::{RuntimeState, Stats};
 pub use tuning::{
     ActionKind, ActionSpec, DifficultyId, DifficultyPreset, GradeBands, ScoringDef, TuningConstants,
+};
+pub use vsm::{
+    DifficultyProposal, Hypothesis, HypothesisEvidence, HypothesisLedger, Operator, OperatorTeam,
+    PlayerTacticObservation, VsmDirector, VsmEvent, VsmSystem,
 };
