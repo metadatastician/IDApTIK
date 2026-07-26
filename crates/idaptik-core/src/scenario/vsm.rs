@@ -291,6 +291,15 @@ impl VsmDirector {
             attention: team.attention,
         });
     }
+
+    pub fn allocate_from_evidence(
+        &mut self,
+        team: &mut OperatorTeam,
+        ledger: &EvidenceLedger,
+        proposition: &[String],
+    ) {
+        self.allocate_attention(team, ledger.recommended_attention(proposition));
+    }
 }
 
 #[cfg(test)]
@@ -426,5 +435,19 @@ mod tests {
         ]);
         assert!(direct_front.recommended_attention(&["front_door".into()]) > 70);
         assert!(staged_vent.recommended_attention(&["front_door".into()]) < 70);
+    }
+
+    #[test]
+    fn evidence_updates_operator_team_and_trace() {
+        let frame = vec!["front_door".into(), "ventilation".into(), "unknown".into()];
+        let ledger = EvidenceLedger::from_evidence(frame, vec![
+            FocalMass { hypotheses: vec!["ventilation".into()], mass: 7_000 },
+            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()], mass: 3_000 },
+        ]);
+        let mut director = VsmDirector::new(0, 1);
+        let mut team = OperatorTeam { id: "patrol-a".into(), operators: vec![], attention: 0 };
+        director.allocate_from_evidence(&mut team, &ledger, &["ventilation".into()]);
+        assert_eq!(team.attention, 100);
+        assert!(matches!(director.trace.last(), Some(VsmEvent::TeamAttentionAllocated { team_id, attention: 100 }) if team_id == "patrol-a"));
     }
 }
