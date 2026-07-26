@@ -157,6 +157,39 @@ pub fn ghost_lobby_evidence(event: &Event, event_id: &str) -> Option<EvidenceLed
     Some(ledger)
 }
 
+/// Opt-in adapter owned by a caller of `GhostLobbySim::tick`. It consumes the
+/// real returned event stream without changing the canonical simulation state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GhostLobbySupervisor {
+    pub director: VsmDirector,
+    pub evidence: Option<EvidenceLedger>,
+    pub team: OperatorTeam,
+    pub observed_events: u64,
+}
+
+impl GhostLobbySupervisor {
+    pub fn new(team_id: impl Into<String>) -> Self {
+        Self {
+            director: VsmDirector::new(0, 1),
+            evidence: None,
+            team: OperatorTeam { id: team_id.into(), operators: vec![], attention: 0 },
+            observed_events: 0,
+        }
+    }
+
+    pub fn ingest(&mut self, events: &[Event]) {
+        for event in events {
+            self.observed_events = self.observed_events.saturating_add(1);
+            let Some(next) = ghost_lobby_evidence(event, &self.observed_events.to_string()) else { continue };
+            if let Some(current) = &mut self.evidence { current.combine_in_place(next); }
+            else { self.evidence = Some(next); }
+        }
+        if let Some(evidence) = &self.evidence {
+            self.director.allocate_from_evidence(&mut self.team, evidence, &["usb".into()]);
+        }
+    }
+}
+
 impl HypothesisLedger {
     pub fn new(propositions: impl IntoIterator<Item = String>) -> Self {
         Self {
@@ -476,5 +509,14 @@ mod tests {
         let evidence = ghost_lobby_evidence(&Event::UsbThrown, "usb-1").expect("USB event evidence");
         assert!(evidence.plausibility(&["usb".into()]) > 0);
         assert!(ghost_lobby_evidence(&Event::LightsFlickered { third_use: false }, "noise").is_none());
+    }
+
+    #[test]
+    fn supervisor_consumes_tick_events_without_mutating_simulation() {
+        let mut supervisor = GhostLobbySupervisor::new("security-team");
+        supervisor.ingest(&[Event::UsbThrown]);
+        assert_eq!(supervisor.observed_events, 1);
+        assert!(supervisor.evidence.is_some());
+        assert!(supervisor.team.attention > 0);
     }
 }

@@ -86,7 +86,7 @@ pub use tuning::{
     ActionKind, ActionSpec, DifficultyId, DifficultyPreset, GradeBands, ScoringDef, TuningConstants,
 };
 pub use vsm::{
-    ghost_lobby_evidence, DifficultyProposal, EvidenceLedger, FocalMass, Hypothesis,
+    ghost_lobby_evidence, DifficultyProposal, EvidenceLedger, FocalMass, GhostLobbySupervisor, Hypothesis,
     HypothesisEvidence, HypothesisLedger, Operator, OperatorTeam, PlayerTacticObservation,
     VsmDirector, VsmEvent, VsmSystem, MASS_TOTAL,
 };
