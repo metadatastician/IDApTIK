@@ -16,6 +16,7 @@ private canonical UMS repository.
 - [x] Add USB/fridge-note and front-door/vent conformance fixtures.
 - [x] Preserve conflict, ignorance, fixed-point replay, and focal-set queries.
 - [x] Connect evidence plausibility to bounded patrol attention allocation.
+- [x] Translate selected Ghost Lobby events into observer-relative evidence.
 
 ## Next: first playable proving slice
 
@@ -49,6 +50,7 @@ The public branch `docs/vsm-esm-framework` contains the first deterministic
 evidence/VSM prototype and is open as PR #61. The core tests cover scalar
 hypotheses, fixed-point focal masses, conflict, USB/fridge-note revision,
 vent/front-door deception, and evidence-driven patrol attention. Nothing yet
-changes the live Ghost Lobby simulation or Bevy presentation. Start the next
-session by connecting `EvidenceLedger::recommended_attention` and
-`VsmDirector::allocate_from_evidence` to a real scenario event stream.
+changes the live Ghost Lobby simulation or Bevy presentation. The event adapter
+now exists, but it is still opt-in; start the next session by invoking it from
+the real simulation event stream and applying the resulting team allocation to
+world coverage.
