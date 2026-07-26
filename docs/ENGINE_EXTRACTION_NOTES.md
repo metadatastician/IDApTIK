@@ -163,8 +163,8 @@ probably wrong, and finding out is cheaper while the two trees are independent.
 
 The cost is a real one and worth naming: the generic half of `interp.rs` and its
 counterpart in `affective-engine` will drift. That is accepted for now. The
-trigger to reconsider is a **second** host wanting the same buffers — the TUI, a
-Fyrox frontend, or `idaptik-net`'s resync path. At that point the duplication
+trigger to reconsider is a **second** host wanting the same buffers — the TUI,
+another graphical frontend, or `idaptik-net`'s resync path. At that point the duplication
 starts costing more than the coupling would, and this section should be revised
 rather than quietly ignored.
 

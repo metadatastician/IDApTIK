@@ -24,7 +24,7 @@ already real:
 | **Multiplayer**: seat split, relay (Elixir/Phoenix), live delay-lockstep netplay with pause + drop/rejoin resync | **[DONE]** — PR #34 + PR #37; byte-identical to the headless reference under CI gates |
 | Multiplayer remaining: gossamer window hosting, burble voice transport | **[GATED]** — ADR-0006 §5 unblock conditions unmet upstream (no wasm surface in gossamer; burble has no Rust client) |
 | Ghost Lobby scenario (the "odd level or two") | **[DONE]** — our vertical-slice testbed |
-| Bevy renderer crate | **[PARTIAL]** — real and tested, but not a player-facing GUI yet; fyrox crate is a stub |
+| Bevy renderer crate | **[SELECTED, PARTIAL]** — real and tested, but not a player-facing GUI yet; the Fyrox stub was retired by ADR-0008 |
 | Nickel config schema + scenario fixtures | **[DONE]** |
 | **UMS**: Idris2 ABI (17 modules) + Zig FFI, level JSON extractors for *every* section (devices, zones, guards, dogs, drones, assassins, items, wiring, defences) | **[DONE]** — extractors landed 2026-07-21 (UMS PR #14), 40/40 runtime checks |
 | UMS ↔ game taxonomy map (device kinds 1:1, zone tier→segment ratified) | **[DONE]** |

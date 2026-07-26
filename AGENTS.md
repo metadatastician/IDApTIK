@@ -16,8 +16,8 @@ Invariants (see `0-AI-MANIFEST.a2ml` for the full list):
   content is CC-BY-SA-4.0, names/marks (IDApTIK, Moletaire) are trademarked.
   Do not relicense the engine or flatten the layers.
 - Gameplay truth lives in `crates/idaptik-core` and stays engine-agnostic and
-  deterministic; `crates/idaptik-bevy`/`crates/idaptik-fyrox` are thin,
-  replaceable frontends.
+  deterministic; `crates/idaptik-bevy` is the selected thin graphical
+  frontend. Do not move game truth into Bevy.
 - The session layer is Bandit + Phoenix Channels, not LiveView.
 - State/metadata belongs under `.machine_readable/`, not the repository root.
 - Contributions come in under DCO 1.1 — sign commits with `git commit -s`
@@ -68,9 +68,9 @@ Two further confusions worth pre-empting:
   two-seat byte-identical loopback gate.
 
 There is no garbage collector — this is Rust. "Avoid GC pauses" is not a design
-goal here; it is free. Bevy *and* Fyrox exist deliberately as interchangeable
-frontends under evaluation (ADR-0003), to be narrowed later; that is not
-duplication to be tidied away.
+goal here; it is free. Bevy is the selected graphical frontend (ADR-0008).
+Fyrox was retired because its evaluation crate remained a bring-up stub while
+Bevy acquired the renderer, parity tests and hosted-client design.
 
 Nothing render-side may feed back into simulation state. The determinism tests
 are load-bearing, not decorative.

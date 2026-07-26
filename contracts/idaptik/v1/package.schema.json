@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/metadatastician/IDApTIK/contracts/idaptik/v1/package.schema.json",
+  "title": "IDApTIK game package v1",
+  "description": "Stable package envelope. Scenario vocabulary and semantic checks are authoritative in idaptik-core::ScenarioDefinition and idaptik-core::package.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "contract",
+    "compatibility",
+    "scenario",
+    "scenario_id",
+    "seed",
+    "run_ticks",
+    "snapshot_tick",
+    "taxonomy",
+    "actors",
+    "commands",
+    "guarantees"
+  ],
+  "properties": {
+    "format": { "const": "idaptik-package/v1" },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "const": "dev.metadatastician.idaptik.package" },
+        "version": { "const": "1.0.0" }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["game", "game_version", "profile", "profile_version"],
+      "properties": {
+        "game": { "const": "idaptik" },
+        "game_version": { "const": "0.1.0" },
+        "profile": { "const": "idaptik" },
+        "profile_version": { "const": "1.0.0" }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "description": "Serialized authoritative IDApTIK ScenarioDefinition; validated semantically by the game loader."
+    },
+    "scenario_id": { "type": "string", "minLength": 1 },
+    "seed": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
+    "run_ticks": { "type": "integer", "minimum": 2 },
+    "snapshot_tick": { "type": "integer", "minimum": 1 },
+    "taxonomy": {
+      "type": "object",
+      "minProperties": 9,
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "actors": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "role"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "role": { "enum": ["security", "non_security"] },
+          "runtime_binding": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["tick", "command"],
+        "properties": {
+          "tick": { "type": "integer", "minimum": 0 },
+          "command": { "type": "object" }
+        }
+      }
+    },
+    "guarantees": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deterministic", "snapshot_format", "required_events"],
+      "properties": {
+        "deterministic": { "const": true },
+        "snapshot_format": { "const": "idaptik-ghost-lobby-runtime-v2" },
+        "required_events": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

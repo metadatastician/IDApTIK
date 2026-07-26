@@ -29,5 +29,5 @@ just   = "1.46.0"    # task runner (this repo's justfile)
 
 [env]
 # Fuller backtraces while the project is young. Linker choice (lld/mold) for fast
-# Bevy/Fyrox builds is a per-machine .cargo/config.toml concern, not pinned here.
+# Bevy builds is a per-machine .cargo/config.toml concern, not pinned here.
 RUST_BACKTRACE = "1"

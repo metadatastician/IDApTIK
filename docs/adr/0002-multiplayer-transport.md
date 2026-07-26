@@ -33,7 +33,7 @@ gameplay.
 
 Rationale:
 
-- The game UI lives in Rust (Bevy/Fyrox), not in HTML. LiveView's whole value is
+- The game UI lives in Rust (Bevy), not in HTML. LiveView's whole value is
   server-rendered HTML DOM diffing — irrelevant to a native/Wasm game client, and
   it would be the wrong abstraction to push game state through.
 - Phoenix Channels is the idiomatic BEAM primitive for exactly this: topic-based
