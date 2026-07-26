@@ -1,116 +1,64 @@
-# Clone the repository
-git clone https://github.com/hyperpolymath/squisher-corpus.git
-cd squisher-corpus
+# Contributing to IDApTIK
 
-# Using Nix (recommended for reproducibility)
-nix develop
+Thank you for contributing. Please read `CODE_OF_CONDUCT.md`, `GOVERNANCE.md`,
+and `AGENTS.md` before making changes.
 
-# Or using toolbox/distrobox
-toolbox create squisher-corpus-dev
-toolbox enter squisher-corpus-dev
-# Install dependencies manually
+## Development setup
 
-# Verify setup
-just check   # or: cargo check / mix compile / etc.
-just test    # Run test suite
+```sh
+git clone https://github.com/metadatastician/IDApTIK.git
+cd IDApTIK
+mise trust
+just setup
+just doctor
 ```
 
-### Repository Structure
-```
-squisher-corpus/
-├── src/                 # Source code (Perimeter 1-2)
-├── lib/                 # Library code (Perimeter 1-2)
-├── extensions/          # Extensions (Perimeter 2)
-├── plugins/             # Plugins (Perimeter 2)
-├── tools/               # Tooling (Perimeter 2)
-├── docs/                # Documentation (Perimeter 3)
-│   ├── architecture/    # ADRs, specs (Perimeter 2)
-│   └── proposals/       # RFCs (Perimeter 3)
-├── examples/            # Examples (Perimeter 3)
-├── spec/                # Spec tests (Perimeter 3)
-├── tests/               # Test suite (Perimeter 2-3)
-├── .well-known/         # Protocol files (Perimeter 1-3)
-├── .github/             # GitHub config (Perimeter 1)
-│   ├── ISSUE_TEMPLATE/
-│   └── workflows/
-├── CHANGELOG.md
-├── CODE_OF_CONDUCT.md
-├── CONTRIBUTING.md      # This file
-├── GOVERNANCE.md
-├── LICENSE
-├── MAINTAINERS.md
-├── README.adoc
-├── SECURITY.md
-├── flake.nix            # Nix flake (Perimeter 1)
-└── Justfile             # Task runner (Perimeter 1)
-```
+Rust is pinned by `rust-toolchain.toml`; Erlang, Elixir, Zig, Nickel, and
+`just` are pinned by `mise.toml`.
 
----
+## Project boundaries
 
-## How to Contribute
+- Gameplay truth belongs in `crates/idaptik-core` and must remain deterministic
+  and independent of Bevy.
+- `crates/idaptik-bevy` is a presentation/input adapter over typed
+  `Command`/`Event` and snapshot surfaces.
+- `server/` relays multiplayer sessions; it does not own gameplay decisions.
+- IDApTIK owns `contracts/idaptik/v1`; Universal Modding Studio consumes it
+  without becoming a runtime dependency.
+- Ruby, Python, JavaScript, and their package/tooling ecosystems are not part
+  of this repository.
+- Do not flatten the licence layers: code is AGPL-3.0-or-later, content is
+  CC-BY-SA-4.0, and the IDApTIK/Moletaire names and marks remain trademarked.
 
-### Reporting Bugs
+Changes to `crates/idaptik-ffi`, `server/`, workflows, licences, or versioned
+contracts receive additional scrutiny.
 
-**Before reporting**:
-1. Search existing issues
-2. Check if it's already fixed in `main`
-3. Determine which perimeter the bug affects
+## Checks
 
-**When reporting**:
+Run the gates relevant to your change. Before requesting merge, the baseline
+set is:
 
-Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md) and include:
-
-- Clear, descriptive title
-- Environment details (OS, versions, toolchain)
-- Steps to reproduce
-- Expected vs actual behaviour
-- Logs, screenshots, or minimal reproduction
-
-### Suggesting Features
-
-**Before suggesting**:
-1. Check the [roadmap](ROADMAP.md) if available
-2. Search existing issues and discussions
-3. Consider which perimeter the feature belongs to
-
-**When suggesting**:
-
-Use the [feature request template](.github/ISSUE_TEMPLATE/feature_request.md) and include:
-
-- Problem statement (what pain point does this solve?)
-- Proposed solution
-- Alternatives considered
-- Which perimeter this affects
-
-### Your First Contribution
-
-Look for issues labelled:
-
-- [`good first issue`](https://github.com/hyperpolymath/squisher-corpus/labels/good%20first%20issue) — Simple Perimeter 3 tasks
-- [`help wanted`](https://github.com/hyperpolymath/squisher-corpus/labels/help%20wanted) — Community help needed
-- [`documentation`](https://github.com/hyperpolymath/squisher-corpus/labels/documentation) — Docs improvements
-- [`perimeter-3`](https://github.com/hyperpolymath/squisher-corpus/labels/perimeter-3) — Community sandbox scope
-
----
-
-## Development Workflow
-
-### Branch Naming
-```
-docs/short-description       # Documentation (P3)
-test/what-added              # Test additions (P3)
-feat/short-description       # New features (P2)
-fix/issue-number-description # Bug fixes (P2)
-refactor/what-changed        # Code improvements (P2)
-security/what-fixed          # Security fixes (P1-2)
+```sh
+just test-ghost
+just config-check
+just loopback-check
+cargo test -p idaptik-bevy
+cargo clippy -p idaptik-bevy --all-targets -- -D warnings
+cd server && mix format --check-formatted
 ```
 
-### Commit Messages
+Checks must fail when required tooling or validation is absent; do not turn a
+missing tool into a successful skip.
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
+## Commits and pull requests
+
+Contributions are made under Developer Certificate of Origin 1.1. Sign every
+commit:
+
+```sh
+git commit -s
 ```
-<type>(<scope>): <description>
 
-[optional body]
-
-[optional footer]
+Use a focused branch and pull request. Explain the user or developer impact,
+the relevant architectural boundary, and the commands used to verify the
+change. Major or breaking changes require an ADR or RFC under `docs/`.

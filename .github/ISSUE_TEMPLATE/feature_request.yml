@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Feature request issue template for metadatastician/paint-type
+# Feature request issue template for metadatastician/IDApTIK
 name: Feature Request
 description: Suggest an idea or enhancement for this project
 title: "[Feature]: "
-labels: ["enhancement", "priority: unset", "triage"]
+labels: ["enhancement"]
 assignees: []
 body:
   - type: markdown
@@ -45,14 +45,15 @@ body:
       label: Category
       description: What area does this feature relate to?
       options:
-        - Core functionality
-        - Developer experience
-        - Performance
+        - Deterministic gameplay core
+        - Bevy frontend / user experience
+        - Multiplayer / session relay
+        - UMS package contract
+        - Content / scenario design
+        - Performance / accessibility
         - Documentation
         - CI/CD / Tooling
-        - Integration / Interop
         - Security
-        - Accessibility
         - Other
     validations:
       required: true

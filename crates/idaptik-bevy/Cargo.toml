@@ -1,6 +1,6 @@
 [package]
 name = "idaptik-bevy"
-description = "Bevy rendering frontend for IDApTIK (evaluation; see ADR-0003)."
+description = "Selected Bevy rendering frontend for IDApTIK (ADR-0008)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

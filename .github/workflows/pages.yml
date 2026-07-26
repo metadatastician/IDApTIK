@@ -36,7 +36,7 @@ jobs:
           elif [ ! -f src/index.md ]; then
             echo "# ${GITHUB_REPOSITORY}" > src/index.md
           fi
-          ./.ddraig-ssg/build/exec/ddraig build src _site https://hyperpolymath.github.io/${GITHUB_REPOSITORY#*/}
+          ./.ddraig-ssg/build/exec/ddraig build src _site https://idaptik.net
       - name: Upload artifact
         uses: actions/upload-pages-artifact@37887958984318f2416549b205437f2699699998 # v3
         with:

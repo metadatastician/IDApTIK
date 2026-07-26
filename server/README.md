@@ -1,38 +1,37 @@
 # idaptik-server
 
-The multiplayer / session layer for IDApTIK — a headless realtime backend.
-**Phoenix Channels over Bandit, no LiveView** (see `../docs/adr/0002-multiplayer-transport.md`).
-Rust owns gameplay truth; this pairs the two asymmetric roles and relays their
-intent.
+The multiplayer/session layer for IDApTIK: Phoenix Channels over Bandit, with
+no LiveView. Rust owns gameplay truth; this service pairs the two asymmetric
+seats and relays their typed stream without interpreting gameplay.
 
 ## Run
 
-```bash
+```sh
 mix deps.get
-mix phx.server        # listens on 127.0.0.1:4000 (dev)
+mix phx.server
 ```
 
-Or from the repo root: `just server-setup && just server`.
+The development endpoint listens on `127.0.0.1:4000`. From the repository root
+use `just server-setup`, `just server-test`, or `just server`.
 
-## Shape
+## Session shape
 
-- `IdaptikServerWeb.Endpoint` — Bandit adapter, one `/socket`.
-- `IdaptikServerWeb.UserSocket` — routes `session:*` topics.
-- `IdaptikServerWeb.SessionChannel` — a single game session. Two clients join
-  `session:<id>` with `%{"role" => "infiltrator" | "hacker"}`; the channel relays
-  `"intent"` (infiltrator → hacker) and `"hacker_action"` (hacker → infiltrator),
-  each tagged with its origin, plus a `"ping"`/pong liveness check.
-- `IdaptikServerWeb.StatusPlug` — terminal plug answering plain HTTP with a
-  small JSON status (this backend is sockets, not an HTTP API).
+Two clients join `session:<id>` with
+`{"role":"infiltrator"}` or `{"role":"hacker"}`.
 
-## Wire protocol (current)
+| Client event | Payload | Relay behaviour |
+|---|---|---|
+| `command` | Rust `Command` JSON tagged with `cmd` | Enforces the command-to-seat routing table, strips optional relay `seq`, and sends the command to the peer |
+| `event` | Rust `Event` JSON tagged with `event` | Relays verbatim to the peer; this also carries namespaced `net:*` control messages |
+| `ping` | any JSON | Replies with `{"pong":true}` |
+| `intent`, `hacker_action` | legacy free-form JSON | Compatibility relay for pre-typed clients |
 
-| Direction | Event | Payload |
-|-----------|-------|---------|
-| client → server | join `session:<id>` | `{"role": "infiltrator"｜"hacker"}` |
-| infiltrator → hacker | `intent` | game-defined, server adds `"from"` |
-| hacker → infiltrator | `hacker_action` | game-defined, server adds `"from"` |
-| server → peer | `peer_joined` | `{"role": ...}` |
+An optional strictly increasing `seq` de-duplicates commands. The client-owned
+`at` tick remains in the payload for delay-lockstep scheduling. Join and leave
+produce `peer_joined` and best-effort `peer_left` notifications.
 
-A binary wire format for the Rust↔Elixir boundary is a later decision
-(ADR-0002); Channels are payload-agnostic, so it does not block this skeleton.
+The relay contains no scoring, physics, FSM, tick, or snapshot decisions. The
+shared fixtures under `fixtures/session_relay/` are decoded by Rust tests and
+relayed by Elixir tests, and `just loopback-check` proves both seats remain
+byte-identical to the headless reference through pause, peer loss, and resync.
+See ADR-0005 and ADR-0006.

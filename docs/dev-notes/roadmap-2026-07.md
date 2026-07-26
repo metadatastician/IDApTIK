@@ -82,10 +82,9 @@ multiplayer is gated integration glue, not design work.
 
 ### A. Interfaces
 
-- **GUI** **[DECIDED, next major]** — port what's portable from
-  IDApixiTIK. Open sub-questions: which host (the existing Bevy crate
-  is real and tested — is it the GUI substrate, or is IDApixiTIK's
-  approach ported onto something else?); TUI feature-parity checklist;
+- **GUI** **[DECIDED, next major]** — extend the selected Bevy frontend
+  (ADR-0008), porting only portable interaction and presentation ideas from
+  IDApixiTIK. Open sub-questions: the TUI feature-parity checklist;
   whether netplay's interactive client (render/keymap/input, already
   library-ified) shares widgets with the GUI.
 - **Game screens** (title, lobby, loadout, results, credits)
@@ -271,7 +270,7 @@ the GUI prototype exists to screenshot.
 now ──────────────────────────────────────────────────────────▶
 [P0] Prototype hardening: Ghost Lobby + TUI + netplay as the
      demoable vertical slice (mostly DONE — keep it green)
-[P1] GUI bring-up (port from IDApixiTIK; decide Bevy-or-not)
+[P1] Bevy GUI/product-shell bring-up (port portable IDApixiTIK ideas)
      ∥ Storyline storyboard + story bible skeleton   (Jonathan)
      ∥ Per-region trope one-pagers + era ledger v0   (Jonathan)
      ∥ Character-system + coprocessor one-pagers     (design only)
@@ -291,13 +290,12 @@ now ─────────────────────────�
 | # | Question | Leaning / owner |
 |---|---|---|
 | 1 | Era/style: single canonical era or switchable tropes? | Build era ledger either way; decision can wait until P2 · both |
-| 2 | GUI substrate: extend the Bevy crate or port IDApixiTIK's approach? | Needs a spike · Joshua |
-| 3 | Which era *is* canon (if single)? Drives every asset. | Before any sprite is commissioned · both |
-| 4 | Coprocessor support: define workloads/APIs | One-pager first · Jonathan |
-| 5 | UMS ai_edit language: declare Python or rewrite in Idris2? | Declare now, rewrite later at will · Jonathan |
-| 6 | Relay hosting: public relay? matchmaking? | After GUI, before any public playtest · both |
-| 7 | Shared-screen co-op (one keyboard) vs netplay-only? | Not discussed — decide cheaply · both |
-| 8 | Playtesting: who, when, what NDA-ish etiquette pre-reveal? | P2 boundary · both |
+| 2 | Which era *is* canon (if single)? Drives every asset. | Before any sprite is commissioned · both |
+| 3 | Coprocessor support: define workloads/APIs | One-pager first · Jonathan |
+| 4 | UMS ai_edit language: declare Python or rewrite in Idris2? | Declare now, rewrite later at will · Jonathan |
+| 5 | Relay hosting: public relay? matchmaking? | After GUI, before any public playtest · both |
+| 6 | Shared-screen co-op (one keyboard) vs netplay-only? | Not discussed — decide cheaply · both |
+| 7 | Playtesting: who, when, what NDA-ish etiquette pre-reveal? | P2 boundary · both |
 
 ---
 

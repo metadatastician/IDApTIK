@@ -6,7 +6,7 @@
 
 [metadata]
 version = "0.1.0"
-last-updated = "2026-07-20"
+last-updated = "2026-07-26"
 
 [project-info]
 name = "IDApTIK"
@@ -26,10 +26,12 @@ adr-dir = "docs/adr/"
 records = [
   { id = "ADR-0001", title = "Toolchain and runtime management", status = "accepted", notes = "mise pins toolchains; rustup owns Rust; just runs tasks; Zig for C ABI/cross-compile, Idris2 models ABI contracts." },
   { id = "ADR-0002", title = "Multiplayer transport — Bandit + Phoenix Channels, not LiveView", status = "accepted" },
-  { id = "ADR-0003", title = "Engine strategy — engine-agnostic core, Bevy + Fyrox as frontends", status = "accepted", notes = "Renderer choice Bevy vs Fyrox settled at end of Envelope." },
+  { id = "ADR-0003", title = "Engine strategy — engine-agnostic core and thin frontends", status = "accepted", notes = "Its dual-renderer evaluation was superseded by ADR-0008." },
   { id = "ADR-0004", title = "Deterministic, event-sourced, definition-as-data scenario simulation", status = "accepted" },
   { id = "ADR-0005", title = "Session relay topology — relay-only lockstep over typed Command/Event", status = "accepted" },
   { id = "ADR-0006", title = "gossamer host window + burble transport — the two-player windowed slice", status = "accepted" },
+  { id = "ADR-0007", title = "Versioned UMS package boundary owned by IDApTIK", status = "accepted" },
+  { id = "ADR-0008", title = "Select Bevy and retire Fyrox", status = "accepted" },
 ]
 
 [development-practices]
@@ -41,7 +43,7 @@ package-managers = ["cargo", "mix"]
 contribution = "DCO 1.1 — sign commits with git commit -s"
 
 [design-rationale]
-gameplay-truth-in-rust = "One engine-agnostic core crate holds all gameplay truth (the network sim + scenario); Bevy and Fyrox are thin, interchangeable rendering frontends over it, so the renderer decision stays reversible (ADR-0003)."
+gameplay-truth-in-rust = "One engine-agnostic core crate holds all gameplay truth; the selected Bevy frontend translates input into commands and presents events/snapshots without feeding render state back into the simulation (ADR-0003, ADR-0008)."
 asymmetric-by-construction = "Control is not shared: the infiltrator moves through the world, the hacker manipulates a grounded, legible network (real topology, subnets/zones, routing, DNS, traceroute, SSH pivoting, trace timers). The hacker has physical presence and real discovery risk."
 elixir-owns-sessions = "Rust owns deterministic gameplay truth; Elixir/OTP owns multiplayer and session lifecycle as a relay-only lockstep over a typed Command/Event wire (ADR-0002, ADR-0005)."
 determinism = "The scenario sim is deterministic and event-sourced (definition-as-data), which is what lets the TUI frontend act as a --headless/--replay/--export verifier over core (ADR-0004)."

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Custom issue template for metadatastician/paint-type
+# Custom issue template for metadatastician/IDApTIK
 name: Other
 description: Report an issue that does not fit the other categories
 title: ""
-labels: ["triage"]
+labels: []
 assignees: []
 body:
   - type: markdown
@@ -22,7 +22,6 @@ body:
         - Technical debt
         - Build / CI issue
         - Dependency update
-        - Security concern
         - Licensing question
         - Ecosystem integration
         - Other
@@ -71,6 +70,8 @@ body:
       label: Pre-submission checklist
       options:
         - label: I have searched existing issues to ensure this is not a duplicate
+          required: true
+        - label: This is not a vulnerability report; vulnerabilities must use the private security-advisory form
           required: true
         - label: I would be willing to submit a PR to address this
           required: false

@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Documentation issue template for metadatastician/paint-type
+# Documentation issue template for metadatastician/IDApTIK
 name: Documentation
 description: Report unclear, missing, or incorrect documentation
 title: "[Docs]: "
-labels: ["documentation", "priority: unset", "triage"]
+labels: ["documentation"]
 assignees: []
 body:
   - type: markdown
@@ -31,7 +31,7 @@ body:
     attributes:
       label: Location
       description: Where is this documentation? (URL, file path, or section name)
-      placeholder: "README.adoc, section \"Installation\""
+      placeholder: "README.md, docs/ARCHITECTURE.md, or a section name"
     validations:
       required: true
 

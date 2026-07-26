@@ -1,30 +1,46 @@
 #!/usr/bin/env bash
-# Report the presence and version of every toolchain IDApTIK depends on.
+# Verify the presence and pinned version of every IDApTIK toolchain.
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
-check() {
-  local name="$1" bin="$2"; shift 2
-  if command -v "$bin" >/dev/null 2>&1; then
-    printf '  \033[1;32m✓\033[0m %-10s %s\n' "$name" "$("$@" 2>&1 | head -n1)"
+failures=0
+
+check_contains() {
+  local name="$1" expected="$2"
+  shift 2
+
+  local output
+  if output="$("$@" 2>&1)" && [[ "$output" == *"$expected"* ]]; then
+    printf '  \033[1;32m✓\033[0m %-10s %s\n' "$name" "$(printf '%s\n' "$output" | tail -n1)"
   else
-    printf '  \033[1;31m✗\033[0m %-10s not installed\n' "$name"
+    printf '  \033[1;31m✗\033[0m %-10s expected %s; got %s\n' \
+      "$name" "$expected" "${output:-not installed}"
+    failures=$((failures + 1))
   fi
 }
 
 echo "IDApTIK toolchain status:"
 echo "Rust (gameplay truth):"
-check rustc  rustc  rustc --version
-check cargo  cargo  cargo --version
-check clippy cargo-clippy cargo-clippy --version
+check_contains rustc  "rustc 1.95.0" rustc --version
+check_contains cargo  "cargo 1.95.0" cargo --version
+check_contains clippy "clippy 0.1.95" cargo-clippy --version
+
 echo "Systems / FFI / config / tasks:"
-check zig    zig    zig version
-check just   just   just --version
-check nickel nickel nickel --version
-check idris2 idris2 idris2 --version
+check_contains zig    "0.14.0" mise exec zig@0.14.0 -- zig version
+check_contains just   "1.46.0" mise exec just@1.46.0 -- just --version
+check_contains nickel "1.16.0" mise exec aqua:nickel-lang/nickel@1.16.0 -- nickel --version
+check_contains idris2 "Idris 2" idris2 --version
+
 echo "BEAM (multiplayer / session):"
-check erlang erl    erl -eval 'io:format("~s",[erlang:system_info(otp_release)]), halt().' -noshell
-check elixir elixir elixir --version
-check mix    mix    mix --version
+check_contains erlang "28" mise exec erlang@28.3.1 -- erl \
+  -eval 'io:format("~s",[erlang:system_info(otp_release)]), halt().' -noshell
+check_contains elixir "Elixir 1.19.5" mise exec elixir@1.19.5-otp-28 -- elixir --version
+check_contains mix    "Mix 1.19.5" mise exec elixir@1.19.5-otp-28 -- mix --version
+
 echo "Manager:"
-check mise   mise   mise --version
+check_contains mise "2026." env MISE_OFFLINE=1 mise --version
+
+if (( failures > 0 )); then
+  printf '\n%d required toolchain check(s) failed.\n' "$failures" >&2
+  exit 1
+fi
