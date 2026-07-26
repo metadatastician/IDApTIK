@@ -15,8 +15,7 @@ For the reasoning behind each choice, see the ADRs in [`docs/adr/`](docs/adr/).
 │   ├── idaptik-core/  #   engine-agnostic sim: netsim + scenario + Moletaire companion
 │   ├── idaptik-ffi/   #   C ABI surface (JSON in / JSON out) over the core
 │   ├── idaptik-tui/   #   ratatui/crossterm frontend + --headless/--replay/--export verifier
-│   ├── idaptik-bevy/  #   Bevy side-on 2.5D frontend (evaluation)
-│   └── idaptik-fyrox/ #   Fyrox frontend (evaluation; ADR-0003)
+│   └── idaptik-bevy/  #   selected Bevy side-on 2.5D frontend (ADR-0008)
 ├── server/            # Elixir/Phoenix session relay (Bandit + Phoenix Channels)
 ├── config/            # Nickel typed config: scenario-schema.ncl + fixtures (incl. bad_*.ncl)
 ├── docs/adr/          # Architecture Decision Records
@@ -43,6 +42,16 @@ The authoritative simulation. It is **engine-agnostic** (no rendering or I/O),
 Determinism is enforced by tests: `replay_determinism`, `snapshot_equivalence`,
 `rng_vectors`, `no_panic_fuzz`, and the negative Nickel fixtures.
 
+### Versioned package boundary
+
+IDApTIK publishes and owns `contracts/idaptik/v1`. The loader in
+`idaptik-core::package` deserializes the real `ScenarioDefinition`, applies the
+game's semantic validation, executes the scheduled commands, snapshots,
+restores and compares the replay tail. UMS consumes this contract but is never
+a runtime or UI dependency. See
+[`architecture/ums-package-contract.md`](architecture/ums-package-contract.md)
+and ADR-0007.
+
 ## The FFI boundary (`crates/idaptik-ffi`)
 
 A C ABI that drives the core over a **JSON-in/JSON-out** surface
@@ -54,10 +63,10 @@ equivalence. Intended host bridge is Zig (ADR-0001).
 
 ## Frontends
 
-`idaptik-tui` (the reference frontend and headless verifier), `idaptik-bevy`
-(side-on 2.5D), and `idaptik-fyrox` are all thin drivers: they read input, push
-`Command`s, and render the `Event`/snapshot stream. The core never depends on
-them (ADR-0003, engine-agnostic strategy).
+`idaptik-tui` is the reference frontend and headless verifier.
+`idaptik-bevy` is the selected side-on 2.5D graphical frontend. Both are thin
+drivers: they read input, push `Command`s, and render the `Event`/snapshot
+stream. The core never depends on them (ADR-0003 and ADR-0008).
 
 ## Multiplayer (`server/`)
 

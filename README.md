@@ -52,13 +52,15 @@ Development runs in vehicle-named phases, smallest viable thing first:
 
 The Rust era's stack is being pinned as decisions are made, and each decision is recorded as an ADR under [`docs/adr/`](docs/adr/) rather than asserted here and quietly contradicted later.
 
-- **Gameplay truth:** Rust — an engine-agnostic core, with **Bevy** and **Fyrox** as evaluation frontends over it ([ADR-0003](docs/adr/0003-engine-strategy.md)).
+- **Gameplay truth:** Rust — an engine-agnostic core, with **Bevy** as the
+  selected graphical frontend over it
+  ([ADR-0008](docs/adr/0008-select-bevy-and-retire-fyrox.md)).
 - **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
 - **FFI / ABI edges:** **Zig** (C ABI, cross-compilation) and **Idris2** (modelling the ABI contracts) ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
 - **Config:** **Nickel** (typed configuration).
 - **Toolchains:** pinned in `mise.toml` + `rust-toolchain.toml`; `just` runs tasks. Provision with `just setup` (or `just bootstrap` for a fast, prebuilt-only bring-up), and check with `just doctor`.
 
-Still open: the renderer choice between Bevy and Fyrox (settled at the end of Envelope), persistence, and the Rust↔Elixir wire format.
+Still open: persistence and the Rust↔Elixir wire format.
 
 ## Layout
 
@@ -66,14 +68,30 @@ Still open: the renderer choice between Bevy and Fyrox (settled at the end of En
 crates/idaptik-core     engine-agnostic gameplay truth — the network sim + Ghost Lobby scenario, no rendering
 crates/idaptik-ffi      C-ABI surface for Zig/Idris2 consumers (ADR-0001)
 crates/idaptik-tui      ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)
-crates/idaptik-bevy     Bevy rendering frontend        (evaluation, ADR-0003)
-crates/idaptik-fyrox    Fyrox rendering frontend       (evaluation, ADR-0003)
+crates/idaptik-bevy     selected Bevy rendering frontend (ADR-0008)
 server/                    Elixir: Bandit + Phoenix Channels (ADR-0002)
 config/                    Nickel — typed, schema-checked game/network config
 docs/adr/                  architecture decision records
 ```
 
 `just` runs the common tasks (`just doctor`, `just test`, `just run-bevy`, `just server`, `just config-check`); toolchains are pinned in `mise.toml` + `rust-toolchain.toml`.
+
+## UMS-authored package proof
+
+The game owns the versioned package and gameplay contracts in
+`contracts/idaptik/v1`; Universal Modding Studio consumes them without the game
+depending on the UMS UI. From the sibling UMS repository, run:
+
+```sh
+just roundtrip-idaptik
+```
+
+That command compiles the UMS Ghost Lobby profile source, hands the exact
+temporary artifact to IDApTIK's real package loader, executes a grounded camera
+uplink, snapshots, restores, replays, and fails unless events and final state
+match. The current Enaction evidence covers extracted interpolation parity;
+IDApTIK still uses Bevy's fixed-step accumulator, so no broader timing adoption
+is claimed.
 
 ## Licensing
 

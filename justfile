@@ -53,9 +53,6 @@ build:
 run-bevy:
     cargo run -p idaptik-bevy
 
-run-fyrox:
-    cargo run -p idaptik-fyrox
-
 # Run the Ghost Lobby terminal frontend (ratatui/crossterm, ADR-0004).
 run-tui:
     cargo run -p idaptik-tui
@@ -71,7 +68,7 @@ replay FILE:
 test:
     cargo test --workspace
 
-# The Ghost Lobby scenario gate: core + tui + ffi + net (does NOT build bevy/fyrox).
+# The Ghost Lobby scenario gate: core + tui + ffi + net (does not build Bevy).
 test-ghost:
     cargo test -p idaptik-core -p idaptik-tui -p idaptik-ffi -p idaptik-net
     cargo clippy -p idaptik-core -p idaptik-tui -p idaptik-net --all-targets -- -D warnings

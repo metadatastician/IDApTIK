@@ -8,8 +8,8 @@
 project = "IDApTIK"
 version = "0.1.0"
 type = "game"
-last-updated = "2026-07-20"
-branch = "main"
+last-updated = "2026-07-25"
+branch = "agent/ums-profile-contract"
 build-status = "early"
 test-status = "core + frontends carry Rust unit/parity tests; server (Elixir) tests land with the relay"
 
@@ -39,6 +39,8 @@ bevy-frontend = { percent = 20, notes = "crates/idaptik-bevy — Bevy rendering 
 fyrox-frontend = { percent = 20, notes = "crates/idaptik-fyrox — Fyrox rendering frontend, evaluation only (ADR-0003)." }
 server = { percent = 10, notes = "server/ — Elixir/OTP: Bandit + Phoenix Channels session relay, relay-only lockstep (ADR-0002, ADR-0005)." }
 config = { percent = 45, notes = "config/ — Nickel schema (schema.ncl, scenario-schema.ncl) + default/ghost_lobby scenarios; validated with just config-check. Includes negative fixtures under config/scenario-fixtures/." }
+ums-package = { percent = 60, notes = "contracts/idaptik/v1 + idaptik-core::package own the v1 envelope, semantic loader, deterministic execution, snapshot/restore and replay. UMS round trip is executable; migrations beyond v1 remain unimplemented." }
+enaction = { percent = 20, notes = "Extracted DoubleBuffer parity is proven. Bevy still owns the game clock; Enaction FixedStep and enaction-cognition are not linked." }
 
 [open-decisions]
 # Recorded as ADRs when settled; still open (README "Still open").
@@ -50,9 +52,52 @@ remaining = [
 
 [route-to-mvp]
 remaining = [
+  { item = "Rebase the versioned UMS package contract onto current origin/main and rerun the exact UMS artifact through the changed network simulation", priority = "critical" },
   { item = "Land the Envelope playable slice (movement + door/elevator/override interactions)", priority = "critical" },
   { item = "Wire the gossamer host window + burble transport two-player slice", priority = "high", ref = "ADR-0006" },
   { item = "Stand up the Elixir relay (Bandit + Phoenix Channels) with typed Command/Event", priority = "high", ref = "ADR-0005" },
   { item = "First art pass + documented mechanics", priority = "medium" },
   { item = "Settle the renderer decision and drop the non-chosen frontend to non-blocking", priority = "medium", ref = "ADR-0003" },
+]
+
+[cross-repository-reconciliation]
+coordination-id = "ums-idaptik-slavia-enaction-2026-07-25"
+decision-status = "working direction recorded for the next agent; rebase and renewed evidence are required before publication"
+role = "Authoritative owner of IDApTIK package syntax, gameplay vocabulary, semantic validation, migrations, snapshots, package loading, and runtime execution."
+settled = [
+  "IDApTIK must not depend on the UMS user interface or UMS Core",
+  "UMS consumes an IDApTIK-owned versioned contract rather than redeclaring ScenarioDefinition or LevelData",
+  "IDApTIK must not import Chronicles of Slavia profile types",
+  "The game-specific guard trace remains IDApTIK vocabulary even if mapped later to game-neutral Enaction domains",
+]
+local-contract-branch = "agent/ums-profile-contract"
+local-contract-commit = "2b85db7ffa5aa2c40c9f57f61154d819fb04fe1b"
+remote-feature-base = "4b805e62aa1f1e3b21e0fc4de7b1bd19b6e9e0a1"
+local-contract-status = "One local commit ahead of origin/agent/ums-profile-contract; no pull request."
+new-origin-main = "df057f0f36d3f26d2c969289a157f1ad02cff19b"
+divergence = "Current origin/main has one interactive-network-view commit absent locally; the local branch has the startup-outline and package-contract commits absent from main."
+contract-artifacts = [
+  "contracts/idaptik/v1/contract.json",
+  "contracts/idaptik/v1/package.schema.json",
+  "contracts/idaptik/v1/fixtures/ghost-lobby-scenario.json",
+  "idaptik-core package loader and headless runner",
+]
+locally-proven = [
+  "the exact UMS-emitted package is accepted by the actual game loader",
+  "real ScenarioDefinition semantic validation",
+  "deterministic GhostLobbySim execution and required events",
+  "snapshot v2, restore, post-snapshot replay, and final equality",
+  "serialisable game-specific camera-failure guard trace",
+]
+required-order = [
+  "Rebase or transplant the contract commit onto origin/main at or after df057f0",
+  "Review changed commands, events, network reachability, and simulation behaviour rather than relying on a conflict-free textual rebase",
+  "Run the full IDApTIK workspace tests and warnings-as-errors Clippy",
+  "Run test-ghost, config-check, config-scenario-check, and loopback-check",
+  "Run the reconciled UMS exact package through the rebased actual loader",
+]
+do-not = [
+  "Do not weaken game-owned semantic validation to accommodate an editor fixture",
+  "Do not accept a separately maintained IDApTIK fixture as proof of the UMS boundary",
+  "Do not adopt Enaction FixedStep or enaction-cognition without fresh game-host evidence",
 ]

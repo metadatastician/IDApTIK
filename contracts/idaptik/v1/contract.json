@@ -1,0 +1,42 @@
+{
+  "contract_id": "dev.metadatastician.idaptik.package",
+  "contract_version": "1.0.0",
+  "package_format": "idaptik-package/v1",
+  "game_id": "idaptik",
+  "profile_id": "idaptik",
+  "scenario_format": "idaptik-ghost-lobby-v2",
+  "snapshot_format": "idaptik-ghost-lobby-runtime-v2",
+  "schema": "package.schema.json",
+  "authoritative_fixture": "fixtures/ghost-lobby-scenario.json",
+  "semantic_validation_ids": [
+    "rooms.present",
+    "rooms.unique_ids",
+    "rooms.contiguous",
+    "rooms.support_range",
+    "doors.unique_ids",
+    "doors.on_boundary",
+    "hide_spots.room_exists",
+    "cameras.room_exists",
+    "cameras.range_ordered",
+    "difficulty.present",
+    "difficulty.arrival_ordered",
+    "actions.non_negative",
+    "capacity.cameras",
+    "capacity.doors_per_room",
+    "objectives.extraction",
+    "objectives.room_exists",
+    "player.spawn_in_bounds",
+    "props.spawn_in_bounds"
+  ],
+  "taxonomy_terms": [
+    "room",
+    "traversal",
+    "camera_device",
+    "security_actor",
+    "non_security_actor",
+    "prop",
+    "objective",
+    "network_action",
+    "physical_effect"
+  ]
+}

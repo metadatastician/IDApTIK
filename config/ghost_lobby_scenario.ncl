@@ -1,6 +1,7 @@
 # The Ghost Lobby scenario, authored as typed Nickel config (issue #10).
 #
-# This is the Nickel-side twin of `crates/idaptik-core/src/scenario/ghost_lobby.json`
+# This is the Nickel-side twin of
+# `contracts/idaptik/v1/fixtures/ghost-lobby-scenario.json`
 # (itself the committed export of the Rust `ghost_lobby()` constructor). The
 # contract in scenario-schema.ncl mirrors `ScenarioDefinition::validate`, so a
 # level that exports here is a level the engine accepts. Check it with

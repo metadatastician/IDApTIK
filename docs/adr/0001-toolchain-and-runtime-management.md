@@ -21,8 +21,8 @@ The tools in play:
 | **Nickel** | typed configuration (game / level / network config) |
 | **Just** | task runner |
 
-`fyrox` and `bevy` are Cargo crates, not toolchains — they are pulled by Cargo,
-not by a version manager (see ADR-0003). `hex` and `bandit` are likewise Hex
+`bevy` is a Cargo crate, not a toolchain — it is pulled by Cargo, not by a
+version manager (see ADR-0008). `hex` and `bandit` are likewise Hex
 packages pulled by `mix`, not toolchains (see ADR-0002).
 
 ## Decision
