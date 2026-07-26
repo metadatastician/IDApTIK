@@ -49,6 +49,14 @@ formatters, linters, package ecosystems, or workflow steps. A documentation
 reference to a separate repository's implementation does not make that
 language part of IDApTIK.
 
+GitHub's hosted service actions are an infrastructure boundary, not part of
+the project stack. Prefer direct commands when an action would add an avoidable
+language runtime (checkout uses `git` directly). A hosted action whose service
+protocol has no practical replacement, such as CodeQL analysis or Pages
+deployment, may use its own internal runtime; keep it SHA-pinned and do not
+extend that exception to repository code, scripts, dependencies, or general
+workflow tooling.
+
 Two further confusions worth pre-empting:
 
 - **miniKanren is not in this repository.** It lives in
