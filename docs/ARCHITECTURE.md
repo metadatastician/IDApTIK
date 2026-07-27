@@ -6,6 +6,8 @@ multiplayer** (a transport-agnostic session relay); frontends are thin drivers
 over the same typed `Command`/`Event` wire.
 
 For the reasoning behind each choice, see the ADRs in [`docs/adr/`](docs/adr/).
+The proposed cross-repository epistemic state-machine seam is documented in
+[`architecture/esm-contract-and-repo-boundaries.md`](architecture/esm-contract-and-repo-boundaries.md).
 
 ## Directory structure
 

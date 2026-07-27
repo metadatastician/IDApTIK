@@ -12,7 +12,7 @@ use crossterm::terminal::{
 };
 use idaptik_core::RunConfig;
 use idaptik_core::scenario::event::{Event as SimEvent, LogLine};
-use idaptik_core::scenario::{GhostLobbySim, TICK_DT, ghost_lobby, log_view};
+use idaptik_core::scenario::{GhostLobbySim, GhostLobbySupervisor, TICK_DT, ghost_lobby, log_view};
 use idaptik_tui::input::InputState;
 use idaptik_tui::keymap::map_key;
 use idaptik_tui::render;
@@ -26,7 +26,9 @@ pub fn run(cfg: RunConfig, seed: u32) -> io::Result<()> {
     let mut sim = GhostLobbySim::new(ghost_lobby(), cfg, seed)
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("{e:?}")))?;
     let mut log: Vec<LogLine> = Vec::new();
+    let mut supervisor = GhostLobbySupervisor::new("ghost-lobby-security");
     let startup = sim.drain_events();
+    supervisor.ingest(&startup);
     ingest(&startup, &sim, &mut log);
 
     enable_raw_mode()?;
@@ -42,7 +44,7 @@ pub fn run(cfg: RunConfig, seed: u32) -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let result = run_loop(&mut terminal, &mut sim, &mut log);
+    let result = run_loop(&mut terminal, &mut sim, &mut log, &mut supervisor);
 
     if enhanced {
         let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
@@ -57,6 +59,7 @@ fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     sim: &mut GhostLobbySim,
     log: &mut Vec<LogLine>,
+    supervisor: &mut GhostLobbySupervisor,
 ) -> io::Result<()> {
     let mut input = InputState::new();
     let mut hint: Option<String> = None;
@@ -86,11 +89,13 @@ fn run_loop(
         while acc >= TICK_DT {
             let ti = input.sample();
             let events = sim.tick(&ti);
+            supervisor.ingest(&events);
             if events
                 .iter()
                 .any(|e| matches!(e, SimEvent::Restarted { .. }))
             {
                 log.clear();
+                *supervisor = GhostLobbySupervisor::new("ghost-lobby-security");
             }
             ingest(&events, sim, log);
             acc -= TICK_DT;
