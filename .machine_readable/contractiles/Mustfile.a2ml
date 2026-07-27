@@ -77,6 +77,22 @@ target IDApTIK's real tree, not a generic template.
 - run: test -f docs/adr/0001-toolchain-and-runtime-management.md && test -f docs/adr/0007-versioned-ums-package-boundary.md && test -f docs/adr/0008-select-bevy-and-retire-fyrox.md
 - severity: warning
 
+## Source Hygiene
+
+### rust-formatted
+- description: The workspace is rustfmt-clean (same check CI runs)
+- run: cargo fmt --all -- --check
+- severity: critical
+- notes: |
+  CI runs this as the third command of `just test-ghost`, after the full test
+  suite and clippy. That ordering meant unformatted code on
+  docs/vsm-esm-framework failed CI for a day while costing a complete
+  test-and-clippy cycle to report a whitespace problem.
+
+  Listing it here makes it checkable on its own, locally, in seconds, with no
+  network and no sibling repository. `just fmt` fixes; `just fmt-check`
+  reports.
+
 ## Architecture Boundary
 
 # These invariants are the executable form of the estate boundary ADRs. Each

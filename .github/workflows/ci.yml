@@ -26,6 +26,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Fails in seconds on a formatting problem, instead of after a full test and
+  # clippy cycle. `just test-ghost` still ends with the same check, so the local
+  # gate stays complete and this job is a fast path, not a replacement.
+  #
+  # Deliberately does not install `just`: the other jobs build it from source,
+  # which costs minutes, and a formatting check needs nothing but rustfmt.
+  fmt:
+    name: fmt (rustfmt --check)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: cargo fmt --all -- --check
+        run: cargo fmt --all -- --check
+
   test-ghost:
     name: test-ghost (core/tui/ffi + clippy + fmt)
     runs-on: ubuntu-latest
