@@ -43,6 +43,17 @@ jobs:
             echo "# ${GITHUB_REPOSITORY}" > src/index.md
           fi
           ./.ddraig-ssg/build/exec/ddraig build src _site https://idaptik.net
+      # RFC 9116 requires security.txt at /.well-known/ on the domain. The SSG
+      # builds from src/ and does not carry dotfile directories through, so it
+      # is copied into the artifact explicitly. Without this the file exists in
+      # the repository and 404s on the site, which is the same as not having one.
+      - name: Publish .well-known/security.txt
+        run: |
+          set -euo pipefail
+          test -f .well-known/security.txt
+          mkdir -p _site/.well-known
+          cp .well-known/security.txt _site/.well-known/security.txt
+          echo "published:"; cat _site/.well-known/security.txt
       - name: Upload artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v3
         with:
