@@ -4,9 +4,9 @@
 //! the useful VSM roles explicit and deterministic so the model can be tested
 //! before it is connected to gameplay events.
 
+use super::Event;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use super::Event;
 
 /// Functional VSM roles. These are roles, not required processes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,29 +95,59 @@ pub struct EvidenceLedger {
 
 impl EvidenceLedger {
     pub fn from_evidence(frame: Vec<String>, focal_masses: Vec<FocalMass>) -> Self {
-        let mut ledger = Self { frame, focal_masses: vec![], conflict_mass: 0 };
-        for focal in focal_masses { ledger.add_focal(focal); }
+        let mut ledger = Self {
+            frame,
+            focal_masses: vec![],
+            conflict_mass: 0,
+        };
+        for focal in focal_masses {
+            ledger.add_focal(focal);
+        }
         ledger
     }
 
     fn add_focal(&mut self, mut focal: FocalMass) {
         focal.hypotheses.sort();
         focal.hypotheses.dedup();
-        if focal.mass == 0 { return; }
-        if let Some(existing) = self.focal_masses.iter_mut().find(|f| f.hypotheses == focal.hypotheses) {
+        if focal.mass == 0 {
+            return;
+        }
+        if let Some(existing) = self
+            .focal_masses
+            .iter_mut()
+            .find(|f| f.hypotheses == focal.hypotheses)
+        {
             existing.mass = existing.mass.saturating_add(focal.mass).min(MASS_TOTAL);
-        } else { self.focal_masses.push(focal); }
-        self.focal_masses.sort_by(|a, b| a.hypotheses.cmp(&b.hypotheses));
+        } else {
+            self.focal_masses.push(focal);
+        }
+        self.focal_masses
+            .sort_by(|a, b| a.hypotheses.cmp(&b.hypotheses));
     }
 
     pub fn combine_conjunctive(&self, other: &Self) -> Self {
-        let mut result = Self { frame: self.frame.clone(), focal_masses: vec![], conflict_mass: self.conflict_mass.saturating_add(other.conflict_mass) };
+        let mut result = Self {
+            frame: self.frame.clone(),
+            focal_masses: vec![],
+            conflict_mass: self.conflict_mass.saturating_add(other.conflict_mass),
+        };
         for left in &self.focal_masses {
             for right in &other.focal_masses {
-                let intersection: Vec<String> = left.hypotheses.iter().filter(|h| right.hypotheses.binary_search(h).is_ok()).cloned().collect();
+                let intersection: Vec<String> = left
+                    .hypotheses
+                    .iter()
+                    .filter(|h| right.hypotheses.binary_search(h).is_ok())
+                    .cloned()
+                    .collect();
                 let mass = ((left.mass as u64 * right.mass as u64) / MASS_TOTAL as u64) as u32;
-                if intersection.is_empty() { result.conflict_mass = result.conflict_mass.saturating_add(mass); }
-                else { result.add_focal(FocalMass { hypotheses: intersection, mass }); }
+                if intersection.is_empty() {
+                    result.conflict_mass = result.conflict_mass.saturating_add(mass);
+                } else {
+                    result.add_focal(FocalMass {
+                        hypotheses: intersection,
+                        mass,
+                    });
+                }
             }
         }
         result
@@ -128,11 +158,27 @@ impl EvidenceLedger {
     }
 
     pub fn belief(&self, proposition: &[String]) -> u32 {
-        self.focal_masses.iter().filter(|f| f.hypotheses.iter().all(|h| proposition.binary_search(h).is_ok())).map(|f| f.mass).sum()
+        self.focal_masses
+            .iter()
+            .filter(|f| {
+                f.hypotheses
+                    .iter()
+                    .all(|h| proposition.binary_search(h).is_ok())
+            })
+            .map(|f| f.mass)
+            .sum()
     }
 
     pub fn plausibility(&self, proposition: &[String]) -> u32 {
-        self.focal_masses.iter().filter(|f| f.hypotheses.iter().any(|h| proposition.binary_search(h).is_ok())).map(|f| f.mass).sum()
+        self.focal_masses
+            .iter()
+            .filter(|f| {
+                f.hypotheses
+                    .iter()
+                    .any(|h| proposition.binary_search(h).is_ok())
+            })
+            .map(|f| f.mass)
+            .sum()
     }
 
     /// Convert an evidence query into a bounded present-time attention value.
@@ -146,13 +192,28 @@ impl EvidenceLedger {
 pub fn ghost_lobby_evidence(event: &Event, event_id: &str) -> Option<EvidenceLedger> {
     let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
     let focal = match event {
-        Event::UsbThrown | Event::UsbTaken { seen: true } | Event::BillyTookUsb =>
-            FocalMass { hypotheses: vec!["usb".into()], mass: 2_500 },
-        Event::NoteExposed | Event::NoteSecured { seen: true } | Event::BillyTookNote =>
-            FocalMass { hypotheses: vec!["fridge_note".into()], mass: 2_500 },
+        Event::UsbThrown | Event::UsbTaken { seen: true } | Event::BillyTookUsb => FocalMass {
+            hypotheses: vec!["usb".into()],
+            mass: 2_500,
+        },
+        Event::NoteExposed | Event::NoteSecured { seen: true } | Event::BillyTookNote => {
+            FocalMass {
+                hypotheses: vec!["fridge_note".into()],
+                mass: 2_500,
+            }
+        }
         _ => return None,
     };
-    let mut ledger = EvidenceLedger::from_evidence(frame.clone(), vec![focal, FocalMass { hypotheses: frame, mass: 7_500 }]);
+    let mut ledger = EvidenceLedger::from_evidence(
+        frame.clone(),
+        vec![
+            focal,
+            FocalMass {
+                hypotheses: frame,
+                mass: 7_500,
+            },
+        ],
+    );
     ledger.conflict_mass = event_id.len() as u32 % 2;
     Some(ledger)
 }
@@ -173,7 +234,11 @@ impl GhostLobbySupervisor {
         Self {
             director: VsmDirector::new(0, 1),
             evidence: None,
-            team: OperatorTeam { id: team_id.into(), operators: vec![], attention: 0 },
+            team: OperatorTeam {
+                id: team_id.into(),
+                operators: vec![],
+                attention: 0,
+            },
             coverage_target: None,
             observed_events: 0,
         }
@@ -182,14 +247,22 @@ impl GhostLobbySupervisor {
     pub fn ingest(&mut self, events: &[Event]) {
         for event in events {
             self.observed_events = self.observed_events.saturating_add(1);
-            let Some(next) = ghost_lobby_evidence(event, &self.observed_events.to_string()) else { continue };
-            if let Some(current) = &mut self.evidence { current.combine_in_place(next); }
-            else { self.evidence = Some(next); }
+            let Some(next) = ghost_lobby_evidence(event, &self.observed_events.to_string()) else {
+                continue;
+            };
+            if let Some(current) = &mut self.evidence {
+                current.combine_in_place(next);
+            } else {
+                self.evidence = Some(next);
+            }
         }
         if let Some(evidence) = &self.evidence {
             let target = ["usb".into()];
-            self.director.allocate_from_evidence(&mut self.team, evidence, &target);
-            if self.team.attention > 0 { self.coverage_target = target.into_iter().next(); }
+            self.director
+                .allocate_from_evidence(&mut self.team, evidence, &target);
+            if self.team.attention > 0 {
+                self.coverage_target = target.into_iter().next();
+            }
         }
     }
 }
@@ -235,7 +308,9 @@ impl HypothesisLedger {
     /// Ties resolve to declaration order, making the result stable across
     /// platforms and independent of map iteration order.
     pub fn most_likely(&self) -> Option<&Hypothesis> {
-        self.hypotheses.iter().max_by_key(|hypothesis| hypothesis.confidence)
+        self.hypotheses
+            .iter()
+            .max_by_key(|hypothesis| hypothesis.confidence)
     }
 }
 
@@ -305,7 +380,10 @@ impl VsmDirector {
             return None;
         }
 
-        let target = self.current_difficulty.saturating_add(1).min(self.maximum_difficulty);
+        let target = self
+            .current_difficulty
+            .saturating_add(1)
+            .min(self.maximum_difficulty);
         Some(DifficultyProposal {
             from: self.current_difficulty,
             to: target,
@@ -331,7 +409,8 @@ impl VsmDirector {
             return false;
         }
         self.current_difficulty = proposal.to;
-        self.trace.push(VsmEvent::DifficultyProposalGenerated(proposal.clone()));
+        self.trace
+            .push(VsmEvent::DifficultyProposalGenerated(proposal.clone()));
         self.trace.push(VsmEvent::AdaptiveInterventionApplied {
             from: proposal.from,
             to: proposal.to,
@@ -366,13 +445,15 @@ mod tests {
     #[test]
     fn repeated_confident_tactic_proposes_bounded_intervention() {
         let mut director = VsmDirector::new(1, 2);
-        assert!(director
-            .observe(PlayerTacticObservation {
-                tactic_id: "hidden-route".into(),
-                occurrence: 1,
-                confidence: 80,
-            })
-            .is_none());
+        assert!(
+            director
+                .observe(PlayerTacticObservation {
+                    tactic_id: "hidden-route".into(),
+                    occurrence: 1,
+                    confidence: 80,
+                })
+                .is_none()
+        );
         let proposal = director
             .observe(PlayerTacticObservation {
                 tactic_id: "hidden-route".into(),
@@ -420,10 +501,8 @@ mod tests {
 
     #[test]
     fn ledger_can_hold_a_rational_but_wrong_usb_hypothesis() {
-        let mut ledger = HypothesisLedger::new([
-            "player_wants_usb".into(),
-            "player_wants_fridge_note".into(),
-        ]);
+        let mut ledger =
+            HypothesisLedger::new(["player_wants_usb".into(), "player_wants_fridge_note".into()]);
         ledger.observe(HypothesisEvidence {
             event_id: "usb-interest-1".into(),
             support: vec![("player_wants_usb".into(), 180)],
@@ -434,7 +513,10 @@ mod tests {
             support: vec![("player_wants_usb".into(), 180)],
             contrary: vec![],
         });
-        assert_eq!(ledger.most_likely().unwrap().proposition, "player_wants_usb");
+        assert_eq!(
+            ledger.most_likely().unwrap().proposition,
+            "player_wants_usb"
+        );
 
         // The player actually wanted the note, but the observer has not seen
         // that fact. Later evidence can revise the belief without erasing the
@@ -444,23 +526,50 @@ mod tests {
             support: vec![("player_wants_fridge_note".into(), 420)],
             contrary: vec![("player_wants_usb".into(), 260)],
         });
-        assert_eq!(ledger.most_likely().unwrap().proposition, "player_wants_fridge_note");
+        assert_eq!(
+            ledger.most_likely().unwrap().proposition,
+            "player_wants_fridge_note"
+        );
         assert_eq!(ledger.hypotheses[0].supporting_events.len(), 2);
-        assert_eq!(ledger.hypotheses[0].contrary_events, vec!["fridge-note-found"]);
+        assert_eq!(
+            ledger.hypotheses[0].contrary_events,
+            vec!["fridge-note-found"]
+        );
     }
 
     #[test]
     fn evidence_fixture_preserves_unknown_and_conflict() {
         let frame = vec!["front_door".into(), "ventilation".into(), "unknown".into()];
-        let first = EvidenceLedger::from_evidence(frame.clone(), vec![
-            FocalMass { hypotheses: vec!["ventilation".into()], mass: 4_000 },
-            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into()], mass: 4_000 },
-            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()], mass: 2_000 },
-        ]);
-        let second = EvidenceLedger::from_evidence(frame, vec![
-            FocalMass { hypotheses: vec!["front_door".into()], mass: 7_000 },
-            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()], mass: 3_000 },
-        ]);
+        let first = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![
+                FocalMass {
+                    hypotheses: vec!["ventilation".into()],
+                    mass: 4_000,
+                },
+                FocalMass {
+                    hypotheses: vec!["front_door".into(), "ventilation".into()],
+                    mass: 4_000,
+                },
+                FocalMass {
+                    hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()],
+                    mass: 2_000,
+                },
+            ],
+        );
+        let second = EvidenceLedger::from_evidence(
+            frame,
+            vec![
+                FocalMass {
+                    hypotheses: vec!["front_door".into()],
+                    mass: 7_000,
+                },
+                FocalMass {
+                    hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()],
+                    mass: 3_000,
+                },
+            ],
+        );
         let combined = first.combine_conjunctive(&second);
         let front = vec!["front_door".into()];
         assert!(combined.plausibility(&front) >= combined.belief(&front));
@@ -470,8 +579,32 @@ mod tests {
     #[test]
     fn evidence_fixture_supports_usb_then_note_revision() {
         let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
-        let usb = EvidenceLedger::from_evidence(frame.clone(), vec![FocalMass { hypotheses: vec!["usb".into()], mass: 6_000 }, FocalMass { hypotheses: frame.clone(), mass: 4_000 }]);
-        let note = EvidenceLedger::from_evidence(frame.clone(), vec![FocalMass { hypotheses: vec!["fridge_note".into()], mass: 7_000 }, FocalMass { hypotheses: frame, mass: 3_000 }]);
+        let usb = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![
+                FocalMass {
+                    hypotheses: vec!["usb".into()],
+                    mass: 6_000,
+                },
+                FocalMass {
+                    hypotheses: frame.clone(),
+                    mass: 4_000,
+                },
+            ],
+        );
+        let note = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![
+                FocalMass {
+                    hypotheses: vec!["fridge_note".into()],
+                    mass: 7_000,
+                },
+                FocalMass {
+                    hypotheses: frame,
+                    mass: 3_000,
+                },
+            ],
+        );
         let revised = usb.combine_conjunctive(&note);
         assert!(revised.conflict_mass > 0);
         assert!(revised.plausibility(&["fridge_note".into()]) > 0);
@@ -480,16 +613,37 @@ mod tests {
     #[test]
     fn ghost_lobby_deception_loop_reallocates_patrol_attention() {
         let frame = vec!["front_door".into(), "ventilation".into(), "unknown".into()];
-        let staged_vent = EvidenceLedger::from_evidence(frame.clone(), vec![
-            FocalMass { hypotheses: vec!["ventilation".into()], mass: 7_000 },
-            FocalMass { hypotheses: frame.clone(), mass: 3_000 },
-        ]);
-        assert_eq!(staged_vent.recommended_attention(&["ventilation".into()]), 100);
+        let staged_vent = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![
+                FocalMass {
+                    hypotheses: vec!["ventilation".into()],
+                    mass: 7_000,
+                },
+                FocalMass {
+                    hypotheses: frame.clone(),
+                    mass: 3_000,
+                },
+            ],
+        );
+        assert_eq!(
+            staged_vent.recommended_attention(&["ventilation".into()]),
+            100
+        );
 
-        let direct_front = EvidenceLedger::from_evidence(frame.clone(), vec![
-            FocalMass { hypotheses: vec!["front_door".into()], mass: 8_000 },
-            FocalMass { hypotheses: frame, mass: 2_000 },
-        ]);
+        let direct_front = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![
+                FocalMass {
+                    hypotheses: vec!["front_door".into()],
+                    mass: 8_000,
+                },
+                FocalMass {
+                    hypotheses: frame,
+                    mass: 2_000,
+                },
+            ],
+        );
         assert!(direct_front.recommended_attention(&["front_door".into()]) > 70);
         assert!(staged_vent.recommended_attention(&["front_door".into()]) < 70);
     }
@@ -497,22 +651,40 @@ mod tests {
     #[test]
     fn evidence_updates_operator_team_and_trace() {
         let frame = vec!["front_door".into(), "ventilation".into(), "unknown".into()];
-        let ledger = EvidenceLedger::from_evidence(frame, vec![
-            FocalMass { hypotheses: vec!["ventilation".into()], mass: 7_000 },
-            FocalMass { hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()], mass: 3_000 },
-        ]);
+        let ledger = EvidenceLedger::from_evidence(
+            frame,
+            vec![
+                FocalMass {
+                    hypotheses: vec!["ventilation".into()],
+                    mass: 7_000,
+                },
+                FocalMass {
+                    hypotheses: vec!["front_door".into(), "ventilation".into(), "unknown".into()],
+                    mass: 3_000,
+                },
+            ],
+        );
         let mut director = VsmDirector::new(0, 1);
-        let mut team = OperatorTeam { id: "patrol-a".into(), operators: vec![], attention: 0 };
+        let mut team = OperatorTeam {
+            id: "patrol-a".into(),
+            operators: vec![],
+            attention: 0,
+        };
         director.allocate_from_evidence(&mut team, &ledger, &["ventilation".into()]);
         assert_eq!(team.attention, 100);
-        assert!(matches!(director.trace.last(), Some(VsmEvent::TeamAttentionAllocated { team_id, attention: 100 }) if team_id == "patrol-a"));
+        assert!(
+            matches!(director.trace.last(), Some(VsmEvent::TeamAttentionAllocated { team_id, attention: 100 }) if team_id == "patrol-a")
+        );
     }
 
     #[test]
     fn ghost_lobby_events_feed_the_evidence_ledger() {
-        let evidence = ghost_lobby_evidence(&Event::UsbThrown, "usb-1").expect("USB event evidence");
+        let evidence =
+            ghost_lobby_evidence(&Event::UsbThrown, "usb-1").expect("USB event evidence");
         assert!(evidence.plausibility(&["usb".into()]) > 0);
-        assert!(ghost_lobby_evidence(&Event::LightsFlickered { third_use: false }, "noise").is_none());
+        assert!(
+            ghost_lobby_evidence(&Event::LightsFlickered { third_use: false }, "noise").is_none()
+        );
     }
 
     #[test]

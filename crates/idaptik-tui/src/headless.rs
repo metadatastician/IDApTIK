@@ -59,7 +59,9 @@ pub fn simulate_with_supervisor(
     supervisor.ingest(&startup);
     let mut log = startup;
     for input in expand(script) {
-        if sim.is_ended() { break; }
+        if sim.is_ended() {
+            break;
+        }
         let events = sim.tick(&input);
         supervisor.ingest(&events);
         log.extend(events);
