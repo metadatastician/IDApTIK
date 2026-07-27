@@ -89,9 +89,19 @@ just roundtrip-idaptik
 That command compiles the UMS Ghost Lobby profile source, hands the exact
 temporary artifact to IDApTIK's real package loader, executes a grounded camera
 uplink, snapshots, restores, replays, and fails unless events and final state
-match. The current Enaction evidence covers extracted interpolation parity;
-IDApTIK still uses Bevy's fixed-step accumulator, so no broader timing adoption
-is claimed.
+match.
+
+**Status:** that recipe is not yet on any `main` branch. It and the
+`ums-profiles` crate it needs currently exist only on the
+`idaptik-ums-canonical` branch `agent/idaptik-roundtrip`, pending the UMS
+repository consolidation. What *is* gated here is the game side of the
+boundary: `crates/idaptik-core/src/package.rs` loads, validates, runs,
+snapshots, restores and replay-checks a package under IDApTIK's own
+`cargo test`. The cross-repository round trip runs in no CI.
+
+The current Enaction evidence covers extracted interpolation parity; IDApTIK
+still uses Bevy's fixed-step accumulator, so no broader timing adoption is
+claimed.
 
 ## Licensing
 

@@ -1,6 +1,23 @@
 # Shared epistemic state-machine contract and repository boundaries
 
-Status: **draft v0.1**
+Status: **draft v0.2 — being split**
+
+This document currently does three jobs, and only one of them belongs in
+IDApTIK. Its own §5 states the rule *"one semantic authority per layer"* and
+assigns kernel event and state semantics to the Enaction Engine — yet the
+kernel semantics are written down here and nowhere else, which is the rule
+being broken by the document that states it.
+
+The split, tracked by ADR-0009 and ADR-0010:
+
+| Section | Destination |
+|---|---|
+| §2 reduction contract, §3 data model and invariants, §4 profiles | Move to `enaction-engine/docs/architecture/CAC-KERNEL.adoc`, which becomes normative |
+| §5 ownership, §6 hand-off flow, §7 validation and compatibility | **Stay here.** IDApTIK owns the versioned package boundary per ADR-0007 |
+| §8 first implementation slice | It is a schedule, not a contract. Moves to `docs/dev-notes/` |
+| §9 open decisions | Each is closed or given an owner below |
+
+Until `CAC-KERNEL.adoc` exists, §2–§4 remain here and remain authoritative.
 
 This document proposes the first shared contract for epistemic state machines
 (ESMs) across IDApTIK, the Enaction Engine, Universal Modding Studio (UMS),
@@ -123,6 +140,13 @@ The initial profile names are expected to be `idaptik/esm/v1` and
 
 ## 5. Ownership and repository boundaries
 
+**This table is a destination, not a description of the present tense.** The
+Enaction Engine holds no evidence ledger, no reduction kernel and no snapshot
+machinery today; the working implementations of all three are in
+`crates/idaptik-core/`, and ADR-0010 records the decision to keep them there
+until the extraction trigger fires. Read the table as where each concern
+*settles*, and ADR-0010 for where the code *is*.
+
 | Concern | Authoritative home | Other repositories may do |
 |---|---|---|
 | Kernel event/state semantics, ordering, replay, snapshots | Enaction Engine | consume, test, propose versioned changes |
@@ -191,16 +215,37 @@ they should not force the first kernel to settle the complete Slavia model.
 
 ## 9. Open decisions
 
-The following remain deliberately open and require an ADR when implementation
-begins:
+Each of the original seven is now closed or has a named owner. Nothing here is
+left open and unattributed.
 
-- canonical proposition language and identifier scheme;
-- probability/confidence representation and calibration;
-- merge semantics for concurrent observations;
-- maximum theory-of-mind depth and resource accounting;
-- signed package/envelope requirements;
-- exact Idris2/ACL2 proof boundary;
-- whether traces use JSON, CBOR, or another canonical encoding on the wire.
+| Decision | Disposition |
+|---|---|
+| Canonical proposition language and identifier scheme | **Open.** The hardest one, and it blocks a single ESM crate. Slavia has ground `Fact { predicate, args }`; IDApTIK has `proposition: String`; the ledger has a `HypothesisId` drawn from a declared frame. Sharp sub-question: *can a Dempster–Shafer focal set contain a non-ground proposition?* miniKanren's whole value is variables; DS frames are enumerated sets. If irreconcilable, "one kernel" weakens to "one trace, two reasoners". |
+| Probability/confidence representation and calibration | **Closed** by Enaction ADR-0016. Fixed-point `Mass` in units of 1/10,000, typed as a justification budget rather than a probability. `Read` is a solution-set cardinality and has no numeric conversion. |
+| Merge semantics for concurrent observations | Deferred to the evidence crate's combination policies. Moot under delay-lockstep, where total order comes from the envelope; not moot under the relay with several independent observers. |
+| Maximum theory-of-mind depth and resource accounting | **Open.** No depth policy exists anywhere in the estate. Note the trap: a cap denominated in *milliseconds* fires at different points on two machines and breaks byte-parity. Any cap must be counted in deterministic units — inferences, unifications, stream nodes. |
+| Signed package/envelope requirements | Already owned by IDApTIK ADR-0007. |
+| Exact Idris2/ACL2 proof boundary | **Open.** Related: nobody has yet said what "verified" *means* here. Both the action-verification gate and the loop diagram place a verifier in the conative path, and both are mocks. Whatever the answer, a veto must be an event — a silent substitution that never appears in the trace violates the provenance invariants in §3. |
+| JSON, CBOR or another canonical wire encoding | **Closed** by Enaction ADR-0015. Canonical CBOR for bytes and parity comparison, JSON for human-readable fixtures, with a round-trip equality test between them. |
 
-Until those decisions are accepted, this document is a design contract, not a
-claim that the complete ESM already exists in any repository.
+Further open problems identified since v0.1, recorded here so they are not
+silently assumed:
+
+- **Frames do not compose.** DS requires a declared frame per question; Slavia's
+  belief space is open-ended. What happens to evidence about a proposition
+  outside every declared frame is undecided.
+- **Affect's clock is undecided**, and it sets the scale ceiling. Per-tick,
+  event-gated, or reduced-rate with algedonic interrupts?
+- **Is affect state, or annotation?** This document permits only an optional
+  annotation on events. A continuous appraisal layer is state with its own
+  dynamics. The contract does not yet say which.
+- **The 1:1 domain/stage correspondence is unvalidated.** Six trace domains map
+  exactly onto six Ghost Lobby guard stages — for *one* scenario. Either a deep
+  result about appraisal structure, or one camera-failure sequence frozen into a
+  kernel enum. A second scenario with a different natural stage count settles it.
+- **Nothing has been benchmarked.** No measurement exists anywhere in the estate
+  for a solver query, a ledger combine, or a tick of affect. Every scale claim
+  is unmeasured.
+
+This document remains a design contract, not a claim that the complete ESM
+exists in any repository.

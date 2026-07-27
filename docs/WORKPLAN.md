@@ -2,9 +2,10 @@
 
 Status: **organised first draft — 2026-07-26**
 
-This is the public work queue. It deliberately describes AI work at the level
-of contracts and observable behaviour. Detailed model design belongs in the
-private canonical UMS repository.
+This is the work queue. Detailed cognitive-model design is documented here in
+the open, alongside the code that implements it, under `docs/architecture/` and
+`docs/dev-notes/` — see ADR-0011, which withdrew the earlier rule sending it to
+a private repository.
 
 ## Now: deterministic foundations
 
