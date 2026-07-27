@@ -4,13 +4,22 @@ A running log of what in IDApTIK is a candidate to lift into a standalone
 runtime, where it is currently welded to this game, and what it would have to
 become to stand alone.
 
-The destination is **`metadatastician/affective-engine`**. IDApTIK is the
-proving ground: things get built here, used in anger, and only generalised once
+The destination is **`metadatastician/enaction-engine`**, renamed from
+`affective-engine`. IDApTIK is the proving ground: things get built here, used in anger, and only generalised once
 they have taught us something. Nothing in this repo depends on that one, and
-that is deliberate — see [Why there is no dependency](#why-there-is-no-dependency).
+that is deliberate — see [Why there is no dependency](#why-there-is-no-dependency)
+and ADR-0009, which states the conditions under which a dependency becomes
+permissible.
 
 Scope today: **fixed-timestep render interpolation** (`crates/idaptik-core/src/interp.rs`).
 This document grows as further subsystems become extraction candidates.
+
+**This document is also the extraction-trigger evidence log.** Enaction
+ADR-0017 requires three things before code moves: a second caller whose want
+was recorded first, bidirectional conformance fixtures, and *a recorded
+surprise* — at least one documented case where the naive boundary was wrong.
+The five coupling boundaries and two measured float results below are what a
+recorded surprise looks like. A candidate with none has not been used in anger.
 
 ---
 
@@ -95,7 +104,7 @@ stall does not try to catch up forever and fall further behind). This is the one
 piece that genuinely cannot be copied out of this repo, because it does not
 exist here.
 
-That asymmetry is the reason `affective-engine`'s crate is not a mirror of
+That asymmetry is the reason `enaction-engine`'s crate is not a mirror of
 `interp.rs`, and it is worth stating plainly: **the extraction is not a copy.**
 
 ---
@@ -153,7 +162,9 @@ fails a test rather than living in a comment.
 
 ## 3. Why there is no dependency
 
-`IDApTIK` does **not** depend on `affective-engine`, and should not yet.
+`IDApTIK` does **not** depend on `enaction-engine`, and should not yet.
+ADR-0009 now states this as a decision with exit conditions rather than as an
+absence.
 
 A cross-repo build dependency now would freeze the interface before the
 prototype has taught us anything — and the whole premise of the proving ground
@@ -162,7 +173,7 @@ are hypotheses about what generalisation will need; at least one of them is
 probably wrong, and finding out is cheaper while the two trees are independent.
 
 The cost is a real one and worth naming: the generic half of `interp.rs` and its
-counterpart in `affective-engine` will drift. That is accepted for now. The
+counterpart in `enaction-engine` will drift. That is accepted for now. The
 trigger to reconsider is a **second** host wanting the same buffers — the TUI,
 another graphical frontend, or `idaptik-net`'s resync path. At that point the duplication
 starts costing more than the coupling would, and this section should be revised

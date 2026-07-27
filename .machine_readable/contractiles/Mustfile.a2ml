@@ -60,9 +60,12 @@ target IDApTIK's real tree, not a generic template.
 ## Directory Structure
 
 ### crates-workspace
-- description: The Rust workspace crates exist (core + ffi + tui + bevy + fyrox)
-- run: test -d crates/idaptik-core && test -d crates/idaptik-ffi && test -d crates/idaptik-tui && test -d crates/idaptik-bevy && test -d crates/idaptik-fyrox
+- description: The Rust workspace crates exist (core + ffi + tui + net + bevy)
+- run: test -d crates/idaptik-core && test -d crates/idaptik-ffi && test -d crates/idaptik-tui && test -d crates/idaptik-net && test -d crates/idaptik-bevy
 - severity: critical
+- notes: idaptik-fyrox was retired by ADR-0008; idaptik-net landed with the
+  delay-lockstep netplay work. This check named the retired crate and omitted
+  the live one, so it failed against the real tree.
 
 ### server-and-config
 - description: The Elixir server relay and the Nickel config dir exist
@@ -70,9 +73,49 @@ target IDApTIK's real tree, not a generic template.
 - severity: critical
 
 ### adr-records
-- description: The architecture decision records exist (ADR-0001..0006)
-- run: test -f docs/adr/0001-toolchain-and-runtime-management.md && test -f docs/adr/0006-gossamer-host-and-burble-transport.md
+- description: The architecture decision records exist (ADR-0001..0008)
+- run: test -f docs/adr/0001-toolchain-and-runtime-management.md && test -f docs/adr/0007-versioned-ums-package-boundary.md && test -f docs/adr/0008-select-bevy-and-retire-fyrox.md
 - severity: warning
+
+## Architecture Boundary
+
+# These invariants are the executable form of the estate boundary ADRs. Each
+# is checkable with no sibling repository present: a check that silently skips
+# when a sibling is absent is not a check. The cross-repository half lives in
+# idaptik-ums/scripts/check-architecture-boundaries.sh.
+
+### no-authoring-dependency
+- description: The game runtime never links the authoring studio or another game
+- run: ! grep -rqE '^[[:space:]]*(ums-[a-z-]+|slavia-[a-z-]+)[[:space:]]*=' Cargo.toml crates/*/Cargo.toml
+- severity: critical
+- notes: A shipped game must build and run with no UMS source or binaries
+  present. UMS consumes contracts/idaptik/v1/*.json as data, never as a crate.
+
+### cac-kernel-is-fixed-point
+- description: The evidence ledger and VSM supervisor carry no IEEE floats
+- run: ! grep -qE '\b(f32|f64)\b' crates/idaptik-core/src/scenario/vsm.rs
+- severity: critical
+- notes: |
+  This is the CAC surface being grown here for eventual extraction to the
+  Enaction kernel, so it is held to the kernel's fixed-point rule now rather
+  than converted later. A comparison against a threshold turns a float into a
+  discrete decision, and that is where a 1-ULP difference becomes a divergent
+  replay and a desynced lockstep peer.
+
+  Scope is deliberately narrow and reflects the tree as it is. The rest of
+  crates/idaptik-core/src/scenario/ uses f64 for continuous world quantities
+  under the byte-parity regime of ADR-0004 §5, and that stays permitted.
+  crates/idaptik-core/src/interp.rs is f64 by design: interpolation output
+  never re-enters simulation.
+
+  Known gap, not yet enforced: actor/belief.rs (6), trace.rs (3) and
+  agents.rs (1) still hold floats. Each must become fixed-point before it
+  feeds the ledger. Widen this check as they convert; do not widen it first.
+
+### package-contract-published
+- description: The versioned package contract IDApTIK owns is complete (ADR-0007)
+- run: test -f contracts/idaptik/v1/contract.json && test -f contracts/idaptik/v1/package.schema.json && test -f contracts/idaptik/v1/fixtures/ghost-lobby-scenario.json
+- severity: critical
 
 ## Machine-Readable Structure
 

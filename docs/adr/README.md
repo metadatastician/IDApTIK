@@ -13,6 +13,9 @@ asserted in the README and quietly contradicted later.
 | [0006](0006-gossamer-host-and-burble-transport.md) | gossamer host window + burble transport: two-player windowed slice | Accepted (design; implementation deferred) |
 | [0007](0007-versioned-ums-package-boundary.md) | IDApTIK owns the versioned UMS package boundary | Accepted |
 | [0008](0008-select-bevy-and-retire-fyrox.md) | Select Bevy and retire the Fyrox evaluation frontend | Accepted |
+| [0009](0009-enaction-kernel-dependency-direction.md) | Enaction kernel dependency direction; IDApTIK publishes `idaptik/esm/v1` | Accepted |
+| [0010](0010-cac-kernel-grown-in-idaptik-core.md) | The CAC kernel is grown in `idaptik-core`, not extracted yet | Accepted |
+| [0011](0011-cognitive-model-documented-in-the-open.md) | Cognitive-model work is documented in the open | Accepted |
 
 New ADRs: copy the format of an existing one, take the next number, and add a row
 above.
