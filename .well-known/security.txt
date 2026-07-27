@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# RFC 9116 — security.txt
+# https://securitytxt.org/
+#
+# Served from https://idaptik.net/.well-known/security.txt via GitHub Pages.
+# idaptik.net's DNS is at Cloudflare, but the record is DNS-only and the site
+# is served by GitHub Pages (A records 185.199.108-111.153), so this file has
+# to be copied into the Pages artifact by .github/workflows/pages.yml rather
+# than configured at the CDN.
+
+Contact: https://github.com/metadatastician/IDApTIK/security/advisories/new
+Contact: mailto:jonathan.jewell@gmail.com
+Expires: 2027-07-27T23:59:59.000Z
+Encryption: https://github.com/metadatastician.gpg
+Preferred-Languages: en
+Canonical: https://idaptik.net/.well-known/security.txt
+Policy: https://github.com/metadatastician/IDApTIK/blob/main/SECURITY.md
