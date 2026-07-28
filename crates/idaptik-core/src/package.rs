@@ -91,6 +91,45 @@ pub struct GamePackage {
     pub guarantees: PackageGuarantees,
 }
 
+/// The loader's own parsed view of the fields a UMS author actually writes.
+///
+/// Exported so an editor can prove its authored content survived the trip into
+/// the game's types, rather than merely that the game accepted *something*.
+///
+/// Deliberately excludes `scenario`. The compiler copies the game-owned fixture
+/// at `contracts/idaptik/v1/fixtures/` into the package verbatim, so comparing
+/// that field back would prove only that serde round-trips JSON -- a tautology
+/// dressed as a contract test. The fields below are the envelope the author
+/// composes, and the ones a compiler bug could plausibly corrupt: a dropped
+/// taxonomy term, a rebound actor, reordered or retimed commands, a changed
+/// seed or tick budget.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AcceptedEnvelope {
+    pub scenario_id: String,
+    pub seed: u32,
+    pub run_ticks: u64,
+    pub snapshot_tick: u64,
+    pub taxonomy: BTreeMap<String, String>,
+    pub actors: Vec<PackageActor>,
+    pub commands: Vec<ScheduledCommand>,
+    pub guarantees: PackageGuarantees,
+}
+
+impl From<&GamePackage> for AcceptedEnvelope {
+    fn from(p: &GamePackage) -> Self {
+        AcceptedEnvelope {
+            scenario_id: p.scenario_id.clone(),
+            seed: p.seed,
+            run_ticks: p.run_ticks,
+            snapshot_tick: p.snapshot_tick,
+            taxonomy: p.taxonomy.clone(),
+            actors: p.actors.clone(),
+            commands: p.commands.clone(),
+            guarantees: p.guarantees.clone(),
+        }
+    }
+}
+
 /// A package accepted by both envelope and gameplay-semantic validation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoadedPackage {
@@ -269,6 +308,10 @@ pub struct RoundTripResult {
     pub final_snapshot: RuntimeSnapshot,
     pub replay_equal: bool,
     pub package_guarantees_met: bool,
+    /// What the loader actually built from the authored envelope. ADR-0014
+    /// requires the round trip to compare against the post-edit model; without
+    /// this the gate could only show the package was accepted and replayed.
+    pub accepted: AcceptedEnvelope,
 }
 
 fn event_name(event: &Event) -> Option<String> {
@@ -332,6 +375,9 @@ fn commands_at(package: &GamePackage, tick: u64) -> Vec<Command> {
 
 /// Execute, snapshot, restore and replay one accepted package.
 pub fn run_package(loaded: LoadedPackage) -> Result<RoundTripResult, PackageError> {
+    // Capture the loader's parsed view before the package is consumed, so the
+    // result can carry what was actually built rather than what was submitted.
+    let accepted = AcceptedEnvelope::from(&loaded.package);
     let package = loaded.package;
     let cfg = RunConfig::standard();
     let mut sim = GhostLobbySim::new(package.scenario.clone(), cfg, package.seed)
@@ -392,6 +438,7 @@ pub fn run_package(loaded: LoadedPackage) -> Result<RoundTripResult, PackageErro
         final_snapshot,
         replay_equal,
         package_guarantees_met: true,
+        accepted,
     })
 }
 
@@ -483,6 +530,55 @@ mod tests {
                 GuardTraceStage::TeamProtectionContext,
             ]
         );
+    }
+
+    /// ADR-0014 asks the round trip to compare against the post-edit model, not
+    /// merely to show the package was accepted. This pins that the loader's own
+    /// parsed envelope equals what was authored, field for field.
+    #[test]
+    fn accepted_envelope_matches_what_was_authored() {
+        let authored = package();
+        let json = serde_json::to_string(&authored).expect("serialize package");
+        let loaded = load_package(&json).expect("load package");
+        let result = run_package(loaded).expect("run package");
+
+        let a = &result.accepted;
+        assert_eq!(a.scenario_id, authored.scenario_id);
+        assert_eq!(a.seed, authored.seed);
+        assert_eq!(a.run_ticks, authored.run_ticks);
+        assert_eq!(a.snapshot_tick, authored.snapshot_tick);
+        assert_eq!(a.taxonomy, authored.taxonomy, "a taxonomy term was lost");
+        assert_eq!(a.actors, authored.actors, "an actor was rebound or dropped");
+        assert_eq!(
+            a.commands, authored.commands,
+            "commands were retimed or reordered"
+        );
+        assert_eq!(a.guarantees, authored.guarantees);
+    }
+
+    /// The comparison above is only worth having if it can fail. A package
+    /// whose taxonomy is short of a term must not load at all -- and if the
+    /// loader ever grew lenient, the equality above would catch it instead.
+    #[test]
+    fn a_dropped_taxonomy_term_cannot_reach_the_accepted_envelope() {
+        let mut short = package();
+        short
+            .taxonomy
+            .remove("room")
+            .expect("fixture has a room term");
+        let json = serde_json::to_string(&short).expect("serialize package");
+        match load_package(&json) {
+            Err(PackageError::MissingTaxonomyTerm(term)) => assert_eq!(term, "room"),
+            Err(other) => panic!("rejected, but for the wrong reason: {other:?}"),
+            Ok(loaded) => {
+                let result = run_package(loaded).expect("run package");
+                assert_ne!(
+                    result.accepted.taxonomy,
+                    package().taxonomy,
+                    "loader accepted a short taxonomy AND reported it as authored"
+                );
+            }
+        }
     }
 
     #[test]
