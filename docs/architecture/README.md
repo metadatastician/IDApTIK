@@ -3,6 +3,8 @@
 IDApTIK documents describe stable interfaces, ownership, determinism, and
 integration boundaries.
 
+- [**Estate status**](ESTATE-STATUS.md) — start here: where IDApTIK sits in the
+  four-repository estate, what is enforced rather than written down, and what is open
 - [ESM contract and repository boundaries](esm-contract-and-repo-boundaries.md)
 - [UMS package contract ownership](ums-package-contract.md)
 - [Repository architecture](../ARCHITECTURE.md)
