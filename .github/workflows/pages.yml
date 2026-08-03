@@ -49,7 +49,9 @@ jobs:
       # the repository and 404s on the site, which is the same as not having one.
       - name: Publish .well-known/security.txt
         run: |
-          set -euo pipefail
+          # The idris2-pack container has no bash, so this step runs under dash;
+          # `set -o pipefail` is a bashism that aborts the step at line 1 there.
+          set -eu
           test -f .well-known/security.txt
           mkdir -p _site/.well-known
           cp .well-known/security.txt _site/.well-known/security.txt
