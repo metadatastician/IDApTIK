@@ -11,7 +11,11 @@
 Contact: https://github.com/metadatastician/IDApTIK/security/advisories/new
 Contact: mailto:jonathan.jewell@gmail.com
 Expires: 2027-07-27T23:59:59.000Z
-Encryption: https://github.com/metadatastician.gpg
+# No Encryption field. https://github.com/metadatastician.gpg returns HTTP 200
+# but its body is "This user hasn't uploaded any GPG keys" -- an empty key
+# block, not a key. Encryption is optional under RFC 9116, and pointing a
+# researcher at a page with no key is worse than omitting the field. Add it
+# when a key is actually published.
 Preferred-Languages: en
 Canonical: https://idaptik.net/.well-known/security.txt
 Policy: https://github.com/metadatastician/IDApTIK/blob/main/SECURITY.md
