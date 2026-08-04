@@ -80,6 +80,20 @@ defmodule IdaptikServerWeb.SessionChannelTest do
       assert_push "command", ^payload
     end
 
+    test "delivers the hacker's Net View verbs (previously rejected as unknown)" do
+      {_reply, _infil} = join!("c9", "infiltrator")
+      {_reply, hacker} = join!("c9", "hacker")
+
+      for payload <- [
+            %{"cmd" => "NetSsh", "node" => 0},
+            %{"cmd" => "NetHack", "node" => 3}
+          ] do
+        ref = push(hacker, "command", payload)
+        assert_reply ref, :ok, %{"relayed" => true}
+        assert_push "command", ^payload
+      end
+    end
+
     test "delivers infiltrator body verbs to the hacker verbatim" do
       {_reply, infil} = join!("c2", "infiltrator")
 
