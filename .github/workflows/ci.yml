@@ -1,3 +1,4 @@
+# This workflow is managed by gh actions-lock.
 # Build + test CI for IDApTIK. These jobs mirror the real local gates:
 #
 #   just test-ghost           -> cargo test (core/tui/ffi) + clippy -D warnings + fmt --check
@@ -98,7 +99,7 @@ jobs:
       - name: Provision pinned Rust toolchain (rust-toolchain.toml)
         run: rustup show
       - name: Provision Erlang/Elixir (versions mirror mise.toml)
-        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        uses: erlef/setup-beam@v1.24.1
         with:
           otp-version: "28.3.1"
           elixir-version: "1.19.5"
