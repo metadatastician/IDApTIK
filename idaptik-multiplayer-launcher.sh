@@ -78,6 +78,7 @@ preflight_common() {
 preflight_host() {
   preflight_common
   need mix "to run the relay (host only)" "install Elixir/OTP (e.g. via mise: 'mise install')"
+  need curl "to poll relay readiness (host only)" "install curl from your package manager"
 }
 
 build_seat() {
@@ -106,7 +107,9 @@ start_relay() {
   mkdir -p "$LOG_DIR"
   say "starting the relay on :$PORT (log: $LOG_FILE)…"
   (cd "$REPO_DIR/server" && mix deps.get >/dev/null)
-  (cd "$REPO_DIR/server" && IDAPTIK_PORT="$PORT" exec mix phx.server >>"$LOG_FILE" 2>&1) &
+  # IDAPTIK_BIND=all: the dev endpoint binds loopback-only by default, which
+  # would make every remote join fail — hosting is the whole point here.
+  (cd "$REPO_DIR/server" && IDAPTIK_BIND=all IDAPTIK_PORT="$PORT" exec mix phx.server >>"$LOG_FILE" 2>&1) &
   echo $! > "$PID_FILE"
   local waited=0
   until relay_up; do
