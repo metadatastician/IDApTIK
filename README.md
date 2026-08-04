@@ -62,6 +62,10 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
 
 Still open: persistence/versioning and the long-term Rust↔Elixir wire encoding.
 
+Two-player netplay is driven by `./idaptik-multiplayer-launcher.sh` (`host` /
+`join`, see `--help`); hit an `ended_no_peer` or a stuck terminal? See
+[`docs/MULTIPLAYER-TROUBLESHOOTING.md`](docs/MULTIPLAYER-TROUBLESHOOTING.md).
+
 ## Layout
 
 ```

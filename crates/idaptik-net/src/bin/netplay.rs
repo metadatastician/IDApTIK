@@ -59,6 +59,11 @@ struct Cli {
     #[arg(long, default_value_t = 3)]
     input_delay: u64,
     /// Fresh seat: wait this long for a peer. Rejoining seat: for the resync.
+    /// Each seat's countdown starts independently from when THAT seat begins
+    /// waiting, not from the other seat's start — two humans coordinating an
+    /// address by voice/chat can easily burn the default 15s before both
+    /// commands run, and both then see ended_no_peer. See
+    /// docs/MULTIPLAYER-TROUBLESHOOTING.md.
     #[arg(long, default_value_t = 15_000)]
     join_timeout_ms: u64,
     /// Silence threshold while blocked on the peer (loss detection).

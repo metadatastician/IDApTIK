@@ -33,6 +33,11 @@
 # WireGuard tunnel between the two machines is the easiest way (then the
 # address is the host's tailnet IP); otherwise forward TCP 4000 on the
 # host's router.
+#
+# Hit ended_no_peer, or a blank terminal after a session? See
+# docs/MULTIPLAYER-TROUBLESHOOTING.md — covers the WSL2 NAT address trap
+# (see share_addresses() below), the 15s join-timeout window, and terminal
+# cleanup after a live session ends.
 # ============================================================================
 
 set -euo pipefail

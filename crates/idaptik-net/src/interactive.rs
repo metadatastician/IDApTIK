@@ -97,6 +97,11 @@ impl TerminalFrontend {
 }
 
 impl Drop for TerminalFrontend {
+    // Every call below is best-effort (`let _ =`): if one fails, the failure
+    // is silent and the terminal can be left raw/alternate-screen/cursor-
+    // hidden even after a session that otherwise ended cleanly. `reset` at
+    // the shell (typed blind) recovers it; see
+    // docs/MULTIPLAYER-TROUBLESHOOTING.md.
     fn drop(&mut self) {
         if self.enhanced {
             let _ = execute!(self.terminal.backend_mut(), PopKeyboardEnhancementFlags);
