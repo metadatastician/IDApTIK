@@ -39,11 +39,13 @@ defmodule IdaptikServerWeb.SessionChannel do
     "Jump" => "infiltrator",
     "Interact" => "infiltrator",
     "ThrowUsb" => "infiltrator",
-    # The hacker's uplink and pivot verbs (pivots are hacker-side: they move
-    # where the hacker plays *from*, never the body).
+    # The hacker's uplink, pivot and Net View verbs (pivots are hacker-side:
+    # they move where the hacker plays *from*, never the body).
     "Uplink" => "hacker",
     "Pivot" => "hacker",
     "Unpivot" => "hacker",
+    "NetSsh" => "hacker",
+    "NetHack" => "hacker",
     # Session and test immediates — either seat.
     "Pause" => :either,
     "Restart" => :either,
