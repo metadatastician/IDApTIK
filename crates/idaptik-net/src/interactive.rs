@@ -31,6 +31,9 @@ use idaptik_tui::keymap::map_key;
 use idaptik_tui::render;
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Paragraph};
 use std::io;
 use std::time::Duration;
 
@@ -168,6 +171,40 @@ impl LiveFrontend for TerminalFrontend {
         self.terminal
             .draw(|f| render::draw(f, sim, log, hint))
             .is_ok()
+    }
+
+    fn notice(&mut self) {
+        // Drawn while there is no simulation yet (the bring-up wait). Without
+        // it the player stares at an unpainted alternate screen and cannot
+        // tell waiting from crashed.
+        let seat = match self.role {
+            Role::Infiltrator => "infiltrator",
+            Role::Hacker => "hacker",
+        };
+        let msg = self
+            .status_line
+            .clone()
+            .unwrap_or_else(|| "connecting…".to_owned());
+        let _ = self.terminal.draw(|f| {
+            let body = Paragraph::new(vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    msg,
+                    Style::default().add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(format!("you are the {seat}")),
+                Line::from("the round starts the moment the other seat arrives"),
+                Line::from(""),
+                Line::from("Ctrl-C to give up waiting"),
+            ])
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title(" IDApTIK — Ghost Lobby "),
+            );
+            f.render_widget(body, f.area());
+        });
     }
 
     fn status(&mut self, status: LiveStatus) {
