@@ -47,6 +47,13 @@ NETPLAY_BIN="$REPO_DIR/target/release/idaptik-netplay"
 PORT="${IDAPTIK_PORT:-4000}"
 SESSION_DEFAULT="ghost-lobby"
 
+# How long a seated player waits for the other to arrive. The seat binary
+# defaults to 15 s, which is a machine-to-machine value; humans swapping an
+# address over chat need minutes. Override with IDAPTIK_WAIT_MS if you want.
+JOIN_TIMEOUT_MS="${IDAPTIK_WAIT_MS:-600000}"
+# And how long the run is held open for a dropped player to rejoin.
+REJOIN_WINDOW_MS="${IDAPTIK_REJOIN_MS:-300000}"
+
 PID_FILE="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/idaptik-relay.pid"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/idaptik-multiplayer"
 LOG_FILE="$LOG_DIR/relay.log"
@@ -208,9 +215,16 @@ seat_url() {
 run_seat() { # $1 url  $2 role  $3 session
   say "seat: $2 · session: $3 · relay: $1"
   say "keys: arrows/WASD move · E interact · Q throw · 1-4 uplinks · p/isp/grid pivots · Esc quits"
+  # Two humans coordinating over chat need minutes, not the seat binary's
+  # 15-second default: whoever sits down first waits while the other copies an
+  # address, sends it, and types the join. A 15 s window meant both seats
+  # timed out with `ended_no_peer` having never overlapped, which reads as
+  # "it doesn't work" when in fact the relay and the network were fine.
   exec "$NETPLAY_BIN" --interactive \
     --url "$1" --session "$3" --role "$2" \
-    --script "$RUN_CONFIG"
+    --script "$RUN_CONFIG" \
+    --join-timeout-ms "$JOIN_TIMEOUT_MS" \
+    --rejoin-window-ms "$REJOIN_WINDOW_MS"
 }
 
 # ----------------------------------------------------------------------------
