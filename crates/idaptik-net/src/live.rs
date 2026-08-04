@@ -79,6 +79,14 @@ pub trait LiveFrontend: InputFeed {
     fn frame(&mut self, sim: &GhostLobbySim, fresh: &[Event]) -> bool;
     /// The session changed state in a way worth surfacing.
     fn status(&mut self, status: LiveStatus);
+    /// Paint the current status on its own, with no simulation to draw.
+    ///
+    /// The bring-up wait happens *before* a `LockstepCore` exists, so `frame`
+    /// cannot run yet — without this the interactive seat enters the alternate
+    /// screen and paints nothing, leaving a black rectangle indistinguishable
+    /// from a crash for the whole time a player waits for their partner.
+    /// Defaulted to nothing: the scripted seat has no screen.
+    fn notice(&mut self) {}
 }
 
 /// A completed run's artifacts — the same blob the batch seat leaves behind.
@@ -122,6 +130,7 @@ pub async fn run_live_seat<T: SessionTransport, F: LiveFrontend>(
         .await?;
     push_control(client, &hello).await?;
     fe.status(LiveStatus::WaitingForPeer);
+    fe.notice();
 
     // -- Bring-up: fresh hello barrier, or adopt the survivor's resync -------
     let mut core = if cfg.rejoin {
