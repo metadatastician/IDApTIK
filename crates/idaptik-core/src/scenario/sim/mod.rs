@@ -909,8 +909,6 @@ impl GhostLobbySim {
         );
     }
 
-    /// Move Billy toward a target x at `speed`, handling door-blocking and the
-    /// badge-through behaviour (emitting `BillyBadgedDoor` under an 8 s throttle).
     /// Whether Billy is still pressed against the closed door that last blocked
     /// him, wanting the far side. True on the non-colliding ticks of a door
     /// wait: he is within reach of the plane and his target lies beyond it.
@@ -934,6 +932,8 @@ impl GhostLobbySim {
         (target_x - door.x) * side < 0.0
     }
 
+    /// Move Billy toward a target x at `speed`, handling door-blocking and the
+    /// badge-through behaviour (emitting `BillyBadgedDoor` under an 8 s throttle).
     pub(crate) fn move_billy_toward(&mut self, target_x: f64, speed: f64) {
         let dt = TICK_DT;
         let old_x = self.state.billy.x;
