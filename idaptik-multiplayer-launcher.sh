@@ -58,6 +58,21 @@ LOG_FILE="$LOG_DIR/relay.log"
 say()  { printf '%s\n' "$*"; }
 die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
 
+# WSL2's virtual adapter is NAT'd behind Windows: an address from it is
+# unreachable from any other machine, so the share banner must not offer it.
+is_wsl() { grep -qi microsoft /proc/version 2>/dev/null; }
+
+# True when running under WSL *and* holding an address in WSL's NAT block
+# (172.16/12). WSL2 mirrored networking (Windows 11 22H2+) shares the host's
+# real LAN address instead and is reachable, so it must not be warned about.
+wsl_natted() {
+  is_wsl || return 1
+  case "$1" in
+    172.1[6-9].*|172.2[0-9].*|172.3[01].*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 build_sha() { git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown; }
 platform()  { echo "$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"; }
 
@@ -137,15 +152,46 @@ stop_relay() {
 share_addresses() {
   say ""
   say "── tell the other player ──────────────────────────────────"
+  local shared=0
+
   if command -v tailscale >/dev/null 2>&1; then
     local ts
     ts="$(tailscale ip -4 2>/dev/null | head -1 || true)"
-    [ -n "$ts" ] && say "  tailnet:  ./idaptik-multiplayer-launcher.sh join $ts"
+    if [ -n "$ts" ]; then
+      say "  tailnet:  ./idaptik-multiplayer-launcher.sh join $ts"
+      shared=1
+    fi
   fi
+
   local lan
   lan="$(ip -4 route get 1.1.1.1 2>/dev/null | grep -oP 'src \K[0-9.]+' | head -1 || true)"
-  [ -n "$lan" ] && say "  LAN:      ./idaptik-multiplayer-launcher.sh join $lan"
-  say "  (internet without a tunnel: forward TCP $PORT, share your public IP)"
+
+  if [ -n "$lan" ] && wsl_natted "$lan"; then
+    # WSL2's default (NAT) networking puts this machine behind an adapter only
+    # Windows can see through, so the address is unreachable from anywhere else
+    # — and forwarding the router port cannot help, because the router cannot
+    # see past Windows either. WSL2 *mirrored* networking shares the host's real
+    # LAN address and is fine, which is why this keys on the address, not on
+    # merely running under WSL.
+    say "  WARNING: WSL2 NAT detected. $lan is a virtual adapter behind Windows"
+    say "  and is NOT reachable from another machine, even on the same network."
+    if [ "$shared" -eq 0 ]; then
+      say "    Fix (once, both machines): install Tailscale, then re-run host —"
+      say "      curl -fsSL https://tailscale.com/install.sh | sh && sudo tailscale up"
+      say "    Alternative: forward TCP $PORT on the router AND add a Windows"
+      say "    portproxy to $lan (netsh interface portproxy)."
+    fi
+  elif [ -n "$lan" ]; then
+    say "  LAN:      ./idaptik-multiplayer-launcher.sh join $lan"
+    shared=1
+  fi
+
+  # Always leave a route out: a host with no detectable address still needs to
+  # know the fallback, and so does one whose LAN address works locally but not
+  # from outside.
+  if [ "$shared" -eq 0 ] || [ -n "$lan" ]; then
+    say "  (internet without a tunnel: forward TCP $PORT, share your public IP)"
+  fi
   say "───────────────────────────────────────────────────────────"
   say ""
 }
