@@ -909,6 +909,29 @@ impl GhostLobbySim {
         );
     }
 
+    /// Whether Billy is still pressed against the closed door that last blocked
+    /// him, wanting the far side. True on the non-colliding ticks of a door
+    /// wait: he is within reach of the plane and his target lies beyond it.
+    fn still_pressed_at_door(&self, target_x: f64) -> bool {
+        let Some(di) = self.state.billy.blocked_door else {
+            return false;
+        };
+        let Some(door) = self.state.doors.get(di) else {
+            return false;
+        };
+        if door.open > 0.0 {
+            return false;
+        }
+        let center = self.state.billy.x + self.def.billy.w / 2.0;
+        let side = center - door.x;
+        if side.abs() > c::BILLY_DOOR_REACH {
+            return false;
+        }
+        // Still on one side wanting the other (a target on his own side means
+        // he has changed his mind and the wait is abandoned).
+        (target_x - door.x) * side < 0.0
+    }
+
     /// Move Billy toward a target x at `speed`, handling door-blocking and the
     /// badge-through behaviour (emitting `BillyBadgedDoor` under an 8 s throttle).
     pub(crate) fn move_billy_toward(&mut self, target_x: f64, speed: f64) {
@@ -939,21 +962,34 @@ impl GhostLobbySim {
         );
         self.state.billy.x = nx;
         let blocked = (before - self.state.billy.x).abs() > 0.1;
-        if !blocked {
+        if blocked {
+            self.state.billy.vx = 0.0;
+            let center = self.state.billy.x + self.def.billy.w / 2.0;
+            let di = match Self::nearest_door(&self.state.doors, center) {
+                Some(d) => d,
+                None => return,
+            };
+            if self.state.billy.blocked_door != Some(di) {
+                self.state.billy.blocked_door = Some(di);
+                self.state.billy.door_wait = 0.0;
+            }
+        } else if !self.still_pressed_at_door(target_x) {
             self.state.billy.door_wait = 0.0;
             self.state.billy.blocked_door = None;
             return;
         }
-        self.state.billy.vx = 0.0;
-        let center = self.state.billy.x + self.def.billy.w / 2.0;
-        let di = match Self::nearest_door(&self.state.doors, center) {
-            Some(d) => d,
-            None => return,
+
+        //## The wait survives the bounce
+        // `constrain_by_doors` puts a blocked Billy back 3px clear of the door
+        // plane, so he spends most ticks of a door wait *not* colliding —
+        // re-accelerating from a standstill into the door he just hit. Resetting
+        // the timer on those ticks capped it at one tick per bounce cycle, so
+        // `badge_delay` was unreachable at any speed and a closed door was a
+        // permanent wall rather than a delay. The wait now accrues for as long
+        // as he is pressed against that door and still wants the far side.
+        let Some(di) = self.state.billy.blocked_door else {
+            return;
         };
-        if self.state.billy.blocked_door != Some(di) {
-            self.state.billy.blocked_door = Some(di);
-            self.state.billy.door_wait = 0.0;
-        }
         self.state.billy.door_wait += dt;
         if self.state.billy.door_wait >= self.preset.badge_delay {
             self.state.billy.door_wait = 0.0;

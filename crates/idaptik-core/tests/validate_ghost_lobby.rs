@@ -3,6 +3,7 @@
 
 use idaptik_core::ScenarioDefinition;
 use idaptik_core::ghost_lobby;
+use idaptik_core::scenario::constants as c;
 use idaptik_core::scenario::definition::{RoomDef, ValidationError};
 use idaptik_core::scenario::ids::{CameraId, DoorId, ObjectiveId, RoomId};
 use idaptik_core::scenario::tuning::{ActionKind, DifficultyId};
@@ -230,4 +231,30 @@ fn object_spawn_out_of_bounds() {
         &def,
         ValidationError::ObjectSpawnOutOfBounds { obj: "note".into() },
     );
+}
+
+/// Every prop the infiltrator must physically reach sits within a body-height
+/// of the floor. The contact note once carried an absolute `y` of 282.0 —
+/// 303px up, over five player-heights — which the Bevy frontend draws
+/// literally, floating the mission's real objective at ceiling level while the
+/// interaction (x-distance + room only) still handed it over.
+#[test]
+fn reachable_props_stay_within_a_body_height_of_the_floor() {
+    let def = ghost_lobby();
+    let reach = c::FLOOR - c::PLAYER_H;
+    for (name, y) in [
+        ("note", def.props.note.y),
+        ("usb", def.props.usb.y),
+        ("vacuum", def.props.vacuum.y),
+    ] {
+        assert!(
+            y >= reach,
+            "{name} sits {:.0}px above the floor — out of a standing player's reach \
+             (floor {}, player height {})",
+            c::FLOOR - y,
+            c::FLOOR,
+            c::PLAYER_H
+        );
+        assert!(y <= c::FLOOR, "{name} sits below the floor");
+    }
 }

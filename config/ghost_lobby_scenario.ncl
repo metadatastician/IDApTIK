@@ -160,7 +160,9 @@ let scenario = import "scenario-schema.ncl" in
   props = {
     note = {
       x = 92.0,
-      y = 282.0,
+      # Fridge-door eye height (FLOOR 585 - 46). Was an absolute 282.0, which
+      # put the mission's real objective 5.6 player-heights up.
+      y = 539.0,
     },
     usb = {
       x = 622.0,
