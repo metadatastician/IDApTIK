@@ -33,6 +33,11 @@
 # WireGuard tunnel between the two machines is the easiest way (then the
 # address is the host's tailnet IP); otherwise forward TCP 4000 on the
 # host's router.
+#
+# Hit ended_no_peer, or a blank terminal after a session? See
+# docs/MULTIPLAYER-TROUBLESHOOTING.md — covers the WSL2 NAT address trap
+# (see share_addresses() below), the 15s join-timeout window, and terminal
+# cleanup after a live session ends.
 # ============================================================================
 
 set -euo pipefail
@@ -208,6 +213,10 @@ seat_url() {
 run_seat() { # $1 url  $2 role  $3 session
   say "seat: $2 · session: $3 · relay: $1"
   say "keys: arrows/WASD move · E interact · Q throw · 1-4 uplinks · p/isp/grid pivots · Esc quits"
+  # exec replaces this shell with the seat process, so --stop (which only
+  # touches the relay) cannot reach it; if it ever hangs with the terminal
+  # left in a bad state, `pkill -f idaptik-netplay` is the escape hatch —
+  # see docs/MULTIPLAYER-TROUBLESHOOTING.md.
   exec "$NETPLAY_BIN" --interactive \
     --url "$1" --session "$3" --role "$2" \
     --script "$RUN_CONFIG"

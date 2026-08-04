@@ -115,7 +115,10 @@ multiplayer is gated integration glue, not design work.
   one, session discovery/matchmaking vs. share-a-session-id (current).
 - *(Not discussed:)* spectator mode (cheap over the event-log
   broadcast), reconnect UX in the GUI, relay abuse/security posture,
-  NAT/firewall guidance for self-hosters.
+  NAT/firewall guidance for self-hosters (one concrete case is now
+  handled: the launcher detects a WSL2-NAT'd share address and warns
+  instead of offering it — #78, `docs/MULTIPLAYER-TROUBLESHOOTING.md`
+  — general router/firewall guidance is still open).
 
 ### C. World & content
 
