@@ -97,6 +97,12 @@ pub const SUPERVISION_ATTENTION_MIN: u8 = 25;
 /// Patrol half-width around the coverage target at full attention.
 pub const SUPERVISION_COVERAGE_BAND: f64 = 90.0;
 pub const BADGE_OPEN: f64 = 1.55;
+/// How close Billy's centre must stay to a closed door's plane to keep his
+/// badge wait running. The door constraint bounces him 3px clear and he
+/// re-accelerates from rest, so a blocked Billy oscillates within a few pixels
+/// of the plane; this window covers that cycle without letting a wait survive
+/// him walking away.
+pub const BILLY_DOOR_REACH: f64 = 12.0;
 pub const SNACK_REACH: f64 = 12.0;
 pub const ALERT_BOOST_DIV: f64 = 260.0;
 pub const LIGHTS_BOOST_K: f64 = 0.035;
@@ -301,7 +307,12 @@ pub const GRADE_FAIL_C: f64 = 500.0;
 // ---------------------------------------------------------------------------
 // Object spawn positions (static bases; note.x / usb.x are re-rolled at reset).
 // ---------------------------------------------------------------------------
-pub const NOTE_Y: f64 = 282.0;
+/// The contact note sits on the fridge door at about eye height — the real
+/// objective, hiding in plain sight next to the shiny decoy. Expressed off
+/// `FLOOR` like every other prop: the old absolute 282.0 put it 303px up
+/// (5.6 player-heights, ceiling level), which the Bevy frontend draws
+/// literally, so the thing the mission turns on floated out of reach.
+pub const NOTE_Y: f64 = FLOOR - 46.0;
 pub const USB_Y: f64 = FLOOR - 16.0;
 pub const CHUTE_X: f64 = 946.0;
 pub const CHUTE_Y: f64 = FLOOR - 90.0;
