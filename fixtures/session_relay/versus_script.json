@@ -1,0 +1,8 @@
+{
+  "seed": 813205,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "supervised": true,
+  "max_ticks": 216000,
+  "commands": []
+}
