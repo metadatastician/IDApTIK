@@ -5,7 +5,7 @@ use crate::config;
 use crate::script::{ScriptFile, expand};
 use idaptik_core::Debrief;
 use idaptik_core::scenario::event::Event;
-use idaptik_core::scenario::{GhostLobbySim, GhostLobbySupervisor, RuntimeSnapshot, ghost_lobby};
+use idaptik_core::scenario::{GhostLobbySim, RuntimeSnapshot, ghost_lobby};
 use serde::Serialize;
 use std::path::Path;
 
@@ -28,7 +28,7 @@ pub struct HeadlessOutput {
 /// Build a sim from a script's config and seed.
 pub fn build(script: &ScriptFile) -> Result<GhostLobbySim, String> {
     let diff = config::parse_difficulty(&script.difficulty)?;
-    let cfg = config::run_config(diff, script.reduced_motion);
+    let cfg = config::run_config(diff, script.reduced_motion, script.supervised);
     GhostLobbySim::new(ghost_lobby(), cfg, script.seed)
         .map_err(|e| format!("invalid scenario: {e:?}"))
 }
@@ -45,28 +45,6 @@ pub fn simulate(script: &ScriptFile) -> Result<(GhostLobbySim, Vec<Event>), Stri
         log.extend(sim.tick(&input));
     }
     Ok((sim, log))
-}
-
-/// Opt-in supervised run: consumes the same tick event stream as `simulate`
-/// and returns the deterministic NPC-team evidence/supervision state alongside
-/// the normal simulation artefacts.
-pub fn simulate_with_supervisor(
-    script: &ScriptFile,
-) -> Result<(GhostLobbySim, Vec<Event>, GhostLobbySupervisor), String> {
-    let mut sim = build(script)?;
-    let mut supervisor = GhostLobbySupervisor::new("ghost-lobby-security");
-    let startup = sim.drain_events();
-    supervisor.ingest(&startup);
-    let mut log = startup;
-    for input in expand(script) {
-        if sim.is_ended() {
-            break;
-        }
-        let events = sim.tick(&input);
-        supervisor.ingest(&events);
-        log.extend(events);
-    }
-    Ok((sim, log, supervisor))
 }
 
 /// Load, run and print a headless script.

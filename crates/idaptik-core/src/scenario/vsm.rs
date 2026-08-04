@@ -188,8 +188,12 @@ impl EvidenceLedger {
     }
 }
 
+/// The evidence frame's discernible coverage targets, in declaration order —
+/// the tie-break order for target selection.
+pub const COVERAGE_TARGETS: [&str; 2] = ["usb", "fridge_note"];
+
 /// Translate existing Ghost Lobby events into observer-relative evidence.
-pub fn ghost_lobby_evidence(event: &Event, event_id: &str) -> Option<EvidenceLedger> {
+pub fn ghost_lobby_evidence(event: &Event, _event_id: &str) -> Option<EvidenceLedger> {
     let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
     let focal = match event {
         Event::UsbThrown | Event::UsbTaken { seen: true } | Event::BillyTookUsb => FocalMass {
@@ -204,7 +208,7 @@ pub fn ghost_lobby_evidence(event: &Event, event_id: &str) -> Option<EvidenceLed
         }
         _ => return None,
     };
-    let mut ledger = EvidenceLedger::from_evidence(
+    Some(EvidenceLedger::from_evidence(
         frame.clone(),
         vec![
             focal,
@@ -213,13 +217,13 @@ pub fn ghost_lobby_evidence(event: &Event, event_id: &str) -> Option<EvidenceLed
                 mass: 7_500,
             },
         ],
-    );
-    ledger.conflict_mass = event_id.len() as u32 % 2;
-    Some(ledger)
+    ))
 }
 
-/// Opt-in adapter owned by a caller of `GhostLobbySim::tick`. It consumes the
-/// real returned event stream without changing the canonical simulation state.
+/// The Ghost Lobby security team's supervisor. Part of the deterministic
+/// runtime state (`RuntimeState::supervision`) when the run is supervised: the
+/// sim folds its own canonical event stream through `ingest`, so every path —
+/// TUI, headless, networked seats — replicates the same supervision state.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GhostLobbySupervisor {
     pub director: VsmDirector,
@@ -244,25 +248,75 @@ impl GhostLobbySupervisor {
         }
     }
 
+    /// Fold a batch of sim events into the evidence picture, then re-allocate
+    /// attention — but only when the batch actually carried evidence, so a
+    /// steady picture neither reallocates every tick nor grows the director's
+    /// trace unboundedly (the trace now lives inside snapshots).
+    ///
+    /// Frontend-only events (`ContextHint`, `TutorialCue`) are skipped: they
+    /// are excluded from the canonical determinism diff, so counting them
+    /// would let two frontends disagree about `observed_events`.
     pub fn ingest(&mut self, events: &[Event]) {
+        let mut evidence_changed = false;
         for event in events {
+            if matches!(event, Event::ContextHint { .. } | Event::TutorialCue { .. }) {
+                continue;
+            }
             self.observed_events = self.observed_events.saturating_add(1);
             let Some(next) = ghost_lobby_evidence(event, &self.observed_events.to_string()) else {
                 continue;
             };
+            evidence_changed = true;
             if let Some(current) = &mut self.evidence {
                 current.combine_in_place(next);
             } else {
                 self.evidence = Some(next);
             }
         }
+        if !evidence_changed {
+            return;
+        }
         if let Some(evidence) = &self.evidence {
-            let target = ["usb".into()];
+            // Pick the most plausible discernible target; ties resolve to
+            // declaration order. This is what makes the deception loop real: a
+            // thrown USB genuinely outcompetes the note for team attention.
+            let target = COVERAGE_TARGETS
+                .iter()
+                .map(|t| {
+                    let prop = [(*t).to_owned()];
+                    (evidence.recommended_attention(&prop), *t)
+                })
+                .max_by_key(|(attention, _)| *attention)
+                .map(|(_, t)| [t.to_owned()])
+                .expect("COVERAGE_TARGETS is non-empty");
             self.director
                 .allocate_from_evidence(&mut self.team, evidence, &target);
             if self.team.attention > 0 {
                 self.coverage_target = target.into_iter().next();
             }
+        }
+    }
+}
+
+/// The supervision half of the runtime state: the supervisor plus the
+/// announce-once latches that keep its allocation visible in the canonical
+/// event log without re-announcing every tick.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SupervisionState {
+    pub supervisor: GhostLobbySupervisor,
+    /// Last announced attention (0 = never announced, matching the initial
+    /// allocation of 0).
+    pub announced_attention: u8,
+    /// Last announced coverage target.
+    pub announced_target: Option<String>,
+}
+
+impl SupervisionState {
+    pub fn new(team_id: impl Into<String>) -> Self {
+        Self {
+            supervisor: GhostLobbySupervisor::new(team_id),
+            announced_attention: 0,
+            announced_target: None,
         }
     }
 }

@@ -83,6 +83,19 @@ pub const PURSUE_GIVEUP_DIST: f64 = 20.0;
 pub const BILLY_ACCEL: f64 = 520.0;
 pub const BILLY_CLAMP_LO: f64 = 25.0;
 pub const BILLY_CLAMP_HI: f64 = 1230.0;
+
+// ---------------------------------------------------------------------------
+// Supervision (supervised runs only) — the security team directing Billy's
+// Assess sweep. Kept as constants for this slice; projection into the tuning
+// table (and the golden scenario JSON) is deferred until they need to vary
+// per difficulty.
+// ---------------------------------------------------------------------------
+/// The Ghost Lobby security team's id (event payloads and state).
+pub const SUPERVISION_TEAM_ID: &str = "ghost-lobby-security";
+/// Minimum team attention (0..=100) before the patrol band bends at all.
+pub const SUPERVISION_ATTENTION_MIN: u8 = 25;
+/// Patrol half-width around the coverage target at full attention.
+pub const SUPERVISION_COVERAGE_BAND: f64 = 90.0;
 pub const BADGE_OPEN: f64 = 1.55;
 pub const SNACK_REACH: f64 = 12.0;
 pub const ALERT_BOOST_DIV: f64 = 260.0;

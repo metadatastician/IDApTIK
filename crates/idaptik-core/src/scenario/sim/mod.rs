@@ -248,7 +248,41 @@ impl GhostLobbySim {
 
     /// Take the pending events (the `RunStarted`/`SeedAnnounced` after `new`).
     pub fn drain_events(&mut self) -> Vec<Event> {
+        self.take_events()
+    }
+
+    /// The single seam through which events leave the sim: in a supervised run
+    /// the pending buffer is folded into the supervision state first, so every
+    /// canonical event is observed exactly once, in order, on every run path —
+    /// TUI, headless, and networked seats alike. The announce-once events the
+    /// fold itself emits are appended after the fold and are never re-folded.
+    fn take_events(&mut self) -> Vec<Event> {
+        if self.cfg.supervised && !self.events.is_empty() {
+            self.system_supervision();
+        }
         std::mem::take(&mut self.events)
+    }
+
+    /// Fold the pending events into `state.supervision`, then make any changed
+    /// allocation visible in the canonical log (announce-once, mirroring the
+    /// `belief_announced` pattern).
+    fn system_supervision(&mut self) {
+        let sup = &mut self.state.supervision;
+        sup.supervisor.ingest(&self.events);
+        let attention = sup.supervisor.team.attention;
+        let team_id = sup.supervisor.team.id.clone();
+        let target = sup.supervisor.coverage_target.clone();
+        if attention != sup.announced_attention {
+            sup.announced_attention = attention;
+            self.events
+                .push(Event::TeamAttentionAllocated { team_id, attention });
+        }
+        if let Some(target) = target
+            && sup.announced_target.as_deref() != Some(target.as_str())
+        {
+            sup.announced_target = Some(target.clone());
+            self.events.push(Event::CoverageRetargeted { target });
+        }
     }
 
     /// The definition export surface (definition + validation report).
@@ -310,13 +344,13 @@ impl GhostLobbySim {
                 crate::scenario::command::Command::Restart => {
                     self.events.push(Event::Restarted { seed: self.seed });
                     self.reset(self.seed);
-                    return std::mem::take(&mut self.events);
+                    return self.take_events();
                 }
                 _ => {}
             }
         }
         if self.paused {
-            return std::mem::take(&mut self.events);
+            return self.take_events();
         }
 
         // P2 — other immediates at the pre-increment `t`.
@@ -360,7 +394,7 @@ impl GhostLobbySim {
             self.update(input);
         }
 
-        std::mem::take(&mut self.events)
+        self.take_events()
     }
 
     /// The system pipeline for one non-ended, non-paused frame.

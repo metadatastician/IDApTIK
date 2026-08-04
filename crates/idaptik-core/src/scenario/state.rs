@@ -19,6 +19,7 @@ use crate::scenario::outcome::Debrief;
 use crate::scenario::rng::InitRoll;
 use crate::scenario::sim::GhostLobbySim;
 use crate::scenario::tuning::{ActionKind, DifficultyPreset};
+use crate::scenario::vsm::SupervisionState;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -242,6 +243,11 @@ pub struct RuntimeState {
     pub dead_nodes: BTreeSet<String>,
     /// The last emitted objective ledger — a change emits `ObjectivesUpdated`.
     pub objective_ledger: (ObjectiveStatus, ObjectiveStatus, ObjectiveStatus),
+    /// The security team's VSM supervision state. Always present so the
+    /// snapshot shape is config-independent; it only *changes* when
+    /// `RunConfig::supervised` is on, which keeps unsupervised runs
+    /// tick-identical to pre-supervision builds.
+    pub supervision: SupervisionState,
     pub ended: bool,
     pub result: Option<Debrief>,
 }
@@ -396,6 +402,7 @@ impl RuntimeState {
                 ObjectiveStatus::Open,
                 ObjectiveStatus::Locked,
             ),
+            supervision: SupervisionState::new(c::SUPERVISION_TEAM_ID),
             ended: false,
             result: None,
         }

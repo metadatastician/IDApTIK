@@ -797,19 +797,57 @@ impl GhostLobbySim {
             });
             return;
         }
+        let (patrol_lo, patrol_hi, patrol_pivot) = self.effective_patrol_band();
         let target = self.state.billy.patrol_target;
         self.move_billy_toward(
             target,
             self.preset.billy_speed * self.actor.stats.assess_speed,
         );
         if dist(self.state.billy.x, self.state.billy.patrol_target) < 10.0 {
-            self.state.billy.patrol_target =
-                if self.state.billy.patrol_target < self.actor.stats.patrol_pivot {
-                    self.actor.stats.patrol_hi
-                } else {
-                    self.actor.stats.patrol_lo
-                };
+            self.state.billy.patrol_target = if self.state.billy.patrol_target < patrol_pivot {
+                patrol_hi
+            } else {
+                patrol_lo
+            };
         }
+    }
+
+    /// The Assess ping-pong band — the archetype's raw band, bent toward the
+    /// supervision coverage target in a supervised run. The bend is
+    /// attention-proportional and threshold-gated, reads only deterministic
+    /// state, and draws no RNG, so it composes with the replay/golden gates.
+    fn effective_patrol_band(&self) -> (f64, f64, f64) {
+        let lo = self.actor.stats.patrol_lo;
+        let hi = self.actor.stats.patrol_hi;
+        let pivot = self.actor.stats.patrol_pivot;
+        if !self.cfg.supervised {
+            return (lo, hi, pivot);
+        }
+        let sup = &self.state.supervision.supervisor;
+        let attention = sup.team.attention;
+        if attention < c::SUPERVISION_ATTENTION_MIN {
+            return (lo, hi, pivot);
+        }
+        // The coverage target follows the object, not where it was last
+        // reported: a decoy that skitters keeps pulling the sweep after it.
+        let target_x = match sup.coverage_target.as_deref() {
+            Some("usb") => self.state.usb.x,
+            Some("fridge_note") => self.state.note.x,
+            _ => return (lo, hi, pivot),
+        };
+        let a = f64::from(attention) / 100.0;
+        let band_lo =
+            (target_x - c::SUPERVISION_COVERAGE_BAND).clamp(c::BILLY_CLAMP_LO, c::BILLY_CLAMP_HI);
+        let band_hi =
+            (target_x + c::SUPERVISION_COVERAGE_BAND).clamp(c::BILLY_CLAMP_LO, c::BILLY_CLAMP_HI);
+        let lo_eff = lo + (band_lo - lo) * a;
+        let hi_eff = hi + (band_hi - hi) * a;
+        let (lo_eff, hi_eff) = if lo_eff <= hi_eff {
+            (lo_eff, hi_eff)
+        } else {
+            (hi_eff, lo_eff)
+        };
+        (lo_eff, hi_eff, (lo_eff + hi_eff) / 2.0)
     }
 
     fn billy_investigate(&mut self, sees: bool) {

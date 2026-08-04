@@ -126,6 +126,12 @@ pub enum Event {
     Resumed,
     /// Session: restarted.
     Restarted { seed: u32 },
+    /// Supervision: the security team's attention allocation changed
+    /// (announce-once; supervised runs only).
+    TeamAttentionAllocated { team_id: String, attention: u8 },
+    /// Supervision: the security team retargeted world coverage
+    /// (announce-once; supervised runs only).
+    CoverageRetargeted { target: String },
     /// Frontend-only prompt (excluded from the canonical determinism diff).
     ContextHint { text: String },
     /// Frontend-only tutorial cue (excluded from the canonical determinism diff).
@@ -325,6 +331,19 @@ pub fn log_view(e: &Event, tick: u64, t: f64) -> Option<LogLine> {
                 FailReason::Traced => "Trace complete. They have the address it came from.".into(),
             };
             line(text, Bad, Log)
+        }
+        Event::TeamAttentionAllocated { attention, .. } => line(
+            format!("Security desk: sweep attention at {attention}%."),
+            Billy,
+            Log,
+        ),
+        Event::CoverageRetargeted { target } => {
+            let text = match target.as_str() {
+                "usb" => "Security desk: \"Sweep past that little drive again.\"".into(),
+                "fridge_note" => "Security desk: \"Keep eyes on the noticeboard.\"".into(),
+                other => format!("Security desk: \"Cover {other}.\""),
+            };
+            line(text, Billy, Log)
         }
         Event::ContextHint { text } => line(text.clone(), Info, Prompt),
         Event::TutorialCue { text, .. } => line(text.clone(), Info, Tutorial),

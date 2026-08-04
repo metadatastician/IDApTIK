@@ -193,7 +193,7 @@ mod tests {
     use crate::scenario::floor_graph::{VACUUM_NODE_ID, floor_graph};
     use crate::scenario::ghost_lobby::ghost_lobby;
     use crate::scenario::rng::{Mulberry32, roll_init};
-    use crate::scenario::tuning::{DifficultyId, DifficultyPreset};
+    use crate::scenario::tuning::DifficultyPreset;
 
     /// A quiet-phase start, built the way `GhostLobbySim::new` builds one. The
     /// roll draws from its own RNG, so it cannot disturb the sim's draw counts.
@@ -377,8 +377,8 @@ mod tests {
     #[test]
     fn reduced_motion_shortens_the_lights_out() {
         let cfg = RunConfig {
-            difficulty: DifficultyId::Standard,
             reduced_motion: true,
+            ..RunConfig::standard()
         };
         let (def, mut state) = start(cfg);
         apply_effects(

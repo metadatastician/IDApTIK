@@ -122,7 +122,7 @@ pub unsafe extern "C" fn idap_ghost_lobby_new(
     };
     let cfg = RunConfig {
         difficulty,
-        reduced_motion: false,
+        ..RunConfig::standard()
     };
     match catch_unwind(|| GhostLobbySim::new(ghost_lobby(), cfg, seed)) {
         Ok(Ok(sim)) => Box::into_raw(Box::new(GhostLobbyHandle {
@@ -192,7 +192,8 @@ pub unsafe extern "C" fn idap_ghost_lobby_tick_json(
 }
 
 /// Serialise a full, restorable `RuntimeSnapshot` of the run at the current
-/// tick (format tag `idaptik-ghost-lobby-runtime-v2`) as an owned JSON string.
+/// tick (format tag `idaptik_core::scenario::snapshot::SNAPSHOT_FORMAT`) as an
+/// owned JSON string.
 /// Free it with [`idap_string_free`]. Returns an `{"error":"..."}` object on a
 /// recoverable failure; null only when `ptr` is null or allocation fails.
 ///
@@ -338,8 +339,9 @@ mod tests {
         let parsed: serde_json::Value =
             serde_json::from_str(&abi_snapshot).expect("snapshot is JSON");
         assert_eq!(
-            parsed["format"], "idaptik-ghost-lobby-runtime-v2",
-            "snapshot carries the v2 format tag GhostLobbySim::restore requires"
+            parsed["format"],
+            idaptik_core::scenario::snapshot::SNAPSHOT_FORMAT,
+            "snapshot carries the format tag GhostLobbySim::restore requires"
         );
 
         unsafe { idap_ghost_lobby_free(handle) };

@@ -12,12 +12,13 @@ use crate::scenario::rng::Mulberry32;
 use crate::scenario::state::RuntimeState;
 use serde::{Deserialize, Serialize};
 
-/// The runtime-snapshot export format tag. v2: `RuntimeState` gained required
-/// `agents`, `camera_looped` and `dead_nodes` fields, so a v1 snapshot no longer
-/// restores into this build.
-pub const SNAPSHOT_FORMAT: &str = "idaptik-ghost-lobby-runtime-v2";
-/// The combined-export format tag (v2 embeds the v2 runtime snapshot).
-pub const EXPORT_FORMAT: &str = "idaptik-ghost-lobby-export-v2";
+/// The runtime-snapshot export format tag. v3: `RuntimeState` gained the
+/// required `supervision` field (and `RunConfig` the `supervised` flag), so a
+/// v2 snapshot no longer restores into this build — the same precedent as v2,
+/// where `agents`, `camera_looped` and `dead_nodes` arrived.
+pub const SNAPSHOT_FORMAT: &str = "idaptik-ghost-lobby-runtime-v3";
+/// The combined-export format tag (v3 embeds the v3 runtime snapshot).
+pub const EXPORT_FORMAT: &str = "idaptik-ghost-lobby-export-v3";
 
 /// A full, restorable snapshot of a run at a given tick (state incl. RNG).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

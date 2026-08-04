@@ -23,7 +23,10 @@ a private repository.
 ## Next: first playable proving slice
 
 - [x] Model the first NPC operator-team type and attention trace event.
-- [ ] Connect the team allocation to actual Ghost Lobby world coverage.
+- [x] Connect the team allocation to actual Ghost Lobby world coverage.
+      (Supervision is deterministic runtime state; `RunConfig::supervised`
+      bends Billy's Assess patrol band toward the evidence-selected coverage
+      target. The interactive TUI is always supervised.)
 - [ ] Add a bounded adaptive intervention with an explicit policy check.
 - [ ] Expose developer telemetry in TUI/replay output.
 - [ ] Verify that the player can create a rational but false NPC hypothesis.
@@ -48,11 +51,25 @@ their disclosure.
 
 ## Current stopping point
 
-The public branch `docs/vsm-esm-framework` contains the first deterministic
-evidence/VSM prototype and is open as PR #61. The core tests cover scalar
-hypotheses, fixed-point focal masses, conflict, USB/fridge-note revision,
-vent/front-door deception, and evidence-driven patrol attention. Nothing yet
-changes the live Ghost Lobby simulation or Bevy presentation. The event adapter
-now exists, but it is still opt-in; start the next session by invoking it from
-the interactive TUI and applying the resulting team allocation to world
-coverage.
+The supervised-coverage slice (2026-08-03) moved the supervisor inside the
+deterministic runtime state: in a supervised run the sim folds its own event
+stream into `RuntimeState::supervision` (snapshot format v3), the evidence
+ledger picks the most plausible coverage target (`usb` vs `fridge_note`,
+declaration-order tie-break), and Billy's Assess patrol band bends toward that
+target in proportion to team attention. The allocation is visible in the
+canonical log as announce-once `TeamAttentionAllocated` / `CoverageRetargeted`
+events — the seed of the "developer telemetry" checkbox. The interactive TUI
+always runs supervised; headless scripts and the CLI opt in via
+`"supervised": true` / `--supervised`, and unsupervised runs are byte-identical
+to before the slice.
+
+Two facts the next session should know:
+
+- Billy cannot badge through a closed door: the constraint bounce-back plus
+  `door_wait` resetting on every unblocked tick form a limit cycle, so the
+  badge timer never accumulates at any Billy speed. Every golden embeds this,
+  so it is canonical behaviour for now — but it silently confines patrol
+  coverage to one door region, and deserves its own decision (bug or feature).
+- The next unchecked item is the bounded adaptive intervention; the
+  `VsmDirector::observe`/`apply` policy envelope already exists and is tested,
+  it just is not driven from sim state yet.

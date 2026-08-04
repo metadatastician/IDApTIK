@@ -16,10 +16,18 @@ pub struct Runner {
 impl Runner {
     /// Start a run at `seed` on `diff`, capturing the startup events.
     pub fn start(diff: DifficultyId, reduced_motion: bool, seed: u32) -> Self {
-        let cfg = RunConfig {
-            difficulty: diff,
-            reduced_motion,
-        };
+        Self::start_with(
+            RunConfig {
+                difficulty: diff,
+                reduced_motion,
+                supervised: false,
+            },
+            seed,
+        )
+    }
+
+    /// Start a run from a full [`RunConfig`] and `seed`.
+    pub fn start_with(cfg: RunConfig, seed: u32) -> Self {
         let mut sim = GhostLobbySim::new(ghost_lobby(), cfg, seed).expect("valid definition");
         let log = sim.drain_events();
         Self {
@@ -32,6 +40,17 @@ impl Runner {
     /// The canonical default: Standard, full motion, seed 123456.
     pub fn standard() -> Self {
         Self::start(DifficultyId::Standard, false, 123456)
+    }
+
+    /// The canonical default with in-sim supervision on.
+    pub fn supervised() -> Self {
+        Self::start_with(
+            RunConfig {
+                supervised: true,
+                ..RunConfig::standard()
+            },
+            123456,
+        )
     }
 
     /// Advance one tick with the given command stream.
