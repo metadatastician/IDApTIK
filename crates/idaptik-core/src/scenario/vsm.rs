@@ -192,6 +192,27 @@ impl EvidenceLedger {
 /// the tie-break order for target selection.
 pub const COVERAGE_TARGETS: [&str; 2] = ["usb", "fridge_note"];
 
+/// The most plausible coverage target under `evidence`, ties resolving to
+/// declaration order — the first entry of [`COVERAGE_TARGETS`] wins.
+///
+/// Declaration order is the whole point: it is a stable, platform-independent
+/// tie-break, exactly as [`HypothesisLedger::most_likely`] promises for
+/// hypotheses. `Iterator::max_by_key` cannot be used here — it returns the
+/// *last* maximum, which would silently hand every tie to the last-declared
+/// target while the surrounding contract claims otherwise.
+pub fn most_plausible_target(evidence: &EvidenceLedger) -> &'static str {
+    let mut best = COVERAGE_TARGETS[0];
+    let mut best_attention = evidence.recommended_attention(&[best.to_owned()]);
+    for candidate in &COVERAGE_TARGETS[1..] {
+        let attention = evidence.recommended_attention(&[(*candidate).to_owned()]);
+        if attention > best_attention {
+            best_attention = attention;
+            best = candidate;
+        }
+    }
+    best
+}
+
 /// Translate existing Ghost Lobby events into observer-relative evidence.
 pub fn ghost_lobby_evidence(event: &Event, _event_id: &str) -> Option<EvidenceLedger> {
     let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
@@ -277,18 +298,7 @@ impl GhostLobbySupervisor {
             return;
         }
         if let Some(evidence) = &self.evidence {
-            // Pick the most plausible discernible target; ties resolve to
-            // declaration order. This is what makes the deception loop real: a
-            // thrown USB genuinely outcompetes the note for team attention.
-            let target = COVERAGE_TARGETS
-                .iter()
-                .map(|t| {
-                    let prop = [(*t).to_owned()];
-                    (evidence.recommended_attention(&prop), *t)
-                })
-                .max_by_key(|(attention, _)| *attention)
-                .map(|(_, t)| [t.to_owned()])
-                .expect("COVERAGE_TARGETS is non-empty");
+            let target = [most_plausible_target(evidence).to_owned()];
             self.director
                 .allocate_from_evidence(&mut self.team, evidence, &target);
             if self.team.attention > 0 {
@@ -739,6 +749,49 @@ mod tests {
         assert!(
             ghost_lobby_evidence(&Event::LightsFlickered { third_use: false }, "noise").is_none()
         );
+    }
+
+    #[test]
+    fn a_tie_resolves_to_the_declared_first_target() {
+        // A frame-wide mass alone makes every target equally plausible. The
+        // contract (and WORKPLAN) promise declaration order, so `usb` — first
+        // in COVERAGE_TARGETS — must win. `max_by_key` returns the LAST
+        // maximum and handed these ties to `fridge_note`.
+        let frame: Vec<String> = COVERAGE_TARGETS
+            .iter()
+            .map(|t| (*t).to_owned())
+            .chain(std::iter::once("unknown".to_owned()))
+            .collect();
+        let vacuous = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![FocalMass {
+                hypotheses: frame,
+                mass: MASS_TOTAL,
+            }],
+        );
+        for target in COVERAGE_TARGETS {
+            assert_eq!(
+                vacuous.recommended_attention(&[target.to_owned()]),
+                100,
+                "{target} is equally plausible under a vacuous ledger"
+            );
+        }
+        assert_eq!(most_plausible_target(&vacuous), COVERAGE_TARGETS[0]);
+    }
+
+    #[test]
+    fn a_clear_winner_beats_declaration_order() {
+        // Ties aside, plausibility decides: a thrown USB really does outcompete
+        // the note, and a note-heavy picture really does take the target back.
+        let frame = vec!["usb".into(), "fridge_note".into(), "unknown".into()];
+        let note_heavy = EvidenceLedger::from_evidence(
+            frame.clone(),
+            vec![FocalMass {
+                hypotheses: vec!["fridge_note".into()],
+                mass: MASS_TOTAL,
+            }],
+        );
+        assert_eq!(most_plausible_target(&note_heavy), "fridge_note");
     }
 
     #[test]
