@@ -27,7 +27,7 @@ fn headless_clean_extract_prints_json_and_exits_zero() {
     assert_eq!(v["debrief"]["success"], serde_json::Value::Bool(true));
     assert_eq!(
         v["final_snapshot"]["format"],
-        "idaptik-ghost-lobby-runtime-v2"
+        idaptik_core::scenario::snapshot::SNAPSHOT_FORMAT
     );
 }
 

@@ -1,0 +1,57 @@
+{
+  "seed": 123456,
+  "difficulty": "standard",
+  "reduced_motion": false,
+  "max_ticks": 900,
+  "commands": [
+    {
+      "at": 0,
+      "hold": [
+        "right",
+        "sprint"
+      ]
+    },
+    {
+      "at": 1,
+      "press": [
+        "bridge"
+      ]
+    },
+    {
+      "at": 240,
+      "press": [
+        "door"
+      ]
+    },
+    {
+      "at": 480,
+      "press": [
+        "door"
+      ]
+    },
+    {
+      "at": 560,
+      "hold": []
+    },
+    {
+      "at": 580,
+      "press": [
+        "e"
+      ]
+    },
+    {
+      "at": 640,
+      "press": [
+        "throw"
+      ]
+    },
+    {
+      "at": 860,
+      "test": {
+        "hook": "force_extract",
+        "method": "service_exit"
+      }
+    }
+  ],
+  "supervised": true
+}

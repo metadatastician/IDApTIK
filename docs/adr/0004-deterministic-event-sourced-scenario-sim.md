@@ -49,9 +49,14 @@ definition-as-data** scenario.
    wasm and std intrinsics would drift the goldens. Time is **accumulated**
    (`t += TICK_DT`), never `tick as f64 / 60.0`. `serde_json` is built with
    `float_roundtrip` so snapshots and exports are bit-exact.
-6. **`reduced_motion`** is the only `RunConfig` knob that changes sim math (the
-   lights-flicker window, 1.45 s vs 0.70 s); it is captured in the snapshot and
-   defaults to `false` for canonical/headless runs.
+6. **`reduced_motion` and `supervised`** are the only `RunConfig` knobs that
+   change sim math. `reduced_motion` shortens the lights-flicker window
+   (1.45 s vs 0.70 s). `supervised` (added by the supervised-coverage slice,
+   2026-08-03; originally this section named `reduced_motion` alone) folds the
+   canonical event stream into `RuntimeState::supervision` and bends Billy's
+   Assess patrol band toward the security team's coverage target. Both are
+   captured in the snapshot and default to `false` for canonical/headless
+   runs, which keeps every pre-existing script and golden byte-identical.
 7. **String ids, resolved once.** Content ids are serde-transparent `String`
    newtypes (homoiconic, human-readable) resolved to `Vec` indices once at
    construction (`IdIndex`); the hot loop never hashes strings. Runtime enums

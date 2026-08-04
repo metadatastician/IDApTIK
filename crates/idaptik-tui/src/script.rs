@@ -17,6 +17,10 @@ pub struct ScriptFile {
     pub difficulty: String,
     #[serde(default)]
     pub reduced_motion: bool,
+    /// Run the VSM security-team supervision inside the sim. Defaults off, so
+    /// every existing script keeps its byte-identical behaviour.
+    #[serde(default)]
+    pub supervised: bool,
     pub max_ticks: u64,
     #[serde(default)]
     pub commands: Vec<ScriptLine>,

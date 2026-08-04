@@ -59,16 +59,26 @@ pub enum Edge {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct RunConfig {
     pub difficulty: DifficultyId,
-    /// The only knob that changes sim math: shortens the lights flicker window.
+    /// Shortens the lights flicker window (with `supervised`, one of the two
+    /// knobs that change sim math — ADR-0004 §6 as amended by the
+    /// supervised-coverage slice).
     pub reduced_motion: bool,
+    /// Runs the VSM security-team supervision inside the sim: evidence folds
+    /// into `RuntimeState::supervision` and Billy's Assess patrol band bends
+    /// toward the coverage target. Defaults off, which keeps every existing
+    /// script and golden byte-identical.
+    #[serde(default)]
+    pub supervised: bool,
 }
 
 impl RunConfig {
-    /// Standard difficulty, full motion — the canonical/headless default.
+    /// Standard difficulty, full motion, unsupervised — the canonical/headless
+    /// default.
     pub fn standard() -> Self {
         Self {
             difficulty: DifficultyId::Standard,
             reduced_motion: false,
+            supervised: false,
         }
     }
 }

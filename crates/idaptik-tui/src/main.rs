@@ -56,6 +56,10 @@ struct Cli {
     /// Shorten the lights-flicker window (the only reduced-motion sim effect).
     #[arg(long)]
     reduced_motion: bool,
+    /// Run the VSM security-team supervision inside the sim (headless/export;
+    /// the interactive TUI is always supervised).
+    #[arg(long)]
+    supervised: bool,
 }
 
 fn main() -> ExitCode {
@@ -113,7 +117,10 @@ fn main() -> ExitCode {
 
 fn resolve_cfg(cli: &Cli) -> Result<(idaptik_core::RunConfig, u32), String> {
     let diff = config::parse_difficulty(&cli.difficulty)?;
-    Ok((config::run_config(diff, cli.reduced_motion), cli.seed))
+    Ok((
+        config::run_config(diff, cli.reduced_motion, cli.supervised),
+        cli.seed,
+    ))
 }
 
 fn fail(msg: &str) -> ExitCode {

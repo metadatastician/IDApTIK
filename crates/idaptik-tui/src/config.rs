@@ -8,10 +8,11 @@ pub fn parse_difficulty(s: &str) -> Result<DifficultyId, String> {
     s.parse()
 }
 
-/// Build a [`RunConfig`] from the resolved difficulty and reduced-motion flag.
-pub fn run_config(difficulty: DifficultyId, reduced_motion: bool) -> RunConfig {
+/// Build a [`RunConfig`] from the resolved difficulty and feature flags.
+pub fn run_config(difficulty: DifficultyId, reduced_motion: bool, supervised: bool) -> RunConfig {
     RunConfig {
         difficulty,
         reduced_motion,
+        supervised,
     }
 }

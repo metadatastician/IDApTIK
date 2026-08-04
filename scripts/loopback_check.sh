@@ -26,6 +26,7 @@ cd "$(dirname "$0")/.."
 
 SCRIPT="${1:-fixtures/session_relay/capture_script.json}"
 LIVE_SCRIPT="${2:-fixtures/session_relay/live_script.json}"
+SUPERVISED_SCRIPT="${3:-fixtures/session_relay/supervised_script.json}"
 PORT="${IDAPTIK_LOOPBACK_PORT:-4013}"
 URL="ws://127.0.0.1:${PORT}/socket/websocket"
 
@@ -89,6 +90,25 @@ cmp -s "$WORK/infiltrator.json" "$WORK/hacker.json" \
 cmp -s "$WORK/infiltrator.json" "$WORK/reference.json" \
     || { echo "FAIL: networked run differs from the headless reference (in $WORK)"; exit 1; }
 echo "   both seats byte-identical, and identical to the headless reference"
+
+echo "== run 1b: supervised determinism (two seats, in-sim supervision on)"
+SID="loopback-supervised-$$-$RANDOM"
+"$SEAT" --url "$URL" --session "$SID" --role infiltrator --script "$SUPERVISED_SCRIPT" \
+    --out "$WORK/sup_infiltrator.json" >"$WORK/sup_infiltrator.meta" &
+A=$!
+"$SEAT" --url "$URL" --session "$SID" --role hacker --script "$SUPERVISED_SCRIPT" \
+    --out "$WORK/sup_hacker.json" >"$WORK/sup_hacker.meta" &
+B=$!
+wait "$A" || { echo "FAIL: supervised infiltrator seat exited non-zero"; cat "$WORK/sup_infiltrator.meta" 2>/dev/null || true; exit 1; }
+wait "$B" || { echo "FAIL: supervised hacker seat exited non-zero"; cat "$WORK/sup_hacker.meta" 2>/dev/null || true; exit 1; }
+"$TUI" --headless --script "$SUPERVISED_SCRIPT" >"$WORK/sup_reference.json"
+cmp -s "$WORK/sup_infiltrator.json" "$WORK/sup_hacker.json" \
+    || { echo "FAIL: supervised seats observed different runs (in $WORK)"; exit 1; }
+cmp -s "$WORK/sup_infiltrator.json" "$WORK/sup_reference.json" \
+    || { echo "FAIL: supervised networked run differs from the headless reference (in $WORK)"; exit 1; }
+grep -q '"TeamAttentionAllocated"' "$WORK/sup_reference.json" \
+    || { echo "FAIL: supervised reference carries no supervision events — the leg is not exercising the slice"; exit 1; }
+echo "   supervised seats byte-identical, identical to reference, supervision events present"
 
 echo "== run 2: connection loss (kill one seat mid-stream)"
 SID="loopback-loss-$$-$RANDOM"

@@ -88,5 +88,6 @@ pub use tuning::{
 pub use vsm::{
     DifficultyProposal, EvidenceLedger, FocalMass, GhostLobbySupervisor, Hypothesis,
     HypothesisEvidence, HypothesisLedger, MASS_TOTAL, Operator, OperatorTeam,
-    PlayerTacticObservation, VsmDirector, VsmEvent, VsmSystem, ghost_lobby_evidence,
+    PlayerTacticObservation, SupervisionState, VsmDirector, VsmEvent, VsmSystem,
+    ghost_lobby_evidence,
 };
