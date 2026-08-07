@@ -67,7 +67,7 @@ impl TerminalFrontend {
         Ok(Self {
             terminal,
             enhanced,
-            input: InputState::new(),
+            input: InputState::with_keyboard_enhancement(enhanced),
             role,
             log: Vec::new(),
             last_sent: Buttons::default(),
