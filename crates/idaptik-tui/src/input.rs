@@ -14,7 +14,7 @@ const HELD_BUTTONS: [Button; 5] = [
 
 /// Non-enhanced terminals do not report key releases. Keep a held key alive
 /// across a short gap between OS key-repeat events, then synthesize release.
-const FALLBACK_HOLD_TICKS: u8 = 8;
+const FALLBACK_HOLD_TICKS: u8 = 24;
 
 /// Accumulated frontend input between simulation ticks.
 #[derive(Default)]
@@ -85,12 +85,12 @@ impl InputState {
 
     /// Sample one tick's input, draining queued edges/immediates (held persists).
     pub fn sample(&mut self) -> TickInput {
+        self.decay_fallback_holds();
         let input = TickInput {
             buttons: self.held,
             edges: std::mem::take(&mut self.edges),
             immediates: std::mem::take(&mut self.immediates),
         };
-        self.decay_fallback_holds();
         input
     }
 
@@ -153,7 +153,7 @@ mod tests {
         let mut input = InputState::with_keyboard_enhancement(false);
 
         input.apply(vec![Intent::Hold(Button::Left, true)]);
-        for _ in 0..FALLBACK_HOLD_TICKS {
+        for _ in 0..(FALLBACK_HOLD_TICKS - 1) {
             assert!(held(&mut input, Button::Left));
         }
         assert!(!held(&mut input, Button::Left));
@@ -169,10 +169,26 @@ mod tests {
         }
 
         input.apply(vec![Intent::Hold(Button::Right, true)]);
-        for _ in 0..FALLBACK_HOLD_TICKS {
+        for _ in 0..(FALLBACK_HOLD_TICKS - 1) {
             assert!(held(&mut input, Button::Right));
         }
         assert!(!held(&mut input, Button::Right));
+    }
+
+    #[test]
+    fn non_enhanced_opposing_keys_do_not_latch_into_paralysis() {
+        let mut input = InputState::with_keyboard_enhancement(false);
+
+        input.apply(vec![Intent::Hold(Button::Left, true)]);
+        assert!(held(&mut input, Button::Left));
+        for _ in 0..(FALLBACK_HOLD_TICKS - 1) {
+            input.sample();
+        }
+
+        input.apply(vec![Intent::Hold(Button::Right, true)]);
+        let sample = input.sample();
+        assert!(!sample.buttons.has(Button::Left));
+        assert!(sample.buttons.has(Button::Right));
     }
 
     #[test]
