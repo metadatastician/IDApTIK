@@ -3493,7 +3493,12 @@ name = "idaptik-bevy"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "clap",
  "idaptik-core",
+ "idaptik-net",
+ "idaptik-tui",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

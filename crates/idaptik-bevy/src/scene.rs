@@ -481,7 +481,7 @@ pub fn sync_player(
     }
 }
 
-/// Billy: body, offsite hides him, facing nose.
+/// Billy: body, offsite hides him, facing nose, and mode-based visual states.
 pub fn sync_billy(
     sim: Res<SimState>,
     map: Res<SceneMap>,
@@ -489,6 +489,11 @@ pub fn sync_billy(
     fixed: Res<Time<Fixed>>,
     mut body: Query<(&mut Transform, &mut Sprite, &mut Visibility), With<BillyMarker>>,
     mut nose: Query<&mut Transform, (With<BillyNose>, Without<BillyMarker>)>,
+    eyes_left: Query<(&mut Sprite, &mut Transform), With<sprites::BillyEyeLeft>>,
+    eyes_right: Query<(&mut Sprite, &mut Transform), With<sprites::BillyEyeRight>>,
+    mouths: Query<(&mut Sprite, &mut Transform), With<sprites::BillyMouth>>,
+    hats: Query<(&mut Visibility, &mut Sprite), With<sprites::BillyHat>>,
+    badges: Query<&mut Visibility, With<sprites::BillyBadge>>,
 ) {
     let def = sim.sim.definition();
     // `mode` is discrete and read live; only the pose interpolates.
@@ -519,6 +524,86 @@ pub fn sync_billy(
     if let Ok(mut nose_tf) = nose.single_mut() {
         nose_tf.translation.x = pose.facing as f32 * (def.billy.w as f32 * 0.5 + 5.0);
         nose_tf.translation.y = def.billy.h as f32 * 0.25;
+    }
+    
+    // Update Billy's facial features and accessories based on mode
+    update_billy_visual_state(b.mode, eyes_left, eyes_right, mouths, hats, badges);
+}
+
+/// Update Billy's visual state based on his current mode.
+/// This enhances immersion by showing Billy's expressions and equipment.
+fn update_billy_visual_state(
+    mode: BillyMode,
+    mut eyes_left: Query<(&mut Sprite, &mut Transform), With<sprites::BillyEyeLeft>>,
+    mut eyes_right: Query<(&mut Sprite, &mut Transform), With<sprites::BillyEyeRight>>,
+    mut mouths: Query<(&mut Sprite, &mut Transform), With<sprites::BillyMouth>>,
+    mut hats: Query<(&mut Visibility, &mut Sprite), With<sprites::BillyHat>>,
+    mut badges: Query<&mut Visibility, With<sprites::BillyBadge>>,
+) {
+    use idaptik_core::scenario::common::BillyMode as Mode;
+    
+    // Eye colors and mouth shapes based on Billy's alertness and mood
+    let (eye_color, mouth_color, mouth_size, show_hat, show_badge) = match mode {
+        Mode::Offsite => {
+            // Not present - all features hidden (handled by main visibility)
+            (Color::srgb(0.1, 0.1, 0.1), Color::srgb(0.5, 0.2, 0.1), Vec2::new(6.0, 2.0), false, false)
+        }
+        Mode::Entering => {
+            // Cautious entry - wide eyes, neutral mouth
+            (Color::srgb(0.2, 0.2, 0.2), Color::srgb(0.6, 0.3, 0.2), Vec2::new(6.0, 2.0), false, false)
+        }
+        Mode::Shock => {
+            // Shocked/discovered - wide eyes, open mouth
+            (Color::WHITE, Color::srgb(0.9, 0.1, 0.1), Vec2::new(8.0, 3.0), false, false)
+        }
+        Mode::Assess => {
+            // Assessing - focused eyes, neutral mouth
+            (Color::srgb(0.3, 0.5, 0.3), Color::srgb(0.5, 0.3, 0.2), Vec2::new(6.0, 2.0), false, false)
+        }
+        Mode::Investigate => {
+            // Investigating - alert eyes, slightly open mouth
+            (Color::srgb(0.4, 0.6, 0.4), Color::srgb(0.7, 0.4, 0.2), Vec2::new(7.0, 2.5), false, false)
+        }
+        Mode::Secure => {
+            // Securing area - focused eyes, determined mouth
+            (Color::srgb(0.2, 0.4, 0.6), Color::srgb(0.4, 0.2, 0.1), Vec2::new(6.0, 1.5), true, false)
+        }
+        Mode::Guard => {
+            // Guarding - alert eyes, serious mouth, hat visible
+            (Color::srgb(0.1, 0.3, 0.5), Color::srgb(0.3, 0.15, 0.1), Vec2::new(5.0, 1.0), true, true)
+        }
+        Mode::CallBoss => {
+            // Calling for backup - wide eyes, open mouth, badge visible
+            (Color::srgb(0.5, 0.2, 0.1), Color::srgb(0.8, 0.8, 0.1), Vec2::new(8.0, 3.0), true, true)
+        }
+        Mode::Pursue => {
+            // Pursuing infiltrator - intense eyes, snarling mouth, hat visible
+            (Color::srgb(1.0, 0.0, 0.0), Color::srgb(0.8, 0.1, 0.1), Vec2::new(9.0, 2.0), true, true)
+        }
+    };
+    
+    // Update eyes
+    if let Ok((mut left_eye, _)) = eyes_left.single_mut() {
+        left_eye.color = eye_color;
+    }
+    if let Ok((mut right_eye, _)) = eyes_right.single_mut() {
+        right_eye.color = eye_color;
+    }
+    
+    // Update mouth
+    if let Ok((mut mouth_sprite, _)) = mouths.single_mut() {
+        mouth_sprite.color = mouth_color;
+        mouth_sprite.custom_size = Some(mouth_size);
+    }
+    
+    // Update hat visibility
+    if let Ok((mut hat_vis, _)) = hats.single_mut() {
+        *hat_vis = if show_hat { Visibility::Inherited } else { Visibility::Hidden };
+    }
+    
+    // Update badge visibility
+    if let Ok(mut badge_vis) = badges.single_mut() {
+        *badge_vis = if show_badge { Visibility::Inherited } else { Visibility::Hidden };
     }
 }
 

@@ -32,6 +32,7 @@ crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
 bevy = "0.19"
 # The client-side session transport (ADR-0006 §2): async runtime + WebSocket.
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+idaptik-net = { path = "crates/idaptik-net" }
 tokio-tungstenite = "0.30"
 futures-util = "0.3"
