@@ -44,7 +44,7 @@ case "$MODE" in
         
 
         # Launching in foreground so you can play the game!
-        exec ~/.local/bin/mise exec -- just run-bevy || exec just run-bevy
+        ~/.local/bin/mise exec -- just run-bevy || exec just run-bevy
         ;;
     --stop)
         echo "[launcher] Stopping $APP_NAME..."
