@@ -50,7 +50,7 @@ pub fn run(cfg: RunConfig, seed: u32) -> io::Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let result = run_loop(&mut terminal, &mut sim, &mut log);
+    let result = run_loop(&mut terminal, &mut sim, &mut log, enhanced);
 
     if enhanced {
         let _ = execute!(terminal.backend_mut(), PopKeyboardEnhancementFlags);
@@ -65,8 +65,9 @@ fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     sim: &mut GhostLobbySim,
     log: &mut Vec<LogLine>,
+    enhanced: bool,
 ) -> io::Result<()> {
-    let mut input = InputState::new();
+    let mut input = InputState::with_keyboard_enhancement(enhanced);
     let mut hint: Option<String> = None;
     let mut acc = 0.0f64;
     let mut last = Instant::now();
