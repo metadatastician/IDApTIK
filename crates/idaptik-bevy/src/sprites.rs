@@ -83,6 +83,39 @@ pub fn spawn_player_children(
 #[derive(Component)]
 pub struct BillyHead;
 
+/// Marker: Billy's left eye.
+#[derive(Component)]
+pub struct BillyEyeLeft;
+
+/// Marker: Billy's right eye.
+#[derive(Component)]
+pub struct BillyEyeRight;
+
+/// Marker: Billy's mouth.
+#[derive(Component)]
+pub struct BillyMouth;
+
+/// Marker: Billy's guard hat.
+#[derive(Component)]
+pub struct BillyHat;
+
+/// Marker: Billy's badge (authority indicator).
+#[derive(Component)]
+pub struct BillyBadge;
+
+/// Constants for Billy facial features
+const BILLY_EYE_RADIUS: f32 = 2.0;
+const BILLY_EYE_Y: f32 = 28.0; // Positioned on head
+const BILLY_EYE_X_OFFSET: f32 = 3.0; // Distance from center to each eye
+const BILLY_MOUTH_W: f32 = 6.0;
+const BILLY_MOUTH_H: f32 = 2.0;
+const BILLY_MOUTH_Y: f32 = 23.0;
+const BILLY_HAT_W: f32 = 16.0;
+const BILLY_HAT_H: f32 = 4.0;
+const BILLY_HAT_Y: f32 = 35.0;
+const BILLY_BADGE_SIZE: f32 = 4.0;
+const BILLY_BADGE_Y: f32 = 26.0;
+
 /// Spawn Billy's head as a child of the existing `BillyMarker` body. Billy has
 /// no source art in IDApixiTIK (there is no guard/NPC anywhere in that
 /// prototype); this extends the same layered-shape language the player just
@@ -92,6 +125,7 @@ pub fn spawn_billy_children(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<ColorMaterial>,
 ) {
+    // Head (base layer)
     let head_mesh = meshes.add(Circle::new(HEAD_RADIUS + 1.0));
     let head_material = materials.add(ColorMaterial::from(Color::srgb(1.0, 0.8, 0.667)));
     parent.spawn((
@@ -99,6 +133,42 @@ pub fn spawn_billy_children(
         Mesh2d(head_mesh),
         MeshMaterial2d(head_material),
         Transform::from_translation(Vec3::new(0.0, HEAD_Y + 4.0, 0.6)),
+    ));
+    
+    // Eyes as sprites (easier to change color dynamically)
+    parent.spawn((
+        BillyEyeLeft,
+        Sprite::from_color(Color::srgb(0.1, 0.1, 0.1), Vec2::new(BILLY_EYE_RADIUS * 2.0, BILLY_EYE_RADIUS * 2.0)),
+        Transform::from_translation(Vec3::new(-BILLY_EYE_X_OFFSET, BILLY_EYE_Y, 0.7)),
+    ));
+    
+    parent.spawn((
+        BillyEyeRight,
+        Sprite::from_color(Color::srgb(0.1, 0.1, 0.1), Vec2::new(BILLY_EYE_RADIUS * 2.0, BILLY_EYE_RADIUS * 2.0)),
+        Transform::from_translation(Vec3::new(BILLY_EYE_X_OFFSET, BILLY_EYE_Y, 0.7)),
+    ));
+    
+    // Mouth (will change based on mode)
+    parent.spawn((
+        BillyMouth,
+        Sprite::from_color(Color::srgb(0.5, 0.2, 0.1), Vec2::new(BILLY_MOUTH_W, BILLY_MOUTH_H)),
+        Transform::from_translation(Vec3::new(0.0, BILLY_MOUTH_Y, 0.7)),
+    ));
+    
+    // Guard hat (only visible in certain modes)
+    parent.spawn((
+        BillyHat,
+        Sprite::from_color(Color::srgb(0.2, 0.25, 0.3), Vec2::new(BILLY_HAT_W, BILLY_HAT_H)),
+        Transform::from_translation(Vec3::new(0.0, BILLY_HAT_Y, 0.8)),
+        Visibility::Hidden, // Hidden by default, shown in guard modes
+    ));
+    
+    // Badge (authority indicator)
+    parent.spawn((
+        BillyBadge,
+        Sprite::from_color(Color::srgb(0.8, 0.6, 0.2), Vec2::new(BILLY_BADGE_SIZE, BILLY_BADGE_SIZE)),
+        Transform::from_translation(Vec3::new(0.0, BILLY_BADGE_Y, 0.75)),
+        Visibility::Hidden, // Hidden by default
     ));
 }
 

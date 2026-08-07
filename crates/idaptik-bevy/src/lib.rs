@@ -21,6 +21,7 @@ pub mod driver;
 pub mod hud;
 pub mod keymap;
 pub mod net_view;
+pub mod netplay;
 pub mod scene;
 pub mod sprites;
 
