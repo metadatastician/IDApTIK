@@ -49,6 +49,19 @@ install-idris2:
 doctor:
     @bash scripts/doctor.sh
 
+# Diagnose only what players need to launch; unlike `just doctor`, this does
+# not require optional FFI/config development toolchains.
+runtime-doctor:
+    @bash scripts/runtime-doctor.sh report all
+
+# Install pinned repository dependencies and guide host/network recovery.
+repair:
+    @bash scripts/runtime-doctor.sh repair all
+
+# Deterministic fixture coverage for fatal/warning runtime diagnosis.
+runtime-doctor-test:
+    @bash tests/runtime_doctor_test.sh
+
 # Show the pinned versions at a glance.
 versions:
     @cat mise.toml rust-toolchain.toml

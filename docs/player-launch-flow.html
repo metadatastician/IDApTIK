@@ -1,0 +1,68 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IDApTIK launch and multiplayer diagnostic flow</title>
+  <style>
+    :root { color-scheme: dark; --bg:#11151a; --card:#1b222b; --ink:#edf5ef; --muted:#aebdb4; --green:#57dc8b; --amber:#ffc857; --red:#ff6b6b; --line:#506257; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 system-ui,sans-serif; }
+    main { width:min(980px,94vw); margin:2rem auto 5rem; }
+    h1 { margin-bottom:.25rem; } h2 { margin-top:2.5rem; }
+    .lead,.note { color:var(--muted); }
+    .flow { display:grid; gap:1rem; }
+    .node { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem; position:relative; }
+    .node + .node::before { content:"↓"; position:absolute; top:-1.35rem; left:50%; color:var(--green); font-weight:800; }
+    .pass { border-left:6px solid var(--green); } .warn { border-left:6px solid var(--amber); } .fail { border-left:6px solid var(--red); }
+    .ready { border:2px solid var(--green); box-shadow:0 0 24px #57dc8b22; text-align:center; font-size:1.2rem; }
+    code,pre { background:#0b0e11; border-radius:6px; }
+    code { padding:.12rem .3rem; } pre { padding:.8rem; overflow:auto; white-space:pre-wrap; }
+    .split { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:1rem; }
+    strong { color:#fff; }
+  </style>
+</head>
+<body><main>
+  <h1>IDApTIK launch flow</h1>
+  <p class="lead">Follow the ticks. A red cross stops the flow. Never tell the joiner to start until the host displays the green readiness message.</p>
+
+  <h2>Host</h2>
+  <section class="flow">
+    <div class="node pass"><strong>1. Runtime diagnosis</strong><br>Machine, OS/kernel, WSLg transport, graphics, audio, Rust, Elixir, network route and Tailscale are checked before anything launches.</div>
+    <div class="node fail"><strong>If you see <code>[WARN: COPY MODE]</code></strong><br>Stop. In Windows PowerShell as Administrator run:<pre>wsl --update
+wsl --shutdown</pre>Reopen Debian. Restart Windows if it remains.</div>
+    <div class="node pass"><strong>2. Build</strong><br>Wait for <em>✓ Bevy GUI build is complete</em>. Cargo may take several minutes on the first machine. Do not invite anyone while it says building.</div>
+    <div class="node pass"><strong>3. Relay and route</strong><br>The Phoenix/Bandit relay must answer on port 4000. Under WSL2 NAT, Tailscale must be installed, running and authenticated.</div>
+    <div class="node ready"><strong>● READY FOR JOINERS</strong><br>Only now share the displayed tailnet address.</div>
+  </section>
+
+  <h2>Joiner</h2>
+  <section class="flow">
+    <div class="node warn"><strong>1. Wait for the host</strong><br>The host must explicitly say that their screen shows <em>READY FOR JOINERS</em>.</div>
+    <div class="node pass"><strong>2. Runtime diagnosis and local build</strong><br>The same machine/display/dependency checks run locally. Wait until the joiner's GUI build has a tick.</div>
+    <div class="node pass"><strong>3. Exact relay probe</strong><br>The launcher tests the supplied host and port. An unreachable relay is a cross, not a half-started game.</div>
+    <div class="node ready"><strong>● READY — JOINING HOST NOW</strong><br>The client starts only after all gates pass.</div>
+  </section>
+
+  <h2>Friendly fault map</h2>
+  <section class="split">
+    <div class="node fail"><strong>Penguin icon; window will not open</strong><br>WSLg Copy Mode. Use the Windows update/shutdown recovery above.</div>
+    <div class="node warn"><strong>Software renderer / llvmpipe</strong><br>The game may run slowly. Update the Windows GPU driver; verify <code>/dev/dxg</code>.</div>
+    <div class="node warn"><strong>No audio device</strong><br>Non-blocking. WSLg audio is unavailable; gameplay and networking can continue.</div>
+    <div class="node fail"><strong>Dependency missing</strong><br>Run <code>./launcher.sh --repair</code>, then <code>./launcher.sh --doctor</code>.</div>
+    <div class="node fail"><strong>Tailscale unavailable</strong><br>Choose safe repair. Follow its install/login prompt. Both players must be on the intended tailnet.</div>
+    <div class="node fail"><strong>Host relay unreachable</strong><br>Do not launch repeatedly. Confirm the host is green, the address is current, and Tailscale is connected on both machines.</div>
+    <div class="node fail"><strong>Build still running</strong><br>Wait. Read the displayed checklist or the reported log. Readiness never means “PID exists.”</div>
+    <div class="node warn"><strong>Extended coprocessor suite</strong><br>QPU/APU/IOPU/vector/physics/math/tensor/neural/crypto backends are not dependencies of this release and are not claimed as active.</div>
+  </section>
+
+  <h2>Useful commands</h2>
+  <pre>./launcher.sh --doctor
+./launcher.sh --repair
+./launcher.sh --status
+./launcher.sh --stop
+./launcher.sh --help
+./launcher.sh --man</pre>
+  <p class="note">This page contains no JavaScript and remains useful when WSLg itself is the failing component.</p>
+</main></body></html>

@@ -6,7 +6,7 @@
 # (
 #   id                   = "idaptik-launcher"
 #   type                 = "launcher"
-#   version              = "0.3.0"
+#   version              = "0.4.0"
 #   app-name             = "idaptik"
 #   app-display          = "IDApTIK"
 #   app-url              = ""
@@ -20,6 +20,10 @@
 #     "--start"
 #     "--stop"
 #     "--status"
+#     "--doctor"
+#     "--repair"
+#     "--flowdiags"
+#     "--man"
 #     "--auto"
 #     "--browser"
 #     "--web"
@@ -42,7 +46,7 @@ APP_NAME="idaptik"
 APP_DISPLAY="IDApTIK"
 APP_DESC="Asymmetric two-player infiltration game"
 APP_CATEGORIES="Game;Network;"
-VERSION="0.3.0"
+VERSION="0.4.0"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP_NAME"
@@ -65,12 +69,18 @@ RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$APP_NAME"
 PID_FILE="$RUNTIME_DIR/$APP_NAME-server.pid"
 LOG_FILE="$STATE_DIR/game.log"
+PROGRESS_FILE="$STATE_DIR/startup.progress"
+READY_FILE="$STATE_DIR/startup.ready"
 PORT="${IDAPTIK_PORT:-4000}"
 MULTIPLAYER_LAUNCHER="$REPO_DIR/idaptik-multiplayer-launcher.sh"
+RUNTIME_DOCTOR="$REPO_DIR/scripts/runtime-doctor.sh"
 
 say()  { printf '[%s] %s\n' "$APP_NAME" "$*"; }
 warn() { printf '[%s] WARN: %s\n' "$APP_NAME" "$*" >&2; }
 die()  {
+  if [ -n "${IDAPTIK_PROGRESS_FILE:-}" ]; then
+    printf 'FAIL|%s\n' "$*" >> "$IDAPTIK_PROGRESS_FILE"
+  fi
   if declare -F hp_gui_error >/dev/null 2>&1; then
     hp_gui_error "$APP_DISPLAY launcher error" "$*"
   else
@@ -111,6 +121,15 @@ pid_is_game() {
 require_repo() {
   [ -f "$REPO_DIR/Cargo.toml" ] || die "repository not found at $REPO_DIR (set IDAPTIK_REPO_DIR or rerun --integ from the repository)"
   [ -x "$MULTIPLAYER_LAUNCHER" ] || die "multiplayer launcher missing or not executable: $MULTIPLAYER_LAUNCHER"
+  [ -x "$RUNTIME_DOCTOR" ] || die "runtime diagnostics missing or not executable: $RUNTIME_DOCTOR"
+}
+
+runtime_preflight() {
+  local profile="$1" target="${2:-}"
+  require_repo
+  if ! "$RUNTIME_DOCTOR" preflight "$profile" "$target"; then
+    die "runtime preflight failed; run './launcher.sh --doctor' for the full report"
+  fi
 }
 
 trust_mise() {
@@ -128,8 +147,33 @@ run_solo() {
   require_repo
   trust_mise
   cd "$REPO_DIR"
+  progress PASS "Pinned Rust dependencies are available"
+  progress STEP "Building the solo GUI (Cargo reuses completed work)"
   "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy
+  progress PASS "Solo GUI build is complete"
+  mark_ready "solo"
   exec "$REPO_DIR/target/debug/idaptik-bevy" --local
+}
+
+progress() {
+  [ -n "${IDAPTIK_PROGRESS_FILE:-}" ] || return 0
+  printf '%s|%s\n' "$1" "$2" >> "$IDAPTIK_PROGRESS_FILE"
+}
+
+mark_ready() {
+  [ -n "${IDAPTIK_READY_FILE:-}" ] || return 0
+  printf '%s\n' "$1" > "$IDAPTIK_READY_FILE"
+}
+
+show_progress_line() {
+  local kind="${1%%|*}" detail="${1#*|}"
+  case "$kind" in
+    PASS) printf '  ✓ %s\n' "$detail" ;;
+    WARN) printf '  ! %s\n' "$detail" ;;
+    FAIL) printf '  ✗ %s\n' "$detail" ;;
+    STEP) printf '  … %s\n' "$detail" ;;
+    *) printf '  · %s\n' "$detail" ;;
+  esac
 }
 
 start_game() {
@@ -138,10 +182,13 @@ start_game() {
     return 0
   fi
 
-  local label="$1"
-  shift
+  local profile="$1" target="$2" label="$3"
+  shift 3
+  runtime_preflight "$profile" "$target"
   mkdir -p "$STATE_DIR"
   : > "$LOG_FILE"
+  : > "$PROGRESS_FILE"
+  rm -f "$READY_FILE"
   say "launching $APP_DISPLAY — $label (GUI)"
   say "startup log: $LOG_FILE"
 
@@ -152,33 +199,67 @@ start_game() {
     return 0
   fi
 
-  nohup "$@" >>"$LOG_FILE" 2>&1 &
+  nohup env \
+    IDAPTIK_PREFLIGHT_DONE=1 \
+    IDAPTIK_PROGRESS_FILE="$PROGRESS_FILE" \
+    IDAPTIK_READY_FILE="$READY_FILE" \
+    "$@" >>"$LOG_FILE" 2>&1 &
   local pid=$!
   printf '%s\n' "$pid" > "$PID_FILE"
 
-  # Catch immediate dependency/argument failures without delaying a healthy
-  # GUI launch. Longer compilation progress remains available in the log.
+  printf '\nStartup checklist:\n'
+  local waited=0 shown=0 lines line startup_timeout="${IDAPTIK_STARTUP_TIMEOUT:-1800}"
+  while [ ! -f "$READY_FILE" ]; do
+    lines="$(wc -l < "$PROGRESS_FILE" 2>/dev/null || printf 0)"
+    if [ "$lines" -gt "$shown" ]; then
+      while IFS= read -r line; do show_progress_line "$line"; done < <(sed -n "$((shown + 1)),${lines}p" "$PROGRESS_FILE")
+      shown="$lines"
+    fi
+    if ! kill -0 "$pid" 2>/dev/null; then
+      rm -f "$PID_FILE"
+      printf '  ✗ Startup process exited before readiness.\n' >&2
+      tail -n 30 "$LOG_FILE" >&2 || true
+      die "nothing is ready; see $LOG_FILE or run './launcher.sh --flowdiags'"
+    fi
+    if [ "$waited" -ge "$startup_timeout" ]; then
+      warn "startup is still incomplete after ${startup_timeout}s; joiners must wait"
+      say "check progress with: tail -f $LOG_FILE"
+      return 1
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  lines="$(wc -l < "$PROGRESS_FILE" 2>/dev/null || printf 0)"
+  if [ "$lines" -gt "$shown" ]; then
+    while IFS= read -r line; do show_progress_line "$line"; done < <(sed -n "$((shown + 1)),${lines}p" "$PROGRESS_FILE")
+  fi
   sleep 1
   if ! kill -0 "$pid" 2>/dev/null; then
-    rm -f "$PID_FILE"
+    rm -f "$PID_FILE" "$READY_FILE"
+    printf '  ✗ Game process exited during the final readiness check.\n' >&2
     tail -n 30 "$LOG_FILE" >&2 || true
-    die "GUI failed to launch; see $LOG_FILE"
+    die "readiness was withdrawn; joiners must not start"
   fi
-  say "GUI startup is running as PID $pid"
+  case "$profile" in
+    host) printf '\n\033[1;32m● READY FOR JOINERS\033[0m — share the address above only now.\n' ;;
+    join) printf '\n\033[1;32m● READY — JOINING HOST NOW\033[0m\n' ;;
+    solo) printf '\n\033[1;32m● READY — OPENING SOLO GUI\033[0m\n' ;;
+  esac
+  say "game process: PID $pid"
 }
 
 start_solo() {
-  start_game "solo (controls both roles)" "$REPO_DIR/launcher.sh" __run-solo
+  start_game solo "" "solo (controls both roles)" "$REPO_DIR/launcher.sh" __run-solo
 }
 
 start_host() {
   local role="$1"
-  start_game "multiplayer host · $role" "$MULTIPLAYER_LAUNCHER" host --role "$role"
+  start_game host "" "multiplayer host · $role" "$MULTIPLAYER_LAUNCHER" host --role "$role"
 }
 
 start_join() {
   local host="$1" role="$2"
-  start_game "multiplayer join · $role · $host" "$MULTIPLAYER_LAUNCHER" join "$host" --role "$role"
+  start_game join "$host" "multiplayer join · $role · $host" "$MULTIPLAYER_LAUNCHER" join "$host" --role "$role"
 }
 
 choose_role() {
@@ -206,10 +287,11 @@ IDApTIK — launch menu
   1) Solo GUI         Control both sides of Ghost Lobby locally
   2) Multiplayer GUI  Host or join a two-player session
   3) Status
-  4) Quit
+  4) Diagnostics and safe repair
+  5) Quit
 MENU
   while true; do
-    read -rp 'Mode [1-4]: ' mode
+    read -rp 'Mode [1-5]: ' mode
     case "$mode" in
       1|s|S|solo) start_solo; return 0 ;;
       2|m|M|multiplayer)
@@ -235,8 +317,20 @@ MENU
         done
         ;;
       3|status) mode_status; return $? ;;
-      4|q|Q|quit|exit) return 0 ;;
-      *) warn "choose 1, 2, 3, or 4" ;;
+      4|d|D|doctor|diagnostics)
+        "$RUNTIME_DOCTOR" report all || true
+        printf '\n  r) Attempt safe dependency/network repair\n' >&2
+        printf '  f) Open the friendly troubleshooting flowchart\n' >&2
+        printf '  Enter) Return to the shell\n' >&2
+        read -rp 'Diagnostics action [r/f/Enter]: ' action
+        case "$action" in
+          r|R|repair) "$RUNTIME_DOCTOR" repair all ;;
+          f|F|flow|flowdiags) mode_flowdiags ;;
+        esac
+        return 0
+        ;;
+      5|q|Q|quit|exit) return 0 ;;
+      *) warn "choose 1, 2, 3, 4, or 5" ;;
     esac
   done
 }
@@ -259,7 +353,7 @@ stop_game() {
   else
     say "game is not running"
   fi
-  rm -f "$PID_FILE"
+  rm -f "$PID_FILE" "$READY_FILE" "$PROGRESS_FILE"
 }
 
 stop_all() {
@@ -276,9 +370,15 @@ mode_status() {
   if pid_is_game; then
     say "game: running (PID $(<"$PID_FILE"))"
     say "log: $LOG_FILE"
+    if [ -r "$READY_FILE" ]; then
+      say "readiness: $(<"$READY_FILE")"
+    else
+      say "readiness: startup incomplete — joiners must wait"
+    fi
     status=0
   else
     say "game: stopped"
+    [ ! -e "$READY_FILE" ] || say "readiness: stale record present (run --stop before relaunching)"
   fi
   if [ -x "$MULTIPLAYER_LAUNCHER" ]; then
     "$MULTIPLAYER_LAUNCHER" __relay-status && status=0 || true
@@ -286,6 +386,35 @@ mode_status() {
     say "relay: unavailable (multiplayer launcher not found)"
   fi
   return "$status"
+}
+
+mode_flowdiags() {
+  local flow="$REPO_DIR/docs/player-launch-flow.html"
+  [ -r "$flow" ] || die "diagnostic flowchart is missing: $flow"
+  if grep -qi microsoft /proc/version 2>/dev/null && command -v explorer.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1; then
+    nohup explorer.exe "$(wslpath -w "$flow")" >/dev/null 2>&1 &
+    say "opened the diagnostic flowchart in the Windows browser"
+  elif command -v xdg-open >/dev/null 2>&1; then
+    nohup xdg-open "$flow" >/dev/null 2>&1 &
+    say "opened the diagnostic flowchart in the default browser"
+  elif command -v open >/dev/null 2>&1; then
+    open "$flow"
+  else
+    say "open this file in a browser: $flow"
+  fi
+}
+
+mode_man() {
+  local manual="$REPO_DIR/docs/man/idaptik-launcher.1"
+  [ -r "$manual" ] || die "manual page is missing: $manual"
+  if command -v man >/dev/null 2>&1 && [ -t 1 ]; then
+    man "$manual"
+  elif command -v groff >/dev/null 2>&1; then
+    groff -man -Tascii "$manual"
+  else
+    say "manual source: $manual"
+    sed -n '1,260p' "$manual"
+  fi
 }
 
 desktop_tools_dir() {
@@ -475,6 +604,18 @@ Player modes:
   --join HOST [--role ROLE] Join HOST in the Bevy GUI
                             ROLE is infiltrator or hacker
 
+Readiness choreography:
+  A host may invite the other player only after ● READY FOR JOINERS.
+  A joiner starts Bevy only after its build and exact relay probe pass.
+  ✓ means passed, ! means non-blocking degradation, ✗ means stop/no launch.
+
+Diagnostics and recovery:
+  --doctor                  Machine/OS/WSL, coprocessor, dependency, audio,
+                            Tailscale, route, and display health report
+  --repair                  Install pinned dependencies; guide Tailscale/WSL repair
+  --flowdiags               Open the friendly HTML troubleshooting flowchart
+  --man                     Display the complete section-1 manual
+
 Standard lifecycle modes:
   --start                   Launch the solo Bevy GUI without opening the menu
   --stop                    Stop the game and a relay started by this project
@@ -484,15 +625,29 @@ Standard lifecycle modes:
   --help, -h                Show this help and the files read/written
   --version, -V             Print launcher version/build/platform
 
+Two-machine example:
+  Host:    $0 --host --role infiltrator
+           Wait for ● READY FOR JOINERS, then share its tailnet address.
+  Joiner:  $0 --join HOST --role hacker
+           Run only after the host is green; wait for ● READY — JOINING HOST NOW.
+
+Recovery example:
+  $0 --doctor
+  $0 --repair
+  $0 --flowdiags
+
 Environment:
   IDAPTIK_PORT              Relay port (current: $PORT; default: 4000)
   IDAPTIK_REPO_DIR          Override repository location for an installed copy
   IDAPTIK_LAUNCHER_DRY_RUN  Set to 1 to print the selected launch command
+  IDAPTIK_STARTUP_TIMEOUT   Readiness wait in seconds (default: 1800)
 
 Files:
   reads  $REPO_PATH_FILE
   writes $PID_FILE
          $LOG_FILE
+         $PROGRESS_FILE
+         $READY_FILE
 
 Detected platform: $(platform)
 Repository: $REPO_DIR
@@ -538,6 +693,10 @@ case "$MODE" in
   --auto|--browser|--web) menu ;;
   --stop) [ $# -eq 0 ] || die "--stop takes no arguments"; stop_all ;;
   --status) [ $# -eq 0 ] || die "--status takes no arguments"; mode_status ;;
+  --doctor) [ $# -eq 0 ] || die "--doctor takes no arguments"; "$RUNTIME_DOCTOR" report all ;;
+  --repair) [ $# -eq 0 ] || die "--repair takes no arguments"; "$RUNTIME_DOCTOR" repair all ;;
+  --flowdiags) [ $# -eq 0 ] || die "--flowdiags takes no arguments"; mode_flowdiags ;;
+  --man) [ $# -eq 0 ] || die "--man takes no arguments"; mode_man ;;
   --integ) [ $# -le 1 ] || die "usage: --integ [--force]"; mode_integ "${1:-}" ;;
   --disinteg) [ $# -eq 0 ] || die "--disinteg takes no arguments"; mode_disinteg ;;
   --version|-V) printf '%s %s (%s) [%s]\n' "$APP_NAME-launcher" "$VERSION" "$(build_sha)" "$(platform)" ;;

@@ -5,6 +5,12 @@ cd "$(dirname "$0")/.." || exit 1
 
 failures=0
 
+echo "IDApTIK player/runtime status:"
+if ! bash scripts/runtime-doctor.sh report all; then
+  failures=$((failures + 1))
+fi
+echo
+
 check_contains() {
   local name="$1" expected="$2"
   shift 2
@@ -19,7 +25,7 @@ check_contains() {
   fi
 }
 
-echo "IDApTIK toolchain status:"
+echo "IDApTIK development toolchain status:"
 echo "Rust (gameplay truth):"
 check_contains rustc  "rustc 1.95.0" rustc --version
 check_contains cargo  "cargo 1.95.0" cargo --version
