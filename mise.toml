@@ -11,6 +11,7 @@ elixir = "1.19.5-otp-28"
 zig = "0.14.0"
 just = "1.46.0"
 "aqua:nickel-lang/nickel" = "1.16.0"
+"aqua:trufflesecurity/trufflehog" = "3.96.0"
 
 # Idris2 is provisioned on demand with `just install-idris2`; it requires a
 # Scheme backend and is not part of the day-to-day game-development toolchain.

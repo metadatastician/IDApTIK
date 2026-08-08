@@ -18,7 +18,16 @@ setup:
     mise trust
     mise install
     rustup target add wasm32-unknown-unknown
-    @echo "Base toolchains ready. On Linux also run 'just bevy-linux-deps'; for Idris2 'just install-idris2'."
+    bash scripts/install-git-hooks.sh
+    @echo "Base toolchains and Git hooks ready. On Linux also run 'just bevy-linux-deps'; for Idris2 'just install-idris2'."
+
+# Activate the tracked, fail-closed pre-push secret scan for an existing clone.
+install-git-hooks:
+    bash scripts/install-git-hooks.sh
+
+# Scan the complete local Git history for verified or unverifiable secrets.
+secret-scan:
+    trufflehog git --no-update --fail --results=verified,unknown file://.
 
 # Install Bevy's Linux system libraries (Debian/Ubuntu). Bevy needs these to
 # build/run on Linux (audio, input, windowing); not needed on macOS/Windows.
