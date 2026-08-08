@@ -6,20 +6,36 @@
 # (
 #   id                   = "idaptik-multiplayer-launcher"
 #   type                 = "launcher"
-#   version              = "0.1.0"
+#   version              = "0.2.0"
 #   app-name             = "idaptik-multiplayer"
 #   app-display          = "IDApTIK Multiplayer"
-#   runtime-kind         = "tui-netplay"
+#   runtime-kind         = "gui-netplay"
 #   standards-compliance = [
 #     "launcher-standard.adoc"
 #   ]
 #   standard-spec-version = "0.3.0"
 #   generator             = "hand-authored"
+#   app-url                = ""
+#   modes                  = [
+#     "--start"
+#     "--stop"
+#     "--status"
+#     "--auto"
+#     "--browser"
+#     "--web"
+#     "--integ"
+#     "--disinteg"
+#     "--help"
+#     "--version"
+#   ]
+#   platforms              = ["linux" "macos" "windows"]
+#   lifecycle-phases-covered = ["install" "run" "stop" "status" "uninstall"]
+#   lifecycle-phases-deferred = ["warmup" "personalize" "update" "repair"]
 # )
 # @a2ml-metadata end
 #
 # ============================================================================
-# idaptik-multiplayer-launcher.sh — two humans, one Ghost Lobby.
+# idaptik-multiplayer-launcher.sh — two humans, one graphical Ghost Lobby.
 # ============================================================================
 # One player HOSTS (runs the relay + a seat), the other JOINS the host's
 # address. Both machines need this repo checked out; both seats read the same
@@ -34,30 +50,22 @@
 # address is the host's tailnet IP); otherwise forward TCP 4000 on the
 # host's router.
 #
-# Hit ended_no_peer, or a blank terminal after a session? See
-# docs/MULTIPLAYER-TROUBLESHOOTING.md — covers the WSL2 NAT address trap
-# (see share_addresses() below), the 15s join-timeout window, and terminal
-# cleanup after a live session ends.
+# If the peer cannot connect or the GUI does not open, see
+# docs/MULTIPLAYER-TROUBLESHOOTING.md. The WSL2 NAT address trap is detected
+# by share_addresses() below.
 # ============================================================================
 
 set -euo pipefail
 
 APP_DISPLAY="IDApTIK Multiplayer"
-VERSION="0.1.0"
+VERSION="0.2.0"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_CONFIG="$REPO_DIR/fixtures/session_relay/versus_script.json"
-NETPLAY_BIN="$REPO_DIR/target/release/idaptik-netplay"
+BEVY_BIN="$REPO_DIR/target/release/idaptik-bevy"
 
 PORT="${IDAPTIK_PORT:-4000}"
 SESSION_DEFAULT="ghost-lobby"
-
-# How long a seated player waits for the other to arrive. The seat binary
-# defaults to 15 s, which is a machine-to-machine value; humans swapping an
-# address over chat need minutes. Override with IDAPTIK_WAIT_MS if you want.
-JOIN_TIMEOUT_MS="${IDAPTIK_WAIT_MS:-600000}"
-# And how long the run is held open for a dropped player to rejoin.
-REJOIN_WINDOW_MS="${IDAPTIK_REJOIN_MS:-300000}"
 
 PID_FILE="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/idaptik-relay.pid"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/idaptik-multiplayer"
@@ -97,23 +105,30 @@ preflight_common() {
   # An untrusted mise config is SILENTLY ignored and the global toolchain
   # resolves instead — trust it before anything builds (see AGENTS.md).
   if command -v mise >/dev/null 2>&1; then
-    (cd "$REPO_DIR" && mise trust -q 2>/dev/null || true)
+    MISE_BIN="$(command -v mise)"
+  elif [ -x "$HOME/.local/bin/mise" ]; then
+    MISE_BIN="$HOME/.local/bin/mise"
+  else
+    die "mise is required — install it, then run 'mise install' in $REPO_DIR"
   fi
-  need cargo "to build the game client" "install Rust (e.g. via mise: 'mise install')"
+  (cd "$REPO_DIR" && "$MISE_BIN" trust -q)
+  (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo --version >/dev/null) || \
+    die "the pinned Rust toolchain is unavailable — run 'mise install'"
 }
 
 preflight_host() {
   preflight_common
-  need mix "to run the relay (host only)" "install Elixir/OTP (e.g. via mise: 'mise install')"
+  (cd "$REPO_DIR" && "$MISE_BIN" exec -- mix --version >/dev/null) || \
+    die "the pinned Elixir/OTP toolchain is unavailable — run 'mise install'"
   need curl "to poll relay readiness (host only)" "install curl from your package manager"
 }
 
 build_seat() {
-  if [ ! -x "$NETPLAY_BIN" ] || [ "${1:-}" = "--rebuild" ]; then
-    say "building the netplay seat (first run takes a few minutes)…"
-    (cd "$REPO_DIR" && cargo build --release -q -p idaptik-net)
+  if [ ! -x "$BEVY_BIN" ] || [ "${1:-}" = "--rebuild" ]; then
+    say "building the Bevy netplay client (first run takes a few minutes)…"
+    (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release -q -p idaptik-bevy)
   fi
-  [ -x "$NETPLAY_BIN" ] || die "build produced no $NETPLAY_BIN"
+  [ -x "$BEVY_BIN" ] || die "build produced no $BEVY_BIN"
 }
 
 relay_pid() {
@@ -133,10 +148,10 @@ start_relay() {
   fi
   mkdir -p "$LOG_DIR"
   say "starting the relay on :$PORT (log: $LOG_FILE)…"
-  (cd "$REPO_DIR/server" && mix deps.get >/dev/null)
+  (cd "$REPO_DIR/server" && "$MISE_BIN" exec -- mix deps.get >/dev/null)
   # IDAPTIK_BIND=all: the dev endpoint binds loopback-only by default, which
   # would make every remote join fail — hosting is the whole point here.
-  (cd "$REPO_DIR/server" && IDAPTIK_BIND=all IDAPTIK_PORT="$PORT" exec mix phx.server >>"$LOG_FILE" 2>&1) &
+  (cd "$REPO_DIR/server" && IDAPTIK_BIND=all IDAPTIK_PORT="$PORT" exec "$MISE_BIN" exec -- mix phx.server >>"$LOG_FILE" 2>&1) &
   echo $! > "$PID_FILE"
   local waited=0
   until relay_up; do
@@ -217,19 +232,21 @@ seat_url() {
   esac
 }
 
-run_seat() { # $1 url  $2 role  $3 session
-  say "seat: $2 · session: $3 · relay: $1"
-  say "keys: arrows/WASD move · E interact · Q throw · 1-4 uplinks · p/isp/grid pivots · Esc quits"
-  # Two humans coordinating over chat need minutes, not the seat binary's
-  # 15-second default: whoever sits down first waits while the other copies an
-  # address, sends it, and types the join. A 15 s window meant both seats
-  # timed out with `ended_no_peer` having never overlapped, which reads as
-  # "it doesn't work" when in fact the relay and the network were fine.
-  exec "$NETPLAY_BIN" --interactive \
-    --url "$1" --session "$3" --role "$2" \
-    --script "$RUN_CONFIG" \
-    --join-timeout-ms "$JOIN_TIMEOUT_MS" \
-    --rejoin-window-ms "$REJOIN_WINDOW_MS"
+run_seat() { # $1 host|join  $2 target  $3 url  $4 role  $5 session
+  local mode="$1" target="$2" url="$3" role="$4" session="$5"
+  say "seat: $role · session: $session · relay: $url · frontend: Bevy GUI"
+  say "keys: arrows/WASD move · E interact · Q throw · 1-4 uplinks · Tab changes view · Esc quits"
+  case "$mode" in
+    host)
+      exec "$BEVY_BIN" --host --url "$url" --session "$session" \
+        --role "$role" --script "$RUN_CONFIG"
+      ;;
+    join)
+      exec "$BEVY_BIN" --join "$target" --url "$url" --session "$session" \
+        --role "$role" --script "$RUN_CONFIG"
+      ;;
+    *) die "internal error: unknown seat mode $mode" ;;
+  esac
 }
 
 # ----------------------------------------------------------------------------
@@ -246,13 +263,14 @@ mode_host() {
       *) die "host: unknown argument $1" ;;
     esac
   done
+  case "$role" in infiltrator|hacker) ;; *) die "role must be infiltrator or hacker" ;; esac
   preflight_host
   build_seat "${REBUILD:+--rebuild}"
   start_relay
   share_addresses
   say "waiting in the lobby for the other seat… (relay keeps running after you quit;"
   say "'./idaptik-multiplayer-launcher.sh --stop' ends it)"
-  run_seat "$(seat_url "127.0.0.1:$PORT")" "$role" "$session"
+  run_seat host "127.0.0.1" "$(seat_url "127.0.0.1:$PORT")" "$role" "$session"
 }
 
 mode_join() {
@@ -266,9 +284,10 @@ mode_join() {
       *) die "join: unknown argument $1" ;;
     esac
   done
+  case "$role" in infiltrator|hacker) ;; *) die "role must be infiltrator or hacker" ;; esac
   preflight_common
   build_seat
-  run_seat "$(seat_url "$target")" "$role" "$session"
+  run_seat join "$target" "$(seat_url "$target")" "$role" "$session"
 }
 
 mode_status() {
@@ -280,52 +299,32 @@ mode_status() {
   else
     say "relay: not running"
   fi
-  if [ -x "$NETPLAY_BIN" ]; then
-    say "seat binary: built ($NETPLAY_BIN)"
+  if [ -x "$BEVY_BIN" ]; then
+    say "GUI binary: built ($BEVY_BIN)"
   else
-    say "seat binary: not built yet"
+    say "GUI binary: not built yet"
   fi
-}
-
-mode_integ() {
-  local apps="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
-  mkdir -p "$apps"
-  cat > "$apps/idaptik-multiplayer.desktop" <<DESK
-[Desktop Entry]
-Type=Application
-Name=$APP_DISPLAY
-Comment=Host or join a two-player Ghost Lobby session
-Exec=$REPO_DIR/idaptik-multiplayer-launcher.sh --auto
-Terminal=true
-Categories=Game;Network;
-DESK
-  command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$apps" || true
-  say "installed $apps/idaptik-multiplayer.desktop"
-}
-
-mode_disinteg() {
-  rm -f "${XDG_DATA_HOME:-$HOME/.local/share}/applications/idaptik-multiplayer.desktop"
-  say "desktop entry removed."
 }
 
 mode_help() {
   cat <<HELP
-$APP_DISPLAY — two humans, one Ghost Lobby.
+$APP_DISPLAY — two humans, one graphical Ghost Lobby.
 
   $0 host [--role infiltrator|hacker] [--session NAME] [--rebuild]
-      Build the seat, start the relay on :$PORT, print the address to share,
-      and sit down (default role: infiltrator).
+      Build the Bevy GUI, start the relay on :$PORT, print the address to
+      share, and sit down (default role: infiltrator).
 
   $0 join <host|host:port|ws://…> [--role R] [--session NAME]
-      Build the seat and join a friend's relay (default role: hacker).
+      Build the Bevy GUI and join a friend's relay (default role: hacker).
 
   Defaults match: a zero-flag 'host' and a one-argument 'join' meet in
   session '$SESSION_DEFAULT' with complementary roles and the same
   deterministic run config ($RUN_CONFIG).
 
-  Standard modes: --start (= host)  --stop (end the relay)  --status
-                  --auto (= host)   --integ / --disinteg (.desktop entry)
-                  --help  --version
+  Standard modes delegate to the main player-facing launcher:
+      --start (= graphical host)  --stop  --status
+      --auto / --browser / --web (= launch menu)
+      --integ / --disinteg  --help  --version
 
   Internet play: easiest is a Tailscale/WireGuard tunnel between the two
   machines (join the host's tailnet IP); otherwise forward TCP $PORT.
@@ -338,17 +337,21 @@ HELP
 # dispatch (standard modes + aliases + game modes)
 # ----------------------------------------------------------------------------
 
-MODE="${1:---help}"
+MODE="${1:---auto}"
 [ $# -gt 0 ] && shift || true
 
 case "$MODE" in
-  host|--start|--auto|--browser|--web) mode_host "$@" ;;
-  join)        mode_join "$@" ;;
-  --stop)      stop_relay ;;
-  --status)    mode_status ;;
-  --integ)     mode_integ ;;
-  --disinteg)  mode_disinteg ;;
-  --version)   say "idaptik-multiplayer-launcher $VERSION ($(build_sha)) [$(platform)]" ;;
+  host)          mode_host "$@" ;;
+  join)          mode_join "$@" ;;
+  __relay-stop)  stop_relay ;;
+  __relay-status) mode_status ;;
+  --start)       exec "$REPO_DIR/launcher.sh" --host "$@" ;;
+  --stop)        exec "$REPO_DIR/launcher.sh" --stop ;;
+  --status)      exec "$REPO_DIR/launcher.sh" --status ;;
+  --auto|--browser|--web) exec "$REPO_DIR/launcher.sh" "$MODE" ;;
+  --integ)       exec "$REPO_DIR/launcher.sh" --integ "$@" ;;
+  --disinteg)    exec "$REPO_DIR/launcher.sh" --disinteg ;;
+  --version|-V)  say "idaptik-multiplayer-launcher $VERSION ($(build_sha)) [$(platform)]" ;;
   --help|-h)   mode_help ;;
   *)           die "unknown mode: $MODE (try --help)" ;;
 esac

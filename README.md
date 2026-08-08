@@ -62,8 +62,11 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
 
 Still open: persistence/versioning and the long-term Rust↔Elixir wire encoding.
 
-Two-player netplay is driven by `./idaptik-multiplayer-launcher.sh` (`host` /
-`join`, see `--help`); hit an `ended_no_peer` or a stuck terminal? See
+Run `./launcher.sh` for the player-facing menu: choose solo or multiplayer,
+then choose the Infiltrator or Hacker seat for multiplayer. Both paths launch
+the Bevy GUI. Direct multiplayer commands remain available through
+`./idaptik-multiplayer-launcher.sh` (`host` / `join`, see `--help`); connection
+trouble is covered by
 [`docs/MULTIPLAYER-TROUBLESHOOTING.md`](docs/MULTIPLAYER-TROUBLESHOOTING.md).
 
 ## Layout

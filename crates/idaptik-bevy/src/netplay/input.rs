@@ -5,7 +5,7 @@
 //! Command streams for the delay-lockstep protocol.
 
 use bevy::prelude::*;
-use idaptik_core::scenario::command::{Buttons, Command, Button};
+use idaptik_core::scenario::command::{Button, Buttons, Command};
 use idaptik_net::lockstep::InputFeed;
 use std::collections::BTreeMap;
 
@@ -35,7 +35,10 @@ impl BevyInputFeed {
 
     /// Queue commands for the current tick
     pub fn queue_commands(&mut self, commands: Vec<Command>) {
-        self.pending.entry(self.current_tick).or_default().extend(commands);
+        self.pending
+            .entry(self.current_tick)
+            .or_default()
+            .extend(commands);
     }
 
     /// Advance to the next tick
@@ -48,7 +51,7 @@ impl BevyInputFeed {
         // Update held buttons based on current keyboard state
         // This is called each frame to update the button state
         let mut new_held = Buttons::default();
-        
+
         // Check each button's key
         if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
             new_held.set(Button::Left, true);
@@ -62,7 +65,7 @@ impl BevyInputFeed {
         if keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight) {
             new_held.set(Button::Sprint, true);
         }
-        
+
         self.held = new_held;
     }
 }

@@ -134,39 +134,54 @@ pub fn spawn_billy_children(
         MeshMaterial2d(head_material),
         Transform::from_translation(Vec3::new(0.0, HEAD_Y + 4.0, 0.6)),
     ));
-    
+
     // Eyes as sprites (easier to change color dynamically)
     parent.spawn((
         BillyEyeLeft,
-        Sprite::from_color(Color::srgb(0.1, 0.1, 0.1), Vec2::new(BILLY_EYE_RADIUS * 2.0, BILLY_EYE_RADIUS * 2.0)),
+        Sprite::from_color(
+            Color::srgb(0.1, 0.1, 0.1),
+            Vec2::new(BILLY_EYE_RADIUS * 2.0, BILLY_EYE_RADIUS * 2.0),
+        ),
         Transform::from_translation(Vec3::new(-BILLY_EYE_X_OFFSET, BILLY_EYE_Y, 0.7)),
     ));
-    
+
     parent.spawn((
         BillyEyeRight,
-        Sprite::from_color(Color::srgb(0.1, 0.1, 0.1), Vec2::new(BILLY_EYE_RADIUS * 2.0, BILLY_EYE_RADIUS * 2.0)),
+        Sprite::from_color(
+            Color::srgb(0.1, 0.1, 0.1),
+            Vec2::new(BILLY_EYE_RADIUS * 2.0, BILLY_EYE_RADIUS * 2.0),
+        ),
         Transform::from_translation(Vec3::new(BILLY_EYE_X_OFFSET, BILLY_EYE_Y, 0.7)),
     ));
-    
+
     // Mouth (will change based on mode)
     parent.spawn((
         BillyMouth,
-        Sprite::from_color(Color::srgb(0.5, 0.2, 0.1), Vec2::new(BILLY_MOUTH_W, BILLY_MOUTH_H)),
+        Sprite::from_color(
+            Color::srgb(0.5, 0.2, 0.1),
+            Vec2::new(BILLY_MOUTH_W, BILLY_MOUTH_H),
+        ),
         Transform::from_translation(Vec3::new(0.0, BILLY_MOUTH_Y, 0.7)),
     ));
-    
+
     // Guard hat (only visible in certain modes)
     parent.spawn((
         BillyHat,
-        Sprite::from_color(Color::srgb(0.2, 0.25, 0.3), Vec2::new(BILLY_HAT_W, BILLY_HAT_H)),
+        Sprite::from_color(
+            Color::srgb(0.2, 0.25, 0.3),
+            Vec2::new(BILLY_HAT_W, BILLY_HAT_H),
+        ),
         Transform::from_translation(Vec3::new(0.0, BILLY_HAT_Y, 0.8)),
         Visibility::Hidden, // Hidden by default, shown in guard modes
     ));
-    
+
     // Badge (authority indicator)
     parent.spawn((
         BillyBadge,
-        Sprite::from_color(Color::srgb(0.8, 0.6, 0.2), Vec2::new(BILLY_BADGE_SIZE, BILLY_BADGE_SIZE)),
+        Sprite::from_color(
+            Color::srgb(0.8, 0.6, 0.2),
+            Vec2::new(BILLY_BADGE_SIZE, BILLY_BADGE_SIZE),
+        ),
         Transform::from_translation(Vec3::new(0.0, BILLY_BADGE_Y, 0.75)),
         Visibility::Hidden, // Hidden by default
     ));

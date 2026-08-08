@@ -15,8 +15,8 @@
 
 use bevy::prelude::*;
 use clap::Parser;
-use idaptik_bevy::driver::SimDriverPlugin;
 use idaptik_bevy::FrontendPlugin;
+use idaptik_bevy::driver::SimDriverPlugin;
 use idaptik_core::RunConfig;
 use idaptik_core::scenario::DifficultyId;
 use std::path::PathBuf;
@@ -25,7 +25,9 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(name = "idaptik-bevy")]
 #[command(about = "Bevy frontend for IDApTIK - local or multiplayer mode")]
-#[command(after_help = "Note: Multiplayer requires a relay server running on the specified port (default: 1984 via IDAPTIK_PORT env var)")]
+#[command(
+    after_help = "Note: Multiplayer requires a relay server running on the specified port (default: 1984 via IDAPTIK_PORT env var)"
+)]
 struct Cli {
     /// Run in local single-player mode (default)
     #[arg(long, default_value_t = true, conflicts_with_all = ["host", "join"])]
@@ -83,11 +85,7 @@ fn main() -> AppExit {
     };
 
     // Build RunConfig from CLI
-    let (cfg, seed) = make_run_config(
-        cli.seed,
-        cli.difficulty.clone(),
-        cli.reduced_motion,
-    );
+    let (cfg, seed) = make_run_config(cli.seed, cli.difficulty.clone(), cli.reduced_motion);
 
     let window_plugin = WindowPlugin {
         primary_window: Some(Window {
@@ -130,9 +128,10 @@ fn make_netplay_config(cli: &Cli) -> idaptik_bevy::netplay::NetplayConfig {
         role: cli.role.clone(),
         session: cli.session.clone(),
         relay_url: cli.url.clone().unwrap_or(default_url),
-        script_path: cli.script.clone().unwrap_or_else(|| {
-            PathBuf::from("fixtures/session_relay/versus_script.json")
-        }),
+        script_path: cli
+            .script
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("fixtures/session_relay/versus_script.json")),
         input_delay: cli.input_delay,
     }
 }
