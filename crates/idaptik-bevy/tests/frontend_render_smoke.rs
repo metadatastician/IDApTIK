@@ -1,6 +1,7 @@
 //! Regression: graphical netplay must install the actual scene, not merely a
 //! network-status overlay in an otherwise empty Bevy window.
 
+use bevy::ecs::schedule::Schedules;
 use bevy::prelude::*;
 use idaptik_bevy::FrontendRenderPlugin;
 use idaptik_bevy::driver::SimDriverPlugin;
@@ -22,6 +23,20 @@ fn shared_renderer_spawns_camera_player_and_hud() {
         .add_plugins(FrontendRenderPlugin);
 
     app.world_mut().run_schedule(Startup);
+
+    // Initialize the complete renderer schedule without executing it. System
+    // initialization is where Bevy rejects overlapping mutable queries; a
+    // headless app intentionally lacks several window/render resources needed
+    // to execute every presentation system.
+    let mut update = app
+        .world_mut()
+        .resource_mut::<Schedules>()
+        .remove(Update)
+        .expect("Update schedule must exist");
+    update
+        .initialize(app.world_mut())
+        .expect("renderer schedule must initialize without conflicting queries");
+    app.world_mut().resource_mut::<Schedules>().insert(update);
 
     let world = app.world_mut();
     let cameras = world.query::<&Camera2d>().iter(world).count();
