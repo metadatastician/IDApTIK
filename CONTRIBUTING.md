@@ -14,7 +14,20 @@ just doctor
 ```
 
 Rust is pinned by `rust-toolchain.toml`; Erlang, Elixir, Zig, Nickel, and
-`just` are pinned by `mise.toml`.
+`just` are pinned by `mise.toml`. TruffleHog is also pinned there, and
+`just setup` activates the repository's tracked Git hooks. For an existing
+clone, install the added hook with:
+
+```sh
+mise install
+just install-git-hooks
+```
+
+The `pre-push` hook scans the commits about to be sent to the remote and
+blocks the push if TruffleHog is unavailable, the scan cannot complete, or a
+verified/unverifiable secret is found. It does not scan only the worktree:
+committed content is checked before it leaves the machine. Run a complete
+local-history scan at any time with `just secret-scan`.
 
 ## Project boundaries
 

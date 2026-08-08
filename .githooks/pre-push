@@ -1,0 +1,52 @@
+#!/bin/sh
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Scan committed objects before Git transfers them to a remote.
+
+set -eu
+
+zero_oid=0000000000000000000000000000000000000000
+
+if ! command -v trufflehog >/dev/null 2>&1; then
+  printf '%s\n' \
+    "error: TruffleHog is required for pushes; run 'mise install'" >&2
+  exit 1
+fi
+
+repo_root=$(git rev-parse --show-toplevel) || exit 1
+scan_count=0
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+  # Deleting a remote ref transfers no new committed content.
+  if [ "$local_oid" = "$zero_oid" ]; then
+    continue
+  fi
+
+  scan_count=$((scan_count + 1))
+  printf '%s\n' "TruffleHog: scanning $local_ref -> $remote_ref" >&2
+
+  if [ "$remote_oid" = "$zero_oid" ]; then
+    # A new remote ref has no trustworthy remote base. Scan all history
+    # reachable from the exact object being pushed.
+    trufflehog git \
+      --no-update \
+      --fail \
+      --results=verified,unknown \
+      --branch "$local_oid" \
+      "file://$repo_root"
+  else
+    # Existing ref: scan the committed range Git is about to introduce.
+    trufflehog git \
+      --no-update \
+      --fail \
+      --results=verified,unknown \
+      --since-commit "$remote_oid" \
+      --branch "$local_oid" \
+      "file://$repo_root"
+  fi
+done
+
+if [ "$scan_count" -eq 0 ]; then
+  printf '%s\n' "TruffleHog: no new committed objects to scan" >&2
+else
+  printf '%s\n' "TruffleHog: pre-push scan passed" >&2
+fi
