@@ -2,11 +2,11 @@
 # SPDX-FileCopyrightText: 2025-2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
 # idaptik-multiplayer.launcher.a2ml — per-app launcher config for the IDApTIK
-# two-player netplay launcher. Compliant with launcher-standard.a2ml v0.3.0.
+# two-player graphical netplay launcher. Compliant with launcher-standard.a2ml v0.3.0.
 #
 # The launcher script is HAND-AUTHORED (generator = "hand-authored"): the
 # launch-scaffolder's runtime kinds (server-url, binary, …) do not model a
-# two-seat host/join TUI game, so the script implements the standard's
+# two-seat host/join GUI game, so the script implements the standard's
 # required modes directly and adds the game-specific `host`/`join` modes.
 
 [project]
@@ -14,7 +14,7 @@ name         = "idaptik-multiplayer"
 display      = "IDApTIK Multiplayer"
 description  = "Two-player Ghost Lobby netplay: host the relay and a seat, or join a friend's session"
 categories   = ["Game", "Network"]
-version      = "0.1.0"
+version      = "0.2.0"
 license      = "AGPL-3.0-or-later"
 
 [repo]
@@ -22,7 +22,7 @@ license      = "AGPL-3.0-or-later"
 path = ""
 
 [runtime]
-kind = "tui-netplay"
+kind = "gui-netplay"
 # The Phoenix relay the host mode starts; join mode connects to a peer's.
 port = 4000
 # Both seats read the shared deterministic run config from this fixture —
@@ -37,7 +37,7 @@ first-line-format = "idaptik-multiplayer-launcher {version} ({build-sha-short}) 
 
 [modes]
 # Standard required modes, plus the game-specific pair.
-runtime     = ["--start", "--stop", "--status", "--auto"]
+runtime     = ["--start", "--stop", "--status", "--auto", "--browser", "--web"]
 integration = ["--integ", "--disinteg"]
 meta        = ["--help", "--version"]
 extra       = ["host", "join"]

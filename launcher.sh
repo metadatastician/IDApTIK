@@ -1,212 +1,546 @@
 #!/usr/bin/env bash
-# a2ml-metadata-block
-# id = "idaptik-game-launcher"
-# type = "launcher"
-# version = "0.2.0"
-# app-name = "idaptik"
-# app-display = "IDApTIK"
-# app-url = "http://localhost:1984"
-# standards-compliance = ["hyperpolymath-launcher-v1"]
-# modes = ["runtime", "integration", "meta"]
-# platforms = ["linux", "windows", "macos"]
-# lifecycle-phases-covered = ["LM-LA-INSTALL", "LM-LA-RUN"]
-# lifecycle-phases-deferred = []
-# end-metadata-block
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+#
+# @a2ml-metadata begin
+# (
+#   id                   = "idaptik-launcher"
+#   type                 = "launcher"
+#   version              = "0.3.0"
+#   app-name             = "idaptik"
+#   app-display          = "IDApTIK"
+#   app-url              = ""
+#   standards-compliance = [
+#     "launcher-standard.adoc"
+#     "LM-LA-LIFECYCLE-STANDARD.adoc"
+#     "cross-platform-system-integration-modes"
+#     "fallback-ladder-keepopen"
+#   ]
+#   modes = [
+#     "--start"
+#     "--stop"
+#     "--status"
+#     "--auto"
+#     "--browser"
+#     "--web"
+#     "--integ"
+#     "--disinteg"
+#     "--help"
+#     "--version"
+#   ]
+#   platforms = ["linux" "macos" "windows"]
+#   lifecycle-phases-covered = ["install" "run" "stop" "status" "uninstall"]
+#   lifecycle-phases-deferred = ["warmup" "personalize" "update" "repair"]
+#   desktop-file-permissions = 444
+#   integrity-verification   = "verify-desktop-integrity.sh"
+# )
+# @a2ml-metadata end
 
 set -euo pipefail
 
 APP_NAME="idaptik"
-VERSION="0.2.0"
-BUILD_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+APP_DISPLAY="IDApTIK"
+APP_DESC="Asymmetric two-player infiltration game"
+APP_CATEGORIES="Game;Network;"
+VERSION="0.3.0"
 
-# Default port for multiplayer relay
-PORT="${IDAPTIK_PORT:-1984}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP_NAME"
+REPO_PATH_FILE="$CONFIG_DIR/repo-path"
 
-show_help() {
-    echo "Usage: $0 [MODE] [OPTIONS]"
-    echo ""
-    echo "Modes:"
-    echo "  --start     Run setup, doctor, and launch the game frontend (Bevy) in LOCAL mode."
-    echo "  --host      Launch the game in MULTIPLAYER HOST mode."
-    echo "              Relay must be running on port ${PORT} (or set IDAPTIK_PORT env var)."
-    echo "  --join <host>  Launch in MULTIPLAYER JOIN mode, connecting to <host>."
-    echo "              Port defaults to ${PORT} (or set IDAPTIK_PORT)."
-    echo "  --stop [TYPE]  Stop the game and/or connection."
-    echo "               Types: --game (game only), --connection (connection only),"
-    echo "                      --all (both, default)"
-    echo "  --status    Check if the game is running and connection status."
-    echo "  --auto      Alias for --start (local mode)."
-    echo "  --integ     (Stub) Integrate with desktop."
-    echo "  --disinteg  (Stub) Remove desktop integration."
-    echo "  --version   Print version info."
-    echo "  --help      Show this help."
-    echo ""
-    echo "Multiplayer options (use with --host or --join):"
-    echo "  --role infiltrator|hacker   Choose your role (default: infiltrator for host, hacker for join)"
-    echo "  --session NAME              Session ID to join/host (default: ghost-lobby)"
-    echo "  --url URL                  Relay URL (default: ws://127.0.0.1:${PORT}/socket/websocket)"
-    echo "  --script PATH              Script file path (default: fixtures/session_relay/versus_script.json)"
-    echo "  --input-delay N            Input delay in ticks for lockstep (default: 3)"
-    echo ""
-    echo "Examples:"
-    echo "  $0 --start                # Local single-player"
-    echo "  $0 --host                 # Host multiplayer (default role: infiltrator)"
-    echo "  $0 --host --role hacker   # Host as hacker"
-    echo "  $0 --join 192.168.1.100   # Join a host at 192.168.1.100"
-    echo "  IDAPTIK_PORT=2000 $0 --join localhost  # Use custom port"
+# An integrated copy lives outside the repository. It finds the source tree
+# through the path recorded by --integ; a source-tree invocation needs no
+# configuration and always wins over a stale recorded path.
+if [ -f "$SCRIPT_DIR/Cargo.toml" ] && [ -f "$SCRIPT_DIR/idaptik-multiplayer-launcher.sh" ]; then
+  REPO_DIR="$SCRIPT_DIR"
+elif [ -n "${IDAPTIK_REPO_DIR:-}" ]; then
+  REPO_DIR="$IDAPTIK_REPO_DIR"
+elif [ -r "$REPO_PATH_FILE" ]; then
+  IFS= read -r REPO_DIR < "$REPO_PATH_FILE"
+else
+  REPO_DIR="$SCRIPT_DIR"
+fi
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/$APP_NAME"
+PID_FILE="$RUNTIME_DIR/$APP_NAME-server.pid"
+LOG_FILE="$STATE_DIR/game.log"
+PORT="${IDAPTIK_PORT:-4000}"
+MULTIPLAYER_LAUNCHER="$REPO_DIR/idaptik-multiplayer-launcher.sh"
+
+say()  { printf '[%s] %s\n' "$APP_NAME" "$*"; }
+warn() { printf '[%s] WARN: %s\n' "$APP_NAME" "$*" >&2; }
+die()  {
+  if declare -F hp_gui_error >/dev/null 2>&1; then
+    hp_gui_error "$APP_DISPLAY launcher error" "$*"
+  else
+    printf '[%s] ERROR: %s\n' "$APP_NAME" "$*" >&2
+  fi
+  exit 1
 }
 
-# Parse mode from first argument
-MODE="${1:---auto}"
-shift || true
+platform() {
+  local os arch
+  os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+  arch="$(uname -m)"
+  case "$os" in
+    mingw*|msys*|cygwin*) os="windows" ;;
+    darwin*) os="macos" ;;
+    linux*) os="linux" ;;
+  esac
+  printf '%s-%s' "$os" "$arch"
+}
 
-# Parse multiplayer options (for --host and --join modes)
-ROLE=""
-SESSION=""
-RELAY_URL=""
-SCRIPT=""
-INPUT_DELAY=""
-HOST_ARG=""
+build_sha() {
+  git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || printf 'unknown'
+}
 
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --role)
-            ROLE="--role $2"
-            shift 2
-            ;;
-        --session)
-            SESSION="--session $2"
-            shift 2
-            ;;
-        --url)
-            RELAY_URL="--url $2"
-            shift 2
-            ;;
-        --script)
-            SCRIPT="--script $2"
-            shift 2
-            ;;
-        --input-delay)
-            INPUT_DELAY="--input-delay $2"
-            shift 2
-            ;;
-        --host)
-            MODE="--host"
-            shift
-            ;;
-        --join)
-            MODE="--join"
-            HOST_ARG="$2"
-            shift 2
-            ;;
-        *)
-            # Unknown option, might be a host argument for --join
-            if [ "$MODE" = "--join" ] && [ -z "$HOST_ARG" ]; then
-                HOST_ARG="$1"
-                shift
-            else
-                break
-            fi
-            ;;
+pid_is_game() {
+  [ -f "$PID_FILE" ] || return 1
+  local pid command
+  IFS= read -r pid < "$PID_FILE" || return 1
+  case "$pid" in *[!0-9]*|'') return 1 ;; esac
+  kill -0 "$pid" 2>/dev/null || return 1
+  command="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  case "$command" in
+    *idaptik-bevy*|*launcher.sh\ __run-*|*idaptik-multiplayer-launcher.sh*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+require_repo() {
+  [ -f "$REPO_DIR/Cargo.toml" ] || die "repository not found at $REPO_DIR (set IDAPTIK_REPO_DIR or rerun --integ from the repository)"
+  [ -x "$MULTIPLAYER_LAUNCHER" ] || die "multiplayer launcher missing or not executable: $MULTIPLAYER_LAUNCHER"
+}
+
+trust_mise() {
+  if command -v mise >/dev/null 2>&1; then
+    MISE_BIN="$(command -v mise)"
+  elif [ -x "$HOME/.local/bin/mise" ]; then
+    MISE_BIN="$HOME/.local/bin/mise"
+  else
+    die "mise is required; install it, then run 'mise install' in $REPO_DIR"
+  fi
+  (cd "$REPO_DIR" && "$MISE_BIN" trust -q)
+}
+
+run_solo() {
+  require_repo
+  trust_mise
+  cd "$REPO_DIR"
+  "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy
+  exec "$REPO_DIR/target/debug/idaptik-bevy" --local
+}
+
+start_game() {
+  if pid_is_game; then
+    say "game already running (PID $(<"$PID_FILE")); stop it first with --stop"
+    return 0
+  fi
+
+  local label="$1"
+  shift
+  mkdir -p "$STATE_DIR"
+  : > "$LOG_FILE"
+  say "launching $APP_DISPLAY — $label (GUI)"
+  say "startup log: $LOG_FILE"
+
+  if [ "${IDAPTIK_LAUNCHER_DRY_RUN:-0}" = "1" ]; then
+    printf '[%s] DRY RUN:' "$APP_NAME"
+    printf ' %q' "$@"
+    printf '\n'
+    return 0
+  fi
+
+  nohup "$@" >>"$LOG_FILE" 2>&1 &
+  local pid=$!
+  printf '%s\n' "$pid" > "$PID_FILE"
+
+  # Catch immediate dependency/argument failures without delaying a healthy
+  # GUI launch. Longer compilation progress remains available in the log.
+  sleep 1
+  if ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$PID_FILE"
+    tail -n 30 "$LOG_FILE" >&2 || true
+    die "GUI failed to launch; see $LOG_FILE"
+  fi
+  say "GUI startup is running as PID $pid"
+}
+
+start_solo() {
+  start_game "solo (controls both roles)" "$REPO_DIR/launcher.sh" __run-solo
+}
+
+start_host() {
+  local role="$1"
+  start_game "multiplayer host · $role" "$MULTIPLAYER_LAUNCHER" host --role "$role"
+}
+
+start_join() {
+  local host="$1" role="$2"
+  start_game "multiplayer join · $role · $host" "$MULTIPLAYER_LAUNCHER" join "$host" --role "$role"
+}
+
+choose_role() {
+  local choice
+  printf '\nChoose your character / seat:\n' >&2
+  printf '  1) Infiltrator — movement, stealth, physical interaction\n' >&2
+  printf '  2) Hacker      — network access, doors, cameras, uplinks\n' >&2
+  while true; do
+    read -rp 'Character [1-2]: ' choice
+    case "$choice" in
+      1|i|I|infiltrator) printf 'infiltrator'; return 0 ;;
+      2|h|H|hacker) printf 'hacker'; return 0 ;;
+      *) warn "choose 1 (Infiltrator) or 2 (Hacker)" ;;
     esac
-done
+  done
+}
+
+menu() {
+  local mode action role host
+  [ -t 0 ] || die "interactive menu needs a terminal; use --solo, --host, or --join HOST"
+  cat <<'MENU'
+
+IDApTIK — launch menu
+
+  1) Solo GUI         Control both sides of Ghost Lobby locally
+  2) Multiplayer GUI  Host or join a two-player session
+  3) Status
+  4) Quit
+MENU
+  while true; do
+    read -rp 'Mode [1-4]: ' mode
+    case "$mode" in
+      1|s|S|solo) start_solo; return 0 ;;
+      2|m|M|multiplayer)
+        printf '\n  1) Host — start the relay and create a session\n' >&2
+        printf '  2) Join — connect to another player\n' >&2
+        while true; do
+          read -rp 'Multiplayer [1-2]: ' action
+          case "$action" in
+            1|h|H|host)
+              role="$(choose_role)"
+              start_host "$role"
+              return 0
+              ;;
+            2|j|J|join)
+              read -rp 'Host address (name, IP, host:port, or ws:// URL): ' host
+              [ -n "$host" ] || { warn "host address cannot be empty"; continue; }
+              role="$(choose_role)"
+              start_join "$host" "$role"
+              return 0
+              ;;
+            *) warn "choose 1 (Host) or 2 (Join)" ;;
+          esac
+        done
+        ;;
+      3|status) mode_status; return $? ;;
+      4|q|Q|quit|exit) return 0 ;;
+      *) warn "choose 1, 2, 3, or 4" ;;
+    esac
+  done
+}
+
+stop_game() {
+  if pid_is_game; then
+    local pid
+    IFS= read -r pid < "$PID_FILE"
+    say "stopping game (PID $pid)"
+    kill "$pid"
+    local waited=0
+    while kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 10 ]; do
+      sleep 1
+      waited=$((waited + 1))
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      warn "game did not stop within 10 seconds (PID $pid)"
+      return 1
+    fi
+  else
+    say "game is not running"
+  fi
+  rm -f "$PID_FILE"
+}
+
+stop_all() {
+  local status=0
+  stop_game || status=1
+  if [ -x "$MULTIPLAYER_LAUNCHER" ]; then
+    "$MULTIPLAYER_LAUNCHER" __relay-stop || status=1
+  fi
+  return "$status"
+}
+
+mode_status() {
+  local status=1
+  if pid_is_game; then
+    say "game: running (PID $(<"$PID_FILE"))"
+    say "log: $LOG_FILE"
+    status=0
+  else
+    say "game: stopped"
+  fi
+  if [ -x "$MULTIPLAYER_LAUNCHER" ]; then
+    "$MULTIPLAYER_LAUNCHER" __relay-status && status=0 || true
+  else
+    say "relay: unavailable (multiplayer launcher not found)"
+  fi
+  return "$status"
+}
+
+desktop_tools_dir() {
+  local candidate
+  for candidate in \
+    "${HP_DESKTOP_TOOLS:-}" \
+    "${HP_ESTATE_ROOT:+$HP_ESTATE_ROOT/.desktop-tools}" \
+    "${XDG_DATA_HOME:-$HOME/.local/share}/hyperpolymath/.desktop-tools" \
+    "/var/mnt/eclipse/repos/.desktop-tools" \
+    "$HOME/developer/repos/.desktop-tools" \
+    "$HOME/dev/repos/.desktop-tools"
+  do
+    [ -n "$candidate" ] && [ -d "$candidate" ] && { printf '%s' "$candidate"; return 0; }
+  done
+  return 1
+}
+
+# The standard's shared helper makes failures visible when this script was
+# started from a desktop icon. It always writes stderr too, and gracefully
+# disappears when the estate desktop tools are not installed.
+DESKTOP_TOOLS="$(desktop_tools_dir || true)"
+if [ -n "$DESKTOP_TOOLS" ] && [ -r "$DESKTOP_TOOLS/gui-error.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$DESKTOP_TOOLS/gui-error.sh"
+fi
+
+integration_paths() {
+  case "$(platform)" in
+    linux-*)
+      INTEG_PLATFORM="linux"
+      APPS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+      DESKTOP_DIR="$HOME/Desktop"
+      BIN_DIR="$HOME/.local/bin"
+      LAUNCHER_TARGET="$BIN_DIR/idaptik-launcher"
+      APP_TARGET="$APPS_DIR/idaptik.desktop"
+      DESKTOP_TARGET="$DESKTOP_DIR/idaptik.desktop"
+      ;;
+    macos-*)
+      INTEG_PLATFORM="macos"
+      APPS_DIR="$HOME/Applications"
+      DESKTOP_DIR="$HOME/Desktop"
+      BIN_DIR="$HOME/.local/bin"
+      LAUNCHER_TARGET="$BIN_DIR/idaptik-launcher"
+      APP_TARGET="$APPS_DIR/$APP_DISPLAY.app"
+      DESKTOP_TARGET="$DESKTOP_DIR/$APP_DISPLAY.command"
+      ;;
+    windows-*)
+      INTEG_PLATFORM="windows"
+      APPS_DIR="${APPDATA:-$HOME/AppData/Roaming}/Microsoft/Windows/Start Menu/Programs"
+      DESKTOP_DIR="$HOME/Desktop"
+      BIN_DIR="$HOME/.local/bin"
+      LAUNCHER_TARGET="$BIN_DIR/idaptik-launcher.sh"
+      APP_TARGET="$APPS_DIR/$APP_DISPLAY.lnk"
+      DESKTOP_TARGET="$DESKTOP_DIR/$APP_DISPLAY.lnk"
+      ;;
+    *) die "unsupported integration platform: $(platform)" ;;
+  esac
+}
+
+write_linux_desktop() {
+  local target="$1" keepopen="$2"
+  local gui_cmd="$LAUNCHER_TARGET --auto"
+  cat > "$target" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=$APP_DISPLAY
+Comment=$APP_DESC
+Exec=$keepopen "$APP_DISPLAY" "$REPO_DIR" "$gui_cmd" "" "$LOG_FILE"
+Icon=applications-games
+Terminal=true
+Categories=$APP_CATEGORIES
+StartupNotify=true
+Actions=stop;status;
+
+[Desktop Action stop]
+Name=Stop IDApTIK
+Exec=$LAUNCHER_TARGET --stop
+
+[Desktop Action status]
+Name=IDApTIK Status
+Exec=$LAUNCHER_TARGET --status
+EOF
+  chmod 444 "$target"
+}
+
+mode_integ() {
+  require_repo
+  integration_paths
+  local force="${1:-}" tools keepopen verifier
+  tools="$(desktop_tools_dir)" || die "desktop tools not found; set HP_DESKTOP_TOOLS to the standards launcher helper directory"
+  keepopen="$tools/keepopen.sh"
+  [ -x "$keepopen" ] || die "required fallback wrapper is missing: $keepopen"
+
+  if { [ -e "$APP_TARGET" ] || [ -e "$LAUNCHER_TARGET" ]; } && [ "$force" != "--force" ]; then
+    if [ -t 0 ]; then
+      local answer
+      read -rp "$APP_DISPLAY is already integrated. Reinstall? [y/N] " answer
+      case "$answer" in y|Y|yes|YES) ;; *) say "nothing changed"; return 0 ;; esac
+    else
+      die "already integrated; rerun with --integ --force"
+    fi
+  fi
+
+  mkdir -p "$APPS_DIR" "$DESKTOP_DIR" "$BIN_DIR" "$CONFIG_DIR"
+  printf '%s\n' "$REPO_DIR" > "$REPO_PATH_FILE"
+  cp "$REPO_DIR/launcher.sh" "$LAUNCHER_TARGET"
+  chmod 755 "$LAUNCHER_TARGET"
+
+  case "$INTEG_PLATFORM" in
+    linux)
+      [ -e "$APP_TARGET" ] && chmod u+w "$APP_TARGET"
+      [ -e "$DESKTOP_TARGET" ] && chmod u+w "$DESKTOP_TARGET"
+      write_linux_desktop "$APP_TARGET" "$keepopen"
+      write_linux_desktop "$DESKTOP_TARGET" "$keepopen"
+      command -v gio >/dev/null 2>&1 && gio set "$DESKTOP_TARGET" metadata::trusted true >/dev/null 2>&1 || true
+      command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$APPS_DIR" >/dev/null 2>&1 || true
+      ;;
+    macos)
+      mkdir -p "$APP_TARGET/Contents/MacOS"
+      cat > "$APP_TARGET/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0"><dict>
+<key>CFBundleName</key><string>$APP_DISPLAY</string>
+<key>CFBundleIdentifier</key><string>org.hyperpolymath.idaptik</string>
+<key>CFBundleExecutable</key><string>idaptik</string>
+</dict></plist>
+EOF
+      cat > "$APP_TARGET/Contents/MacOS/idaptik" <<EOF
+#!/usr/bin/env bash
+exec "$keepopen" "$APP_DISPLAY" "$REPO_DIR" "$LAUNCHER_TARGET --auto" "" "$LOG_FILE"
+EOF
+      chmod 755 "$APP_TARGET/Contents/MacOS/idaptik"
+      cp "$APP_TARGET/Contents/MacOS/idaptik" "$DESKTOP_TARGET"
+      chmod 755 "$DESKTOP_TARGET"
+      ;;
+    windows)
+      if command -v powershell.exe >/dev/null 2>&1; then
+        powershell.exe -NoProfile -NonInteractive -Command \
+          "\$w=New-Object -ComObject WScript.Shell; \$s=\$w.CreateShortcut('$APP_TARGET'); \$s.TargetPath='bash.exe'; \$s.Arguments='$keepopen \"$APP_DISPLAY\" \"$REPO_DIR\" \"$LAUNCHER_TARGET --auto\" \"\" \"$LOG_FILE\"'; \$s.Save(); \$d=\$w.CreateShortcut('$DESKTOP_TARGET'); \$d.TargetPath=\$s.TargetPath; \$d.Arguments=\$s.Arguments; \$d.Save()"
+      else
+        printf '@echo off\nbash.exe "%s" "%s" "%s" "%s --auto" "" "%s"\n' \
+          "$keepopen" "$APP_DISPLAY" "$REPO_DIR" "$LAUNCHER_TARGET" "$LOG_FILE" \
+          > "${APP_TARGET%.lnk}.bat"
+        cp "${APP_TARGET%.lnk}.bat" "${DESKTOP_TARGET%.lnk}.bat"
+      fi
+      ;;
+  esac
+
+  verifier="$tools/verify-desktop-integrity.sh"
+  if [ -x "$verifier" ]; then
+    "$verifier" --generate >/dev/null 2>&1 || warn "desktop integrity verification failed"
+  else
+    warn "optional desktop integrity verifier not found at $verifier"
+  fi
+  say "integrated $APP_DISPLAY for $INTEG_PLATFORM; remove with $LAUNCHER_TARGET --disinteg"
+}
+
+mode_disinteg() {
+  integration_paths
+  stop_all || true
+  local target
+  for target in "$APP_TARGET" "$DESKTOP_TARGET" "${APP_TARGET%.lnk}.bat" "${DESKTOP_TARGET%.lnk}.bat"; do
+    [ -e "$target" ] || [ -L "$target" ] || continue
+    [ -f "$target" ] && chmod u+w "$target" 2>/dev/null || true
+    if [ -d "$target" ] && [ ! -L "$target" ]; then
+      rm -rf -- "$target"
+    else
+      rm -f -- "$target"
+    fi
+    say "removed $target"
+  done
+  rm -f -- "$LAUNCHER_TARGET" "$PID_FILE"
+  say "integration removed; configuration in $CONFIG_DIR and logs in $STATE_DIR were preserved"
+}
+
+show_help() {
+  cat <<EOF
+$APP_DISPLAY launcher — GUI entry point for solo and multiplayer play
+
+Usage: $0 [MODE] [OPTIONS]
+
+Player modes:
+  --auto, --browser, --web  Open the interactive launch menu (default)
+  --solo                    Launch the solo Bevy GUI (controls both roles)
+  --host [--role ROLE]      Start the relay and host in the Bevy GUI
+  --join HOST [--role ROLE] Join HOST in the Bevy GUI
+                            ROLE is infiltrator or hacker
+
+Standard lifecycle modes:
+  --start                   Launch the solo Bevy GUI without opening the menu
+  --stop                    Stop the game and a relay started by this project
+  --status                  Report game, relay, binary, and log status
+  --integ [--force]         Install desktop/start-menu integration
+  --disinteg                Remove installed integration; preserve config/logs
+  --help, -h                Show this help and the files read/written
+  --version, -V             Print launcher version/build/platform
+
+Environment:
+  IDAPTIK_PORT              Relay port (current: $PORT; default: 4000)
+  IDAPTIK_REPO_DIR          Override repository location for an installed copy
+  IDAPTIK_LAUNCHER_DRY_RUN  Set to 1 to print the selected launch command
+
+Files:
+  reads  $REPO_PATH_FILE
+  writes $PID_FILE
+         $LOG_FILE
+
+Detected platform: $(platform)
+Repository: $REPO_DIR
+EOF
+}
+
+parse_role() {
+  local role="${1:-infiltrator}"
+  case "$role" in
+    infiltrator|hacker) printf '%s' "$role" ;;
+    *) die "role must be 'infiltrator' or 'hacker', got '$role'" ;;
+  esac
+}
+
+MODE="${1:---auto}"
+[ $# -gt 0 ] && shift || true
 
 case "$MODE" in
-    --start|--auto)
-        echo "[launcher] Preparing $APP_NAME for cleanest start..."
-        ~/.local/bin/mise exec -- just setup || just setup
-        ~/.local/bin/mise exec -- just doctor || just doctor
-        echo "[launcher] Launching game (LOCAL mode)..."
-        exec ~/.local/bin/mise exec -- just run-bevy
-        ;;
-    --host)
-        echo "[launcher] Launching game (MULTIPLAYER HOST mode)..."
-        echo "[launcher] NOTE: Relay must be running on port ${PORT} (or set IDAPTIK_PORT)"
-        ~/.local/bin/mise exec -- just setup || just setup
-        ~/.local/bin/mise exec -- just doctor || just doctor
-        exec ~/.local/bin/mise exec -- cargo run -p idaptik-bevy -- \
-            --host \
-            ${ROLE:---role infiltrator} \
-            ${SESSION:---session ghost-lobby} \
-            ${RELAY_URL} \
-            ${SCRIPT} \
-            ${INPUT_DELAY:---input-delay 3}
-        ;;
-    --join)
-        HOST="${HOST_ARG:-127.0.0.1}"
-        echo "[launcher] Launching game (MULTIPLAYER JOIN mode) to ${HOST}..."
-        ~/.local/bin/mise exec -- just setup || just setup
-        ~/.local/bin/mise exec -- just doctor || just doctor
-        exec ~/.local/bin/mise exec -- cargo run -p idaptik-bevy -- \
-            --join "${HOST}" \
-            ${ROLE:---role hacker} \
-            ${SESSION:---session ghost-lobby} \
-            ${RELAY_URL} \
-            ${SCRIPT} \
-            ${INPUT_DELAY:---input-delay 3}
-        ;;
-    --stop)
-        STOP_TYPE="${1:---all}"
-        case "$STOP_TYPE" in
-            --game)
-                echo "[launcher] Stopping game process..."
-                pkill -f "idaptik-bevy" 2>/dev/null || echo "Game process not running."
-                ;;
-            --connection)
-                echo "[launcher] Stopping network connection..."
-                # In multiplayer mode, connection runs in a thread within the bevy process
-                # Killing the bevy process will kill the connection
-                pkill -f "idaptik-bevy" 2>/dev/null || echo "No game/connection process found."
-                ;;
-            --all)
-                echo "[launcher] Stopping game and connection..."
-                pkill -f "idaptik-bevy" 2>/dev/null || echo "No game/connection process found."
-                ;;
-            *)
-                echo "Unknown stop type: $STOP_TYPE"
-                echo "Usage: $0 --stop [--game|--connection|--all]"
-                exit 1
-                ;;
-        esac
-        ;;
-    --status)
-        if pgrep -f "idaptik-bevy" > /dev/null; then
-            echo "Status: GAME RUNNING"
-            # Check if this is a multiplayer session by looking at command line
-            if pgrep -f "idaptik-bevy" | xargs -I{} ps -p {} -o args= 2>/dev/null | grep -qE "(--host|--join)"; then
-                echo "Mode: MULTIPLAYER"
-                # Try to determine if relay is reachable
-                if command -v curl >/dev/null 2>&1; then
-                    if curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; then
-                        echo "Relay: RUNNING on port ${PORT}"
-                    else
-                        echo "Relay: NOT RESPONDING on port ${PORT}"
-                    fi
-                else
-                    echo "Relay: (curl not available, cannot check)"
-                fi
-            else
-                echo "Mode: LOCAL"
-            fi
-            exit 0
-        else
-            echo "Status: STOPPED"
-            exit 1
-        fi
-        ;;
-    --integ|--disinteg)
-        echo "[launcher] Mode $MODE is not fully implemented for this interactive application yet."
-        ;;
-    --version)
-        echo "$APP_NAME $VERSION ($BUILD_SHA) [$PLATFORM]"
-        ;;
-    --help)
-        show_help
-        ;;
-    *)
-        echo "Unknown mode: $MODE"
-        show_help
-        exit 1
-        ;;
+  __run-solo) run_solo ;;
+  --start|--solo) start_solo ;;
+  --host)
+    role="infiltrator"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --role) [ $# -ge 2 ] || die "--role needs a value"; role="$(parse_role "$2")"; shift 2 ;;
+        *) die "unknown --host option: $1" ;;
+      esac
+    done
+    start_host "$role"
+    ;;
+  --join)
+    [ $# -ge 1 ] || die "--join needs HOST"
+    host="$1"; shift
+    role="hacker"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --role) [ $# -ge 2 ] || die "--role needs a value"; role="$(parse_role "$2")"; shift 2 ;;
+        *) die "unknown --join option: $1" ;;
+      esac
+    done
+    start_join "$host" "$role"
+    ;;
+  --auto|--browser|--web) menu ;;
+  --stop) [ $# -eq 0 ] || die "--stop takes no arguments"; stop_all ;;
+  --status) [ $# -eq 0 ] || die "--status takes no arguments"; mode_status ;;
+  --integ) [ $# -le 1 ] || die "usage: --integ [--force]"; mode_integ "${1:-}" ;;
+  --disinteg) [ $# -eq 0 ] || die "--disinteg takes no arguments"; mode_disinteg ;;
+  --version|-V) printf '%s %s (%s) [%s]\n' "$APP_NAME-launcher" "$VERSION" "$(build_sha)" "$(platform)" ;;
+  --help|-h) show_help ;;
+  *) die "unknown mode: $MODE (try --help)" ;;
 esac

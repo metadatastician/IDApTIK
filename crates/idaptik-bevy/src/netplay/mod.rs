@@ -4,12 +4,15 @@
 //! protocol from idaptik-net, allowing the GUI frontend to participate in
 //! multiplayer sessions over Phoenix Channels.
 
+pub mod connection;
 pub mod input;
 pub mod plugin;
-pub mod connection;
 pub mod ui;
 
+pub use connection::{IncomingMessage, NetplayStatus, NetworkMessage};
 pub use input::BevyInputFeed;
-pub use plugin::{NetplayConfig, NetplayMode, NetplayPlugin, NetplayState, ConnectionStatusUi, ConnectionStatusText};
-pub use connection::{NetworkMessage, NetplayStatus, IncomingMessage};
+pub use plugin::{
+    ConnectionStatusText, ConnectionStatusUi, NetplayConfig, NetplayMode, NetplayPlugin,
+    NetplayState,
+};
 pub use ui::NetplayAppState;
