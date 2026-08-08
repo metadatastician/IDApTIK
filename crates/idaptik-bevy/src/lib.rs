@@ -27,21 +27,17 @@ pub mod sprites;
 
 use bevy::prelude::*;
 
-/// Everything the windowed frontend adds on top of [`driver::SimDriverPlugin`]:
-/// input decoding, the scene, and the HUD.
-pub struct FrontendPlugin;
+/// The camera, scene, sprites and HUD shared by local and networked play.
+///
+/// This plugin owns no simulation truth and decodes no input. Local play adds
+/// [`FrontendPlugin`] for the command queue; netplay places it above a
+/// one-way render mirror of the lockstep simulation.
+pub struct FrontendRenderPlugin;
 
-impl Plugin for FrontendPlugin {
+impl Plugin for FrontendRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<net_view::AppMode>()
-            .init_resource::<net_view::NetViewDrag>()
             .add_systems(Startup, (scene::setup_scene, hud::setup_hud))
-            .add_systems(
-                // Decode the keyboard right before the fixed main loop so a
-                // press lands on this frame's tick, not the next frame's.
-                RunFixedMainLoop,
-                keymap::keyboard_input.in_set(RunFixedMainLoopSystems::BeforeFixedMainLoop),
-            )
             .add_systems(
                 Update,
                 (
@@ -56,15 +52,29 @@ impl Plugin for FrontendPlugin {
                     hud::update_result_text,
                 )
                     .run_if(in_state(net_view::AppMode::GhostLobby)),
+            );
+    }
+}
+
+/// Everything local windowed play adds on top of
+/// [`driver::SimDriverPlugin`]: rendering plus command-queue input decoding.
+pub struct FrontendPlugin;
+
+impl Plugin for FrontendPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(FrontendRenderPlugin)
+            .init_resource::<net_view::NetViewDrag>()
+            .add_systems(
+                // Decode the keyboard right before the fixed main loop so a
+                // press lands on this frame's tick, not the next frame's.
+                RunFixedMainLoop,
+                keymap::keyboard_input.in_set(RunFixedMainLoopSystems::BeforeFixedMainLoop),
             )
             .add_systems(
                 Update,
                 (
                     // `pan_net_view` must run before `net_view_click`: the click
-                    // reads this frame's `dragging` latch to decide whether to
-                    // suppress the pivot, and a bare tuple guarantees no order,
-                    // so chain them explicitly. `draw_segment_edges` and the HUD
-                    // are order-independent of both.
+                    // reads this frame's dragging latch before handling pivot.
                     (net_view::pan_net_view, net_view::net_view_click).chain(),
                     net_view::draw_segment_edges,
                     net_view::update_net_hud,

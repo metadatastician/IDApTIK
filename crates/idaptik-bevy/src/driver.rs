@@ -44,6 +44,41 @@ impl SimState {
         Ok(state)
     }
 
+    /// Build a render-facing view from an already constructed simulation.
+    ///
+    /// Netplay keeps gameplay truth inside `LockstepCore`; this clone is a
+    /// one-way view for Bevy's scene and HUD and is never fed back into it.
+    pub fn from_sim(mut sim: GhostLobbySim) -> Self {
+        let startup = sim.drain_events();
+        let mut state = Self {
+            sim,
+            log: Vec::new(),
+            event_log: Vec::new(),
+        };
+        state.ingest(startup);
+        state
+    }
+
+    /// Refresh the render-only view after one or more lockstep ticks.
+    pub(crate) fn mirror_lockstep_tick(&mut self, sim: &GhostLobbySim, events: &[SimEvent]) {
+        if events
+            .iter()
+            .any(|event| matches!(event, SimEvent::Restarted { .. }))
+        {
+            self.log.clear();
+        }
+        self.sim = sim.clone();
+        self.ingest(events.to_vec());
+    }
+
+    /// Replace the render-only view after network resynchronisation.
+    pub(crate) fn mirror_lockstep_history(&mut self, sim: &GhostLobbySim, events: &[SimEvent]) {
+        self.sim = sim.clone();
+        self.log.clear();
+        self.event_log.clear();
+        self.ingest(events.to_vec());
+    }
+
     /// Append fresh events to the event log and render them into log lines.
     fn ingest(&mut self, events: Vec<SimEvent>) {
         let tick = self.sim.current_tick();

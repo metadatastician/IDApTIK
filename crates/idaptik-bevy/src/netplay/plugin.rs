@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, mpsc};
 use tokio::runtime::Runtime;
 
-use crate::driver::VisualBuffers;
+use crate::driver::{SIM_HZ, SimState, VisualBuffers};
 use crate::netplay::connection::{
     ConnectionConfig, IncomingMessage, NetplayStatus, NetworkMessage, spawn_connection_task,
 };
@@ -57,8 +57,6 @@ pub struct NetplayState {
     pub role: Option<Role>,
     /// The script file loaded from disk
     pub script: Option<ScriptFile>,
-    /// Visual buffers for rendering
-    pub visual: Option<VisualBuffers>,
     /// Sender for network messages to connection task (Sync-safe when cloned)
     pub tx_network: Option<mpsc::Sender<NetworkMessage>>,
     /// Receiver for network messages from connection task, wrapped for thread safety
@@ -72,7 +70,6 @@ impl Default for NetplayState {
             status: NetplayStatus::SelectingRole,
             role: None,
             script: None,
-            visual: None,
             tx_network: None,
             rx_network: None,
         }
@@ -106,13 +103,23 @@ impl Plugin for NetplayPlugin {
         state.status = NetplayStatus::Connecting;
         state.role = Some(role);
 
-        // We'll create channels and spawn connection in setup_netplay_system
-        // after we have the script loaded
+        // Lockstep owns gameplay truth. The scene and HUD receive a cloned,
+        // one-way render view so no renderer state can feed back into it.
+        let script = idaptik_tui::headless::load(&self.config.script_path)
+            .expect("the configured multiplayer script must load");
+        let render_sim = idaptik_tui::headless::build(&script)
+            .expect("the configured multiplayer script must build");
+        let render_state = SimState::from_sim(render_sim);
+        let render_visual = VisualBuffers::primed(&render_state.sim);
 
         // Insert resources
         app.insert_resource(state)
             .insert_resource(self.config.clone())
+            .insert_resource(render_state)
+            .insert_resource(render_visual)
             .insert_resource(BevyInputFeed::new())
+            .insert_resource(Time::<Fixed>::from_hz(SIM_HZ))
+            .add_plugins(crate::FrontendRenderPlugin)
             .add_systems(Startup, (setup_netplay_system, setup_connection_status_ui))
             .add_systems(
                 FixedUpdate,
@@ -161,11 +168,6 @@ fn setup_netplay_system(mut state: ResMut<NetplayState>, config: Res<NetplayConf
                 Ok(core) => {
                     state.core = Some(core);
                     state.script = Some(script);
-
-                    // Initialize visual buffers from the lockstep core's simulation
-                    if let Some(ref core) = state.core {
-                        state.visual = Some(VisualBuffers::primed(core.sim()));
-                    }
 
                     // Create two channels:
                     // 1. Bevy -> Connection: Bevy sends outgoing lockstep messages to connection
@@ -229,7 +231,11 @@ fn pump_outgoing_system(mut state: ResMut<NetplayState>, mut input_feed: ResMut<
 }
 
 /// System to process incoming network messages
-fn process_incoming_system(mut state: ResMut<NetplayState>) {
+fn process_incoming_system(
+    mut state: ResMut<NetplayState>,
+    mut render_state: ResMut<SimState>,
+    mut render_visual: ResMut<VisualBuffers>,
+) {
     if let Some(rx_arc) = &state.rx_network {
         let mut status_update: Option<NetplayStatus> = None;
         let mut incoming_messages: Vec<IncomingMessage> = Vec::new();
@@ -286,10 +292,11 @@ fn process_incoming_system(mut state: ResMut<NetplayState>) {
                                     // Replace the existing core with the resynced one
                                     state.core = Some(new_core);
 
-                                    // Reinitialize visual buffers from the new core's simulation
-                                    state.visual = Some(VisualBuffers::primed(
-                                        state.core.as_ref().unwrap().sim(),
-                                    ));
+                                    if let Some(core) = &state.core {
+                                        render_state
+                                            .mirror_lockstep_history(core.sim(), core.log());
+                                        *render_visual = VisualBuffers::primed(core.sim());
+                                    }
 
                                     // Transition back to running state
                                     state.status = NetplayStatus::Running;
@@ -335,18 +342,26 @@ fn process_incoming_system(mut state: ResMut<NetplayState>) {
 }
 
 /// System to advance the lockstep core
-fn advance_lockstep_system(mut state: ResMut<NetplayState>) {
-    // Take ownership of core and visual to avoid borrow checker issues
+fn advance_lockstep_system(
+    mut state: ResMut<NetplayState>,
+    mut render_state: ResMut<SimState>,
+    mut render_visual: ResMut<VisualBuffers>,
+) {
+    // Take ownership so the callback can update the one-way render resources.
     let core = std::mem::take(&mut state.core);
-    let visual = std::mem::take(&mut state.visual);
 
-    if let (Some(mut core), Some(mut visual)) = (core, visual) {
-        core.advance_with(|sim, _events| {
-            // Update visual state from sim
-            visual.commit(sim, false);
+    if let Some(mut core) = core {
+        core.advance_with(|sim, events| {
+            let restarted = events.iter().any(|event| {
+                matches!(
+                    event,
+                    idaptik_core::scenario::event::Event::Restarted { .. }
+                )
+            });
+            render_visual.commit(sim, restarted);
+            render_state.mirror_lockstep_tick(sim, events);
         });
         state.core = Some(core);
-        state.visual = Some(visual);
     }
 }
 

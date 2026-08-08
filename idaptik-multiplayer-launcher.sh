@@ -124,10 +124,11 @@ preflight_host() {
 }
 
 build_seat() {
-  if [ ! -x "$BEVY_BIN" ] || [ "${1:-}" = "--rebuild" ]; then
-    say "building the Bevy netplay client (first run takes a few minutes)…"
-    (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release -q -p idaptik-bevy)
-  fi
+  # Always ask Cargo to build. Its fingerprinting makes an unchanged build
+  # effectively free, while a freshly pulled source fix can never be hidden by
+  # an older executable that happens to exist in target/release.
+  say "checking the Bevy netplay client (a first build takes a few minutes)…"
+  (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release --locked -q -p idaptik-bevy)
   [ -x "$BEVY_BIN" ] || die "build produced no $BEVY_BIN"
 }
 

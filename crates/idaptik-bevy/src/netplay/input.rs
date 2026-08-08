@@ -5,9 +5,11 @@
 //! Command streams for the delay-lockstep protocol.
 
 use bevy::prelude::*;
-use idaptik_core::scenario::command::{Button, Buttons, Command};
+use idaptik_core::scenario::command::Command;
 use idaptik_net::lockstep::InputFeed;
 use std::collections::BTreeMap;
+
+use crate::driver::CommandQueue;
 
 /// Bevy-compatible input feed for lockstep.
 ///
@@ -19,8 +21,8 @@ pub struct BevyInputFeed {
     pending: BTreeMap<u64, Vec<Command>>,
     /// Current tick being sampled
     current_tick: u64,
-    /// Held buttons state (persistent across ticks)
-    held: Buttons,
+    /// The canonical Bevy decoder's held/pause state and pending commands.
+    command_queue: CommandQueue,
 }
 
 impl BevyInputFeed {
@@ -29,7 +31,7 @@ impl BevyInputFeed {
         Self {
             pending: BTreeMap::new(),
             current_tick: 0,
-            held: Buttons::default(),
+            command_queue: CommandQueue::default(),
         }
     }
 
@@ -44,29 +46,6 @@ impl BevyInputFeed {
     /// Advance to the next tick
     pub fn advance_tick(&mut self) {
         self.current_tick += 1;
-    }
-
-    /// Update held buttons from keyboard state
-    pub fn update_held(&mut self, keyboard: &Res<ButtonInput<KeyCode>>) {
-        // Update held buttons based on current keyboard state
-        // This is called each frame to update the button state
-        let mut new_held = Buttons::default();
-
-        // Check each button's key
-        if keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::KeyA) {
-            new_held.set(Button::Left, true);
-        }
-        if keyboard.pressed(KeyCode::ArrowRight) || keyboard.pressed(KeyCode::KeyD) {
-            new_held.set(Button::Right, true);
-        }
-        if keyboard.pressed(KeyCode::ArrowDown) || keyboard.pressed(KeyCode::KeyS) {
-            new_held.set(Button::Crouch, true);
-        }
-        if keyboard.pressed(KeyCode::ShiftLeft) || keyboard.pressed(KeyCode::ShiftRight) {
-            new_held.set(Button::Sprint, true);
-        }
-
-        self.held = new_held;
     }
 }
 
@@ -84,68 +63,19 @@ impl InputFeed for BevyInputFeed {
 pub fn capture_lockstep_input(
     mut feed: ResMut<BevyInputFeed>,
     keyboard: Res<ButtonInput<KeyCode>>,
+    mut exit: MessageWriter<AppExit>,
 ) {
-    let mut commands = Vec::new();
-
-    // Update held button state
-    feed.update_held(&keyboard);
-
-    // Check for just-pressed keys (edge commands)
-    for key in keyboard.get_just_pressed() {
-        if let Some(cmd) = key_to_edge_command(*key) {
-            commands.push(cmd);
-        }
-    }
-
-    // Check for just-released keys (button release)
-    for key in keyboard.get_just_released() {
-        if let Some(button) = key_to_button(*key) {
-            commands.push(Command::SetButton {
-                button,
-                down: false,
-            });
-        }
-    }
+    // Reuse local Bevy's canonical decoder so multiplayer cannot silently
+    // lose movement presses, interaction holds, pivots, pause or restart.
+    let quit = crate::keymap::decode(&keyboard, &mut feed.command_queue);
+    let commands = std::mem::take(&mut feed.command_queue.pending);
 
     // Queue commands for current tick
     if !commands.is_empty() {
         feed.queue_commands(commands);
     }
-}
-
-/// Convert a key to an edge command (pressed once)
-fn key_to_edge_command(key: KeyCode) -> Option<Command> {
-    use idaptik_core::scenario::ActionKind;
-    match key {
-        KeyCode::Space => Some(Command::Jump),
-        KeyCode::KeyE => Some(Command::Interact),
-        KeyCode::KeyQ => Some(Command::ThrowUsb),
-        KeyCode::Digit1 => Some(Command::Uplink {
-            kind: ActionKind::Camera,
-        }),
-        KeyCode::Digit2 => Some(Command::Uplink {
-            kind: ActionKind::Door,
-        }),
-        KeyCode::Digit3 => Some(Command::Uplink {
-            kind: ActionKind::Vacuum,
-        }),
-        KeyCode::Digit4 => Some(Command::Uplink {
-            kind: ActionKind::Lights,
-        }),
-        KeyCode::Escape => Some(Command::Pause { on: true }),
-        KeyCode::KeyR => Some(Command::Restart),
-        _ => None,
-    }
-}
-
-/// Convert a key to a button for held state
-fn key_to_button(key: KeyCode) -> Option<Button> {
-    match key {
-        KeyCode::ArrowLeft | KeyCode::KeyA => Some(Button::Left),
-        KeyCode::ArrowRight | KeyCode::KeyD => Some(Button::Right),
-        KeyCode::ArrowDown | KeyCode::KeyS => Some(Button::Crouch),
-        KeyCode::ShiftLeft | KeyCode::ShiftRight => Some(Button::Sprint),
-        _ => None,
+    if quit {
+        exit.write(AppExit::Success);
     }
 }
 
@@ -154,4 +84,42 @@ fn key_to_button(key: KeyCode) -> Option<Button> {
 /// Called at the start of each lockstep tick to move to the next tick.
 pub fn advance_input_feed_tick(mut feed: ResMut<BevyInputFeed>) {
     feed.advance_tick();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use idaptik_core::scenario::command::{Button, Command};
+
+    #[test]
+    fn movement_press_and_release_enter_the_lockstep_feed() {
+        let mut feed = BevyInputFeed::new();
+        let mut keys = ButtonInput::<KeyCode>::default();
+
+        keys.press(KeyCode::KeyA);
+        let quit = crate::keymap::decode(&keys, &mut feed.command_queue);
+        assert!(!quit);
+        let pressed = std::mem::take(&mut feed.command_queue.pending);
+        feed.queue_commands(pressed);
+        assert_eq!(
+            feed.commands_for(0),
+            vec![Command::SetButton {
+                button: Button::Left,
+                down: true,
+            }]
+        );
+
+        keys.clear();
+        keys.release(KeyCode::KeyA);
+        crate::keymap::decode(&keys, &mut feed.command_queue);
+        let released = std::mem::take(&mut feed.command_queue.pending);
+        feed.queue_commands(released);
+        assert_eq!(
+            feed.commands_for(0),
+            vec![Command::SetButton {
+                button: Button::Left,
+                down: false,
+            }]
+        );
+    }
 }
