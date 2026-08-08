@@ -484,6 +484,60 @@ pub fn sync_player(
 
 /// Billy's related scene queries, grouped so the render system's signature
 /// describes one visual concern rather than each individual sprite layer.
+type BillyBodyFilter = (
+    With<BillyMarker>,
+    Without<BillyNose>,
+    Without<sprites::BillyEyeLeft>,
+    Without<sprites::BillyEyeRight>,
+    Without<sprites::BillyMouth>,
+    Without<sprites::BillyHat>,
+    Without<sprites::BillyBadge>,
+);
+type BillyNoseFilter = (
+    With<BillyNose>,
+    Without<BillyMarker>,
+    Without<sprites::BillyEyeLeft>,
+    Without<sprites::BillyEyeRight>,
+    Without<sprites::BillyMouth>,
+);
+type BillyEyeLeftFilter = (
+    With<sprites::BillyEyeLeft>,
+    Without<BillyMarker>,
+    Without<BillyNose>,
+    Without<sprites::BillyEyeRight>,
+    Without<sprites::BillyMouth>,
+    Without<sprites::BillyHat>,
+);
+type BillyEyeRightFilter = (
+    With<sprites::BillyEyeRight>,
+    Without<BillyMarker>,
+    Without<BillyNose>,
+    Without<sprites::BillyEyeLeft>,
+    Without<sprites::BillyMouth>,
+    Without<sprites::BillyHat>,
+);
+type BillyMouthFilter = (
+    With<sprites::BillyMouth>,
+    Without<BillyMarker>,
+    Without<BillyNose>,
+    Without<sprites::BillyEyeLeft>,
+    Without<sprites::BillyEyeRight>,
+    Without<sprites::BillyHat>,
+);
+type BillyHatFilter = (
+    With<sprites::BillyHat>,
+    Without<BillyMarker>,
+    Without<sprites::BillyEyeLeft>,
+    Without<sprites::BillyEyeRight>,
+    Without<sprites::BillyMouth>,
+    Without<sprites::BillyBadge>,
+);
+type BillyBadgeFilter = (
+    With<sprites::BillyBadge>,
+    Without<BillyMarker>,
+    Without<sprites::BillyHat>,
+);
+
 #[derive(SystemParam)]
 pub struct BillyVisuals<'w, 's> {
     body: Query<
@@ -494,16 +548,14 @@ pub struct BillyVisuals<'w, 's> {
             &'static mut Sprite,
             &'static mut Visibility,
         ),
-        With<BillyMarker>,
+        BillyBodyFilter,
     >,
-    nose: Query<'w, 's, &'static mut Transform, (With<BillyNose>, Without<BillyMarker>)>,
-    eyes_left:
-        Query<'w, 's, (&'static mut Sprite, &'static mut Transform), With<sprites::BillyEyeLeft>>,
-    eyes_right:
-        Query<'w, 's, (&'static mut Sprite, &'static mut Transform), With<sprites::BillyEyeRight>>,
-    mouths: Query<'w, 's, (&'static mut Sprite, &'static mut Transform), With<sprites::BillyMouth>>,
-    hats: Query<'w, 's, (&'static mut Visibility, &'static mut Sprite), With<sprites::BillyHat>>,
-    badges: Query<'w, 's, &'static mut Visibility, With<sprites::BillyBadge>>,
+    nose: Query<'w, 's, &'static mut Transform, BillyNoseFilter>,
+    eyes_left: Query<'w, 's, (&'static mut Sprite, &'static mut Transform), BillyEyeLeftFilter>,
+    eyes_right: Query<'w, 's, (&'static mut Sprite, &'static mut Transform), BillyEyeRightFilter>,
+    mouths: Query<'w, 's, (&'static mut Sprite, &'static mut Transform), BillyMouthFilter>,
+    hats: Query<'w, 's, (&'static mut Visibility, &'static mut Sprite), BillyHatFilter>,
+    badges: Query<'w, 's, &'static mut Visibility, BillyBadgeFilter>,
 }
 
 /// Billy: body, offsite hides him, facing nose, and mode-based visual states.
@@ -560,11 +612,11 @@ pub fn sync_billy(
 /// This enhances immersion by showing Billy's expressions and equipment.
 fn update_billy_visual_state(
     mode: BillyMode,
-    mut eyes_left: Query<(&mut Sprite, &mut Transform), With<sprites::BillyEyeLeft>>,
-    mut eyes_right: Query<(&mut Sprite, &mut Transform), With<sprites::BillyEyeRight>>,
-    mut mouths: Query<(&mut Sprite, &mut Transform), With<sprites::BillyMouth>>,
-    mut hats: Query<(&mut Visibility, &mut Sprite), With<sprites::BillyHat>>,
-    mut badges: Query<&mut Visibility, With<sprites::BillyBadge>>,
+    mut eyes_left: Query<(&mut Sprite, &mut Transform), BillyEyeLeftFilter>,
+    mut eyes_right: Query<(&mut Sprite, &mut Transform), BillyEyeRightFilter>,
+    mut mouths: Query<(&mut Sprite, &mut Transform), BillyMouthFilter>,
+    mut hats: Query<(&mut Visibility, &mut Sprite), BillyHatFilter>,
+    mut badges: Query<&mut Visibility, BillyBadgeFilter>,
 ) {
     use idaptik_core::scenario::common::BillyMode as Mode;
 
