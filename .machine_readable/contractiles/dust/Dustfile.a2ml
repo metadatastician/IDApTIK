@@ -46,3 +46,53 @@ the repository tidy — stale build artifacts, editor cruft, and metadata drift
 - run: test -z "$(git ls-files generated/k9iser 2>/dev/null)"
 - severity: info
 - notes: Re-emit with `k9iser generate`; keep them out of version control unless intentionally pinned.
+
+## Runtime Environment Residue
+
+### wslg-copy-mode-preflight
+- description: Detect WSLg shared-memory failure before creating an unusable GUI window
+- run: bash tests/runtime_doctor_test.sh
+- severity: warning
+- observed: 2026-08-08 on WSL 2.7.11.0, kernel 6.18.33.2-2, WSLg 1.0.73.2
+- signature: |
+    Windows showed a penguin taskbar entry named
+    `[WARN: COPY MODE] IDApTIK ...`, but it could not be restored or maximised.
+    `/mnt/shared_memory` was absent and `/mnt/wslg/weston.log` contained
+    `rdp_allocate_shared_memory: Failed to open ... Input/output error`.
+    Bevy consequently selected llvmpipe software rendering; its separate
+    no-audio warning was non-fatal.
+- explanation: |
+    `[WARN: COPY MODE]` is added by WSLg, not IDApTIK. WSLg has fallen back
+    from VAIL (host/guest shared-memory window transport) to RAIL (copying
+    pixels over the RDP transport). The fallback can leave only a taskbar
+    surface, impair window movement/maximisation, and make coordination look
+    like a game or multiplayer failure even though Bevy created its window.
+- prevention: |
+    Both launchers run `scripts/runtime-doctor.sh` before building, starting
+    the relay, or creating a game window. A Weston shared-memory EIO or missing
+    WSLg mount is blocking: the launcher exits non-zero and says that nothing
+    launched. Software graphics and unavailable audio remain warnings.
+- remediation: |
+    From Windows PowerShell as Administrator, run `wsl --update`, then
+    `wsl --shutdown`; reopen the distribution and run `./launcher.sh --doctor`.
+    If Copy Mode remains, restart Windows. Do not create `/mnt/shared_memory`
+    manually: an ordinary directory or tmpfs can hide the symptom without
+    restoring WSLg's host-backed shared-memory transport. If it still fails,
+    retain `wsl --version`, `wsl --status`, `uname -r`, `/mnt/wslg/weston.log`,
+    and the presence/absence of `/mnt/shared_memory` and `/dev/dxg`.
+- self-healing-boundary: |
+    `./launcher.sh --repair` may trust the repository, install pinned mise
+    toolchains, and—with explicit confirmation—bootstrap/authenticate
+    Tailscale. It must not invoke `wsl --shutdown`, alter Windows drivers, fake
+    the shared-memory mount, or change firewall/router state silently; those
+    actions terminate unrelated work or cross a host/security boundary.
+- choreography: |
+    Host: diagnosis → dependencies → build → relay health → peer route → host
+    seat → green READY FOR JOINERS. Joiner: diagnosis → dependencies → build →
+    exact host/port probe → green READY — JOINING HOST NOW. A red cross stops
+    before a half-session is created; a PID alone never counts as readiness.
+- fault-tolerance: |
+    The preflight prevents abandoned PIDs, duplicate penguin taskbar items,
+    stale lobby state, and the false impression that remote inputs are broken.
+    `--flowdiags` opens a no-JavaScript HTML decision flow in the Windows
+    browser so it remains usable when WSLg itself is broken.

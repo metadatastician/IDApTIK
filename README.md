@@ -68,6 +68,13 @@ the Bevy GUI. Direct multiplayer commands remain available through
 `./idaptik-multiplayer-launcher.sh` (`host` / `join`, see `--help`); connection
 trouble is covered by
 [`docs/MULTIPLAYER-TROUBLESHOOTING.md`](docs/MULTIPLAYER-TROUBLESHOOTING.md).
+Before launch, the menu and `./launcher.sh --doctor` review the player machine,
+OS/kernel/WSL transport, graphics coprocessor, audio, pinned dependencies,
+Tailscale and reachability. `./launcher.sh --repair` performs safe dependency
+and guided network remediation; `./launcher.sh --flowdiags` opens a friendly
+HTML decision flow, and `./launcher.sh --man` displays the complete manual.
+Hosts invite peers only after the green `READY FOR JOINERS` result; joiners get
+their own build/reachability checklist and green joining result.
 
 ## Layout
 

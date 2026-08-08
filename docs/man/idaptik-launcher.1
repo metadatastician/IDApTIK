@@ -1,0 +1,123 @@
+.\" SPDX-License-Identifier: CC-BY-SA-4.0
+.TH IDAPTIK-LAUNCHER 1 "August 2026" "IDApTIK 0.4.0" "Player Commands"
+.SH NAME
+idaptik-launcher \- diagnose, repair, build, and launch IDApTIK solo or multiplayer
+.SH SYNOPSIS
+.B ./launcher.sh
+.RI [ mode ]
+.RI [ options ]
+.SH DESCRIPTION
+The IDApTIK launcher is the canonical player entry point.  With no arguments
+it opens a menu for solo play, multiplayer hosting/joining, status, and
+diagnostics.  Every launch performs a fail-closed runtime preflight before it
+builds or starts a relay.  It then prints a tick/cross startup checklist and
+does not declare readiness merely because a process exists.
+.SH PLAYER MODES
+.TP
+.B --solo
+Build and open the Bevy GUI with both roles controlled locally.
+.TP
+.BR --host " [--role infiltrator|hacker]"
+Check host dependencies and route, build the GUI, start and health-check the
+Phoenix/Bandit relay, then open the selected seat.  Invite another player only
+after the green READY FOR JOINERS message.
+.TP
+.BR --join " HOST [--role infiltrator|hacker]"
+Check the join machine, build the GUI, and probe HOST port 4000.  The client
+does not start until the relay answers.  HOST may be a name, IPv4 address,
+host:port pair, or ws:// / wss:// URL.
+.TP
+.BR --auto , " --browser" , " --web"
+Open the interactive menu.  This is the default.
+.SH DIAGNOSTICS AND REPAIR
+.TP
+.B --doctor
+Print machine, OS/kernel/architecture, WSL/WSLg transport, CPU/memory,
+graphics coprocessor/renderer, audio, pinned Rust and Elixir dependencies,
+Tailscale, and host-route status.  Fatal checks return non-zero.
+.TP
+.B --repair
+Trust the repository and install its pinned mise dependencies.  On WSL2 NAT,
+offer guided Tailscale installation/authentication.  Host-level WSLg recovery
+is explained but never performed automatically because wsl --shutdown would
+terminate every active WSL process.
+.TP
+.B --flowdiags
+Open the static HTML launch/troubleshooting flowchart.  Under WSL it uses the
+Windows browser so it remains usable when WSLg windows are broken.
+.TP
+.B --man
+Display this manual.
+.SH LIFECYCLE MODES
+.TP
+.B --start
+Alias for solo GUI launch.
+.TP
+.B --status
+Report tracked game/relay processes, binary state, and logs.
+.TP
+.B --stop
+Stop the tracked game and relay.
+.TP
+.BR --integ " [--force]"
+Install desktop/start-menu integration.
+.TP
+.B --disinteg
+Remove integration while preserving configuration and logs.
+.SH READINESS CONTRACT
+The host's READY FOR JOINERS message means runtime diagnostics passed, the GUI
+build completed, the relay answered its health probe, a peer-reachable address
+exists, and the host seat is launching.  The joiner's READY -- JOINING HOST NOW
+message means its diagnostics/build passed and the exact host relay answered.
+A warning is a degradation; a cross is blocking and nothing should launch.
+.SH WSLG COPY MODE
+If Windows shows a penguin taskbar item prefixed [WARN: COPY MODE], WSLg failed
+its shared-memory window transport.  The launcher detects the Weston
+rdp_allocate_shared_memory error or missing /mnt/shared_memory and stops before
+launch.  In Windows PowerShell as Administrator run:
+.PP
+.nf
+wsl --update
+wsl --shutdown
+.fi
+.PP
+Reopen the distribution and run --doctor.  Restart Windows if necessary.  Do
+not manually create /mnt/shared_memory; WSLg must supply the host-backed mount.
+.SH NETWORKING
+WSL2 NAT addresses in 172.16.0.0/12 are not offered to peers.  Tailscale is the
+supported simple route and must be connected before the host becomes ready.
+The joiner probes the selected host and port before launching.
+.SH EXTENDED COPROCESSORS
+QPU, APU, IOPU, vector, physics, math, tensor, neural, graphics, and crypto
+suite work is separate architecture planning.  Except for the graphics adapter
+needed by Bevy, that suite is not a runtime dependency of this release and the
+doctor does not claim those backends are implemented.
+.SH ENVIRONMENT
+.TP
+.B IDAPTIK_PORT
+Relay port; default 4000.
+.TP
+.B IDAPTIK_REPO_DIR
+Override the repository located by an integrated launcher.
+.TP
+.B IDAPTIK_STARTUP_TIMEOUT
+Maximum seconds to wait for readiness; default 1800.
+.SH FILES
+.TP
+.I ~/.local/state/idaptik/game.log
+GUI/build startup log.
+.TP
+.I ~/.local/state/idaptik/startup.progress
+Machine-readable startup phase stream.
+.TP
+.I ~/.local/state/idaptik/startup.ready
+Readiness record, created only after all startup gates.
+.TP
+.I ~/.local/state/idaptik-multiplayer/relay.log
+Phoenix/Bandit relay log.
+.SH EXIT STATUS
+Zero means the requested report/action completed.  Diagnostics and launches
+return non-zero for blocking faults, failed builds, unreachable relays, or
+readiness timeout.  Warnings alone do not fail.
+.SH SEE ALSO
+docs/MULTIPLAYER-TROUBLESHOOTING.md, docs/player-launch-flow.html

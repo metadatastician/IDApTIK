@@ -6,7 +6,7 @@
 # (
 #   id                   = "idaptik-multiplayer-launcher"
 #   type                 = "launcher"
-#   version              = "0.2.0"
+#   version              = "0.3.0"
 #   app-name             = "idaptik-multiplayer"
 #   app-display          = "IDApTIK Multiplayer"
 #   runtime-kind         = "gui-netplay"
@@ -20,6 +20,10 @@
 #     "--start"
 #     "--stop"
 #     "--status"
+#     "--doctor"
+#     "--repair"
+#     "--flowdiags"
+#     "--man"
 #     "--auto"
 #     "--browser"
 #     "--web"
@@ -58,9 +62,10 @@
 set -euo pipefail
 
 APP_DISPLAY="IDApTIK Multiplayer"
-VERSION="0.2.0"
+VERSION="0.3.0"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUNTIME_DOCTOR="$REPO_DIR/scripts/runtime-doctor.sh"
 RUN_CONFIG="$REPO_DIR/fixtures/session_relay/versus_script.json"
 BEVY_BIN="$REPO_DIR/target/release/idaptik-bevy"
 
@@ -76,7 +81,27 @@ LOG_FILE="$LOG_DIR/relay.log"
 # ----------------------------------------------------------------------------
 
 say()  { printf '%s\n' "$*"; }
-die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
+die()  {
+  if [ -n "${IDAPTIK_PROGRESS_FILE:-}" ]; then
+    printf 'FAIL|%s\n' "$*" >> "$IDAPTIK_PROGRESS_FILE"
+  fi
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+progress() {
+  [ -n "${IDAPTIK_PROGRESS_FILE:-}" ] || return 0
+  printf '%s|%s\n' "$1" "$2" >> "$IDAPTIK_PROGRESS_FILE"
+}
+mark_ready() {
+  if [ -n "${IDAPTIK_READY_FILE:-}" ]; then
+    printf '%s\n' "$1" > "$IDAPTIK_READY_FILE"
+  else
+    case "$1" in
+      host\|*) printf '\n\033[1;32m● READY FOR JOINERS\033[0m\n' ;;
+      join\|*) printf '\n\033[1;32m● READY — JOINING HOST NOW\033[0m\n' ;;
+    esac
+  fi
+}
 
 # WSL2's virtual adapter is NAT'd behind Windows: an address from it is
 # unreachable from any other machine, so the share banner must not offer it.
@@ -101,6 +126,11 @@ need() {
 }
 
 preflight_common() {
+  local profile="$1" target="${2:-}"
+  if [ "${IDAPTIK_PREFLIGHT_DONE:-0}" != "1" ]; then
+    [ -x "$RUNTIME_DOCTOR" ] || die "runtime diagnostics missing: $RUNTIME_DOCTOR"
+    "$RUNTIME_DOCTOR" preflight "$profile" "$target" || die "runtime preflight failed; run './launcher.sh --doctor'"
+  fi
   [ -f "$RUN_CONFIG" ] || die "run config missing: $RUN_CONFIG (pull the repo?)"
   # An untrusted mise config is SILENTLY ignored and the global toolchain
   # resolves instead — trust it before anything builds (see AGENTS.md).
@@ -117,7 +147,7 @@ preflight_common() {
 }
 
 preflight_host() {
-  preflight_common
+  preflight_common host
   (cd "$REPO_DIR" && "$MISE_BIN" exec -- mix --version >/dev/null) || \
     die "the pinned Elixir/OTP toolchain is unavailable — run 'mise install'"
   need curl "to poll relay readiness (host only)" "install curl from your package manager"
@@ -128,8 +158,10 @@ build_seat() {
   # effectively free, while a freshly pulled source fix can never be hidden by
   # an older executable that happens to exist in target/release.
   say "checking the Bevy netplay client (a first build takes a few minutes)…"
+  progress STEP "Building the Bevy GUI; joiners must wait until this completes"
   (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release --locked -q -p idaptik-bevy)
   [ -x "$BEVY_BIN" ] || die "build produced no $BEVY_BIN"
+  progress PASS "Bevy GUI build is complete"
 }
 
 relay_pid() {
@@ -145,10 +177,12 @@ relay_up() { curl -fsS "http://127.0.0.1:${PORT}/" >/dev/null 2>&1; }
 start_relay() {
   if relay_up; then
     say "relay already answering on :$PORT — reusing it."
+    progress PASS "Relay is already answering on port $PORT"
     return 0
   fi
   mkdir -p "$LOG_DIR"
   say "starting the relay on :$PORT (log: $LOG_FILE)…"
+  progress STEP "Starting the Phoenix/Bandit relay on port $PORT"
   (cd "$REPO_DIR/server" && "$MISE_BIN" exec -- mix deps.get >/dev/null)
   # IDAPTIK_BIND=all: the dev endpoint binds loopback-only by default, which
   # would make every remote join fail — hosting is the whole point here.
@@ -162,6 +196,7 @@ start_relay() {
     sleep 1
   done
   say "relay is up."
+  progress PASS "Relay health check passed on port $PORT"
 }
 
 stop_relay() {
@@ -181,12 +216,14 @@ share_addresses() {
   say ""
   say "── tell the other player ──────────────────────────────────"
   local shared=0
+  HOST_SHARE_ADDRESS=""
 
   if command -v tailscale >/dev/null 2>&1; then
     local ts
     ts="$(tailscale ip -4 2>/dev/null | head -1 || true)"
     if [ -n "$ts" ]; then
       say "  tailnet:  ./idaptik-multiplayer-launcher.sh join $ts"
+      HOST_SHARE_ADDRESS="$ts"
       shared=1
     fi
   fi
@@ -211,6 +248,7 @@ share_addresses() {
     fi
   elif [ -n "$lan" ]; then
     say "  LAN:      ./idaptik-multiplayer-launcher.sh join $lan"
+    HOST_SHARE_ADDRESS="$lan"
     shared=1
   fi
 
@@ -266,11 +304,16 @@ mode_host() {
   done
   case "$role" in infiltrator|hacker) ;; *) die "role must be infiltrator or hacker" ;; esac
   preflight_host
+  progress PASS "Host machine, WSLg, dependencies, and tailnet route passed preflight"
   build_seat "${REBUILD:+--rebuild}"
   start_relay
   share_addresses
+  [ -n "${HOST_SHARE_ADDRESS:-}" ] || die "no peer-reachable host address is available"
+  progress PASS "Peer route is ready at $HOST_SHARE_ADDRESS:$PORT"
   say "waiting in the lobby for the other seat… (relay keeps running after you quit;"
   say "'./idaptik-multiplayer-launcher.sh --stop' ends it)"
+  progress PASS "Host seat is launching for session $session as $role"
+  mark_ready "host|$HOST_SHARE_ADDRESS|$PORT|$session|$role"
   run_seat host "127.0.0.1" "$(seat_url "127.0.0.1:$PORT")" "$role" "$session"
 }
 
@@ -286,8 +329,11 @@ mode_join() {
     esac
   done
   case "$role" in infiltrator|hacker) ;; *) die "role must be infiltrator or hacker" ;; esac
-  preflight_common
+  preflight_common join "$target"
+  progress PASS "Join machine, WSLg, dependencies, and host relay passed preflight"
   build_seat
+  progress PASS "Host $target is reachable and the local seat is launching as $role"
+  mark_ready "join|$target|$session|$role"
   run_seat join "$target" "$(seat_url "$target")" "$role" "$session"
 }
 
@@ -323,7 +369,8 @@ $APP_DISPLAY — two humans, one graphical Ghost Lobby.
   deterministic run config ($RUN_CONFIG).
 
   Standard modes delegate to the main player-facing launcher:
-      --start (= graphical host)  --stop  --status
+      --start (= graphical host)  --stop  --status  --doctor  --repair
+      --flowdiags  --man
       --auto / --browser / --web (= launch menu)
       --integ / --disinteg  --help  --version
 
@@ -349,6 +396,10 @@ case "$MODE" in
   --start)       exec "$REPO_DIR/launcher.sh" --host "$@" ;;
   --stop)        exec "$REPO_DIR/launcher.sh" --stop ;;
   --status)      exec "$REPO_DIR/launcher.sh" --status ;;
+  --doctor)      exec "$REPO_DIR/launcher.sh" --doctor ;;
+  --repair)      exec "$REPO_DIR/launcher.sh" --repair ;;
+  --flowdiags)   exec "$REPO_DIR/launcher.sh" --flowdiags ;;
+  --man)         exec "$REPO_DIR/launcher.sh" --man ;;
   --auto|--browser|--web) exec "$REPO_DIR/launcher.sh" "$MODE" ;;
   --integ)       exec "$REPO_DIR/launcher.sh" --integ "$@" ;;
   --disinteg)    exec "$REPO_DIR/launcher.sh" --disinteg ;;

@@ -14,7 +14,7 @@ name         = "idaptik-multiplayer"
 display      = "IDApTIK Multiplayer"
 description  = "Two-player Ghost Lobby netplay: host the relay and a seat, or join a friend's session"
 categories   = ["Game", "Network"]
-version      = "0.2.0"
+version      = "0.3.0"
 license      = "AGPL-3.0-or-later"
 
 [repo]
@@ -37,7 +37,7 @@ first-line-format = "idaptik-multiplayer-launcher {version} ({build-sha-short}) 
 
 [modes]
 # Standard required modes, plus the game-specific pair.
-runtime     = ["--start", "--stop", "--status", "--auto", "--browser", "--web"]
+runtime     = ["--start", "--stop", "--status", "--doctor", "--repair", "--flowdiags", "--man", "--auto", "--browser", "--web"]
 integration = ["--integ", "--disinteg"]
 meta        = ["--help", "--version"]
 extra       = ["host", "join"]
