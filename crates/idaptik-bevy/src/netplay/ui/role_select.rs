@@ -42,10 +42,7 @@ pub struct RoleSelectionTitle;
 
 /// Text formatting for role selection UI
 fn title_text() -> (TextFont, TextColor) {
-    (
-        TextFont::from_font_size(24.0),
-        TextColor(Color::WHITE),
-    )
+    (TextFont::from_font_size(24.0), TextColor(Color::WHITE))
 }
 
 fn subtitle_text() -> (TextFont, TextColor) {
@@ -56,10 +53,7 @@ fn subtitle_text() -> (TextFont, TextColor) {
 }
 
 fn role_text() -> (TextFont, TextColor) {
-    (
-        TextFont::from_font_size(18.0),
-        TextColor(Color::WHITE),
-    )
+    (TextFont::from_font_size(18.0), TextColor(Color::WHITE))
 }
 
 fn description_text() -> (TextFont, TextColor) {
@@ -103,12 +97,18 @@ impl Plugin for RoleSelectionPlugin {
         app.init_resource::<RoleSelectionState>()
             .init_state::<NetplayAppState>()
             .add_systems(Startup, setup_role_selection_ui)
-            .add_systems(Update, (
-                check_cli_role_selection,
-                handle_role_button_interaction,
-            ))
-            .add_systems(OnEnter(NetplayAppState::RoleSelection), show_role_selection_ui)
-            .add_systems(OnExit(NetplayAppState::RoleSelection), hide_role_selection_ui);
+            .add_systems(
+                Update,
+                (check_cli_role_selection, handle_role_button_interaction),
+            )
+            .add_systems(
+                OnEnter(NetplayAppState::RoleSelection),
+                show_role_selection_ui,
+            )
+            .add_systems(
+                OnExit(NetplayAppState::RoleSelection),
+                hide_role_selection_ui,
+            );
     }
 }
 
@@ -146,49 +146,41 @@ pub fn setup_role_selection_ui(mut commands: Commands) {
                 Text::new("Select Your Role"),
                 title_text(),
             ));
-            
+
             // Description
-            parent.spawn((
-                Text::new("Choose how you want to play"),
-                subtitle_text(),
-            ));
-            
+            parent.spawn((Text::new("Choose how you want to play"), subtitle_text()));
+
             // Infiltrator button
-            parent.spawn((
-                RoleButton { role: Role::Infiltrator },
-                Button,
-                button_node(),
-                button_normal_color(),
-            ))
-            .with_children(|button| {
-                button.spawn((
-                    Text::new("Infiltrator"),
-                    role_text(),
-                ));
-                button.spawn((
-                    Text::new("Stealth & Agility"),
-                    description_text(),
-                ));
-            });
-            
-            // Hacker button  
-            parent.spawn((
-                RoleButton { role: Role::Hacker },
-                Button,
-                button_node(),
-                button_normal_color(),
-            ))
-            .with_children(|button| {
-                button.spawn((
-                    Text::new("Hacker"),
-                    role_text(),
-                ));
-                button.spawn((
-                    Text::new("Systems & Control"),
-                    TextColor(Color::srgb(0.7, 0.7, 0.9)),
-                    TextFont::from_font_size(12.0),
-                ));
-            });
+            parent
+                .spawn((
+                    RoleButton {
+                        role: Role::Infiltrator,
+                    },
+                    Button,
+                    button_node(),
+                    button_normal_color(),
+                ))
+                .with_children(|button| {
+                    button.spawn((Text::new("Infiltrator"), role_text()));
+                    button.spawn((Text::new("Stealth & Agility"), description_text()));
+                });
+
+            // Hacker button
+            parent
+                .spawn((
+                    RoleButton { role: Role::Hacker },
+                    Button,
+                    button_node(),
+                    button_normal_color(),
+                ))
+                .with_children(|button| {
+                    button.spawn((Text::new("Hacker"), role_text()));
+                    button.spawn((
+                        Text::new("Systems & Control"),
+                        TextColor(Color::srgb(0.7, 0.7, 0.9)),
+                        TextFont::from_font_size(12.0),
+                    ));
+                });
         });
 }
 
@@ -216,11 +208,7 @@ fn hide_role_selection_ui(
 
 /// Handle button interactions for role selection
 fn handle_role_button_interaction(
-    mut interaction_query: Query<(
-        &Interaction,
-        &RoleButton,
-        &mut BackgroundColor,
-    )>,
+    mut interaction_query: Query<(&Interaction, &RoleButton, &mut BackgroundColor)>,
     mut state: ResMut<RoleSelectionState>,
     mut app_state: ResMut<NextState<NetplayAppState>>,
 ) {
@@ -230,10 +218,10 @@ fn handle_role_button_interaction(
                 // Select this role
                 state.selected_role = Some(role_button.role);
                 state.active = false;
-                
+
                 // Hide the UI and return to normal state
                 app_state.set(NetplayAppState::Normal);
-                
+
                 // Set the button to active color to show selection
                 *bg_color = button_active_color();
             }

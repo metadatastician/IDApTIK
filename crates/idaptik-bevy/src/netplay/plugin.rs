@@ -12,7 +12,9 @@ use std::sync::{Arc, Mutex, mpsc};
 use tokio::runtime::Runtime;
 
 use crate::driver::VisualBuffers;
-use crate::netplay::connection::{spawn_connection_task, ConnectionConfig, NetworkMessage, NetplayStatus, IncomingMessage};
+use crate::netplay::connection::{
+    ConnectionConfig, IncomingMessage, NetplayStatus, NetworkMessage, spawn_connection_task,
+};
 use crate::netplay::input::BevyInputFeed;
 
 /// Mode for netplay: hosting a new session or joining an existing one.
@@ -103,7 +105,7 @@ impl Plugin for NetplayPlugin {
         let mut state = NetplayState::new();
         state.status = NetplayStatus::Connecting;
         state.role = Some(role);
-        
+
         // We'll create channels and spawn connection in setup_netplay_system
         // after we have the script loaded
 
@@ -111,10 +113,7 @@ impl Plugin for NetplayPlugin {
         app.insert_resource(state)
             .insert_resource(self.config.clone())
             .insert_resource(BevyInputFeed::new())
-            .add_systems(Startup, (
-                setup_netplay_system,
-                setup_connection_status_ui,
-            ))
+            .add_systems(Startup, (setup_netplay_system, setup_connection_status_ui))
             .add_systems(
                 FixedUpdate,
                 (
@@ -122,7 +121,8 @@ impl Plugin for NetplayPlugin {
                     pump_outgoing_system,
                     process_incoming_system,
                     advance_lockstep_system,
-                ).chain(),
+                )
+                    .chain(),
             )
             .add_systems(
                 Update,
@@ -135,10 +135,7 @@ impl Plugin for NetplayPlugin {
 }
 
 /// System to initialize netplay after script loading
-fn setup_netplay_system(
-    mut state: ResMut<NetplayState>,
-    config: Res<NetplayConfig>,
-) {
+fn setup_netplay_system(mut state: ResMut<NetplayState>, config: Res<NetplayConfig>) {
     // Only initialize once
     if state.core.is_some() {
         return;
@@ -149,37 +146,37 @@ fn setup_netplay_system(
         Ok(script) => {
             // Parse role from config
             let role: Role = config.role.parse().unwrap_or(Role::Infiltrator);
-            
+
             // Extract script configuration
             let script_seed = script.seed;
             let script_difficulty = script.difficulty.clone();
             let script_reduced_motion = script.reduced_motion;
             let script_max_ticks = script.max_ticks;
-            
+
             // Use the script's seed
             let actual_seed = script_seed;
-            
+
             // Create the LockstepCore
             match LockstepCore::new(role, config.input_delay, &script) {
                 Ok(core) => {
                     state.core = Some(core);
                     state.script = Some(script);
-                    
+
                     // Initialize visual buffers from the lockstep core's simulation
                     if let Some(ref core) = state.core {
                         state.visual = Some(VisualBuffers::primed(core.sim()));
                     }
-                    
+
                     // Create two channels:
                     // 1. Bevy -> Connection: Bevy sends outgoing lockstep messages to connection
                     // 2. Connection -> Bevy: Connection sends incoming network messages to Bevy
-                    let (tx_from_bevy, rx_from_bevy) = mpsc::channel();  // Bevy → Connection
-                    let (tx_to_bevy, rx_to_bevy) = mpsc::channel();      // Connection → Bevy
-                    
+                    let (tx_from_bevy, rx_from_bevy) = mpsc::channel(); // Bevy → Connection
+                    let (tx_to_bevy, rx_to_bevy) = mpsc::channel(); // Connection → Bevy
+
                     // Store in state
-                    state.tx_network = Some(tx_from_bevy);  // Bevy uses this to send to connection
-                    state.rx_network = Some(Arc::new(Mutex::new(rx_to_bevy)));  // Bevy uses this to receive from connection
-                    
+                    state.tx_network = Some(tx_from_bevy); // Bevy uses this to send to connection
+                    state.rx_network = Some(Arc::new(Mutex::new(rx_to_bevy))); // Bevy uses this to receive from connection
+
                     // Spawn connection task in separate thread
                     let role_for_task = state.role.unwrap_or(Role::Infiltrator);
                     let connection_config = ConnectionConfig {
@@ -194,18 +191,19 @@ fn setup_netplay_system(
                     let runtime = Runtime::new().expect("Failed to create tokio runtime");
                     let handle = spawn_connection_task(
                         connection_config,
-                        rx_from_bevy,   // rx_ui: connection receives from Bevy
-                        tx_to_bevy,     // tx_back: connection sends to Bevy
+                        rx_from_bevy, // rx_ui: connection receives from Bevy
+                        tx_to_bevy,   // tx_back: connection sends to Bevy
                     );
-                    
+
                     // Note: We don't store runtime and handle since they're not Sync
                     std::mem::forget(runtime);
                     std::mem::forget(handle);
-                    
+
                     state.status = NetplayStatus::WaitingForPeer;
                 }
                 Err(e) => {
-                    state.status = NetplayStatus::Error(format!("Failed to create lockstep core: {}", e));
+                    state.status =
+                        NetplayStatus::Error(format!("Failed to create lockstep core: {}", e));
                 }
             }
         }
@@ -216,10 +214,7 @@ fn setup_netplay_system(
 }
 
 /// System to pump outgoing messages from lockstep to network
-fn pump_outgoing_system(
-    mut state: ResMut<NetplayState>,
-    mut input_feed: ResMut<BevyInputFeed>,
-) {
+fn pump_outgoing_system(mut state: ResMut<NetplayState>, mut input_feed: ResMut<BevyInputFeed>) {
     // If we have a core, pump outgoing messages
     if let Some(core) = &mut state.core {
         let outgoing = core.pump_outgoing(&mut *input_feed);
@@ -234,13 +229,11 @@ fn pump_outgoing_system(
 }
 
 /// System to process incoming network messages
-fn process_incoming_system(
-    mut state: ResMut<NetplayState>,
-) {
+fn process_incoming_system(mut state: ResMut<NetplayState>) {
     if let Some(rx_arc) = &state.rx_network {
         let mut status_update: Option<NetplayStatus> = None;
         let mut incoming_messages: Vec<IncomingMessage> = Vec::new();
-        
+
         // Collect messages while holding the lock
         {
             let rx = rx_arc.lock().unwrap();
@@ -258,7 +251,7 @@ fn process_incoming_system(
                 }
             }
         }
-        
+
         // Process collected messages outside the lock
         for incoming in incoming_messages {
             match incoming {
@@ -277,31 +270,42 @@ fn process_incoming_system(
                 IncomingMessage::Resync(resync_payload) => {
                     // Handle resync request
                     state.status = NetplayStatus::Resyncing;
-                    
+
                     // Try to parse the resync payload and rebuild the lockstep core
-                    if let Ok(resync_data) = serde_json::from_value::<idaptik_net::lockstep::Resync>(resync_payload) {
+                    if let Ok(resync_data) =
+                        serde_json::from_value::<idaptik_net::lockstep::Resync>(resync_payload)
+                    {
                         if let Some(role) = state.role {
                             let input_delay = 3; // Use default input delay for resync
-                            match idaptik_net::lockstep::LockstepCore::adopt_resync(role, input_delay, resync_data) {
+                            match idaptik_net::lockstep::LockstepCore::adopt_resync(
+                                role,
+                                input_delay,
+                                resync_data,
+                            ) {
                                 Ok(new_core) => {
                                     // Replace the existing core with the resynced one
                                     state.core = Some(new_core);
-                                    
+
                                     // Reinitialize visual buffers from the new core's simulation
-                                    state.visual = Some(VisualBuffers::primed(state.core.as_ref().unwrap().sim()));
-                                    
+                                    state.visual = Some(VisualBuffers::primed(
+                                        state.core.as_ref().unwrap().sim(),
+                                    ));
+
                                     // Transition back to running state
                                     state.status = NetplayStatus::Running;
                                 }
                                 Err(err) => {
-                                    state.status = NetplayStatus::Error(format!("Resync failed: {}", err));
+                                    state.status =
+                                        NetplayStatus::Error(format!("Resync failed: {}", err));
                                 }
                             }
                         } else {
-                            state.status = NetplayStatus::Error("Resync failed: role not set".to_string());
+                            state.status =
+                                NetplayStatus::Error("Resync failed: role not set".to_string());
                         }
                     } else {
-                        state.status = NetplayStatus::Error("Resync failed: invalid payload".to_string());
+                        state.status =
+                            NetplayStatus::Error("Resync failed: invalid payload".to_string());
                     }
                 }
                 IncomingMessage::PeerJoined => {
@@ -322,7 +326,7 @@ fn process_incoming_system(
                 }
             }
         }
-        
+
         // Update status if needed
         if let Some(new_status) = status_update {
             state.status = new_status;
@@ -331,13 +335,11 @@ fn process_incoming_system(
 }
 
 /// System to advance the lockstep core
-fn advance_lockstep_system(
-    mut state: ResMut<NetplayState>,
-) {
+fn advance_lockstep_system(mut state: ResMut<NetplayState>) {
     // Take ownership of core and visual to avoid borrow checker issues
     let core = std::mem::take(&mut state.core);
     let visual = std::mem::take(&mut state.visual);
-    
+
     if let (Some(mut core), Some(mut visual)) = (core, visual) {
         core.advance_with(|sim, _events| {
             // Update visual state from sim
@@ -354,10 +356,7 @@ pub struct ConnectionStatusUi;
 
 /// Text formatting for connection status
 fn status_text() -> (TextFont, TextColor) {
-    (
-        TextFont::from_font_size(14.0),
-        TextColor(Color::WHITE),
-    )
+    (TextFont::from_font_size(14.0), TextColor(Color::WHITE))
 }
 
 /// Setup connection status UI
@@ -382,10 +381,7 @@ fn setup_connection_status_ui(mut commands: Commands) {
         ))
         .with_children(|parent| {
             // Status label
-            parent.spawn((
-                Text::new("Status: "),
-                status_text(),
-            ));
+            parent.spawn((Text::new("Status: "), status_text()));
             // Status text (will be updated dynamically)
             parent.spawn((
                 ConnectionStatusText,

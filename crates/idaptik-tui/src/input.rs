@@ -86,12 +86,11 @@ impl InputState {
     /// Sample one tick's input, draining queued edges/immediates (held persists).
     pub fn sample(&mut self) -> TickInput {
         self.decay_fallback_holds();
-        let input = TickInput {
+        TickInput {
             buttons: self.held,
             edges: std::mem::take(&mut self.edges),
             immediates: std::mem::take(&mut self.immediates),
-        };
-        input
+        }
     }
 
     fn set_held(&mut self, button: Button, down: bool) {

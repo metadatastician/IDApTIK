@@ -1,16 +1,14 @@
 # Multiplayer troubleshooting
 
-Known, reproduced failure modes of `idaptik-multiplayer-launcher.sh` and the
-`idaptik-netplay` seat it drives, and what to do about each. Add to this file
-when a new one is confirmed; don't speculate ones that haven't been hit.
+Known, reproduced failure modes of the multiplayer relay and launch path.
+`launcher.sh` and `idaptik-multiplayer-launcher.sh` now run the Bevy GUI;
+`idaptik-netplay` remains a direct TUI/verifier binary rather than the
+player-facing launcher target. Add to this file when a new failure is
+confirmed; don't speculate about ones that haven't been hit.
 
-## `ended_no_peer` even though the relay is up
+## A peer cannot join even though the relay is up
 
-Two independent causes produce the same symptom — the seat reports
-`{"status":"ended_no_peer"}` after waiting for a peer that never arrives.
-Check both.
-
-### 1. The shared address is unreachable (WSL2 NAT)
+### The shared address is unreachable (WSL2 NAT)
 
 **Status:** fixed in the launcher's share banner as of PR #78 (commit
 `e01e3f5`) — this section documents the underlying cause for anyone still
@@ -38,48 +36,25 @@ router port-forward *combined with* a Windows `netsh interface portproxy`
 hop into WSL2. WSL2 **mirrored** networking (Windows 11 22H2+) is unaffected
 since it shares the host's real LAN address.
 
-### 2. The 15-second join timeout is easy to miss when coordinating by hand
+## The GUI does not open
 
-`idaptik-netplay`'s `--join-timeout-ms` defaults to `15000` (15 seconds;
-see `join_timeout_ms` in `crates/idaptik-net/src/bin/netplay.rs`). Each seat
-starts its own 15-second countdown independently, from the moment *that
-seat* starts waiting — not from when the other seat starts.
+The main launcher builds and starts Bevy in the background. It reports the
+startup log location when launching; by default this is
+`$XDG_STATE_HOME/idaptik/game.log` (or
+`$HOME/.local/state/idaptik/game.log`). Check it with:
 
-Two humans coordinating an address over a separate channel (voice, chat)
-routinely burn more than 15 seconds typing and pasting the join command, so
-both seats give up and report `ended_no_peer` even though the relay and the
-network path are both fine.
+```sh
+tail -50 "${XDG_STATE_HOME:-$HOME/.local/state}/idaptik/game.log"
+```
 
-Workarounds:
-- Have both players pre-type their `host`/`join` commands before either
-  presses Enter, so both seats start waiting within a couple of seconds of
-  each other.
-- Or run the seat binary directly (bypassing the launcher, which does not
-  currently expose this flag) with more slack:
-  ```sh
-  target/release/idaptik-netplay --interactive \
-    --url ws://<host>:4000/socket/websocket --session ghost-lobby --role hacker \
-    --script fixtures/session_relay/versus_script.json \
-    --join-timeout-ms 60000
-  ```
+Run `./launcher.sh --status` to distinguish a slow first build from a process
+that has exited, and `./launcher.sh --stop` to stop both the GUI and a relay
+started by the host path.
 
-## Terminal left blank/black after a session ends
+## Legacy direct TUI use
 
-`TerminalFrontend` (`crates/idaptik-net/src/interactive.rs`) restores the
-terminal — leaves raw mode, leaves the alternate screen, shows the cursor —
-in its `Drop` impl, so it runs on every normal exit path. That cleanup uses
-`let _ = …` throughout (see the `Drop for TerminalFrontend` block), so if
-any one of those calls fails, the failure is silently swallowed and the
-terminal is left in whatever state it was in — which can look like a blank
-or black screen, even after a session that ended successfully
-(`LiveEnd::Completed`).
-
-If this happens:
-- Type `reset` at the shell and press Enter, even blind (the terminal isn't
-  reading your keystrokes, but the shell is).
-- If that doesn't recover it, open a new terminal and run
-  `pkill -f idaptik-netplay`. The launcher's own `--stop` only stops the
-  relay (Elixir/Phoenix) — it does not touch the seat process, which is
-  `exec`'d directly into your terminal by `run_seat()` in
-  `idaptik-multiplayer-launcher.sh` and has no other way to be told to quit
-  from outside.
+The `idaptik-netplay --interactive` binary still has a 15-second default join
+timeout and uses terminal raw mode. Those behaviours apply only when invoking
+that binary directly; neither launcher selects it now. If a direct TUI run
+leaves the terminal in raw/alternate-screen state, type `reset` (even blind)
+or open another terminal and stop `idaptik-netplay`.

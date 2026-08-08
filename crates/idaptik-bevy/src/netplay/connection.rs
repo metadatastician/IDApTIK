@@ -39,7 +39,10 @@ pub enum NetworkMessage {
 #[derive(Debug, Clone)]
 pub enum IncomingMessage {
     /// A command from the peer
-    Command { at: u64, cmd: idaptik_core::scenario::command::Command },
+    Command {
+        at: u64,
+        cmd: idaptik_core::scenario::command::Command,
+    },
     /// A watermark commit from the peer
     Commit { through: u64 },
     /// Resync payload
@@ -89,13 +92,13 @@ pub fn spawn_connection_task(
     let join_handle = thread::spawn(move || {
         // Create a tokio runtime for this thread
         let runtime = Runtime::new().expect("Failed to create tokio runtime");
-        
+
         // Run the async connection task
         runtime.block_on(async move {
             run_connection_loop(config, &rx_ui, &tx_back).await;
         });
     });
-    
+
     ConnectionHandle { join_handle }
 }
 
@@ -115,20 +118,16 @@ async fn run_connection_loop(
             Err(e) => {
                 retry_count += 1;
                 if retry_count >= MAX_RETRIES {
-                    let _ = tx_back.send(NetworkMessage::Status(
-                        NetplayStatus::Error(format!(
-                            "Failed after {} retries: {}",
-                            MAX_RETRIES, e
-                        ))
-                    ));
+                    let _ = tx_back.send(NetworkMessage::Status(NetplayStatus::Error(format!(
+                        "Failed after {} retries: {}",
+                        MAX_RETRIES, e
+                    ))));
                     break;
                 }
-                let _ = tx_back.send(NetworkMessage::Status(
-                    NetplayStatus::Error(format!(
-                        "Connection error, retry {}/{}...",
-                        retry_count, MAX_RETRIES
-                    ))
-                ));
+                let _ = tx_back.send(NetworkMessage::Status(NetplayStatus::Error(format!(
+                    "Connection error, retry {}/{}...",
+                    retry_count, MAX_RETRIES
+                ))));
                 tokio::time::sleep(std::time::Duration::from_millis(RETRY_DELAY_MS)).await;
             }
         }
@@ -166,7 +165,8 @@ async fn run_single_connection(
     });
 
     // Join session
-    let _join_response = client.join(&topic, hello_payload)
+    let _join_response = client
+        .join(&topic, hello_payload)
         .await
         .map_err(|e| format!("Join session: {}", e))?;
 
@@ -188,7 +188,10 @@ async fn run_single_connection(
         }
 
         // Check for messages from relay
-        match client.next_broadcast(std::time::Duration::from_millis(50)).await {
+        match client
+            .next_broadcast(std::time::Duration::from_millis(50))
+            .await
+        {
             Ok(Some(broadcast)) => {
                 // Process broadcast from relay
                 process_broadcast(&broadcast, tx_back)?
@@ -216,7 +219,8 @@ async fn send_outgoing(
             // Encode command for relay
             let payload = idaptik_net::envelope::encode_command(&cmd, 0, at)
                 .map_err(|e| format!("Encode command: {}", e))?;
-            client.push("command", payload)
+            client
+                .push("command", payload)
                 .await
                 .map_err(|e| format!("Push command: {}", e))?;
         }
@@ -227,7 +231,8 @@ async fn send_outgoing(
                 through,
             };
             let payload = commit.to_control();
-            client.push("event", payload)
+            client
+                .push("event", payload)
                 .await
                 .map_err(|e| format!("Push commit: {}", e))?;
         }
@@ -247,15 +252,15 @@ fn process_broadcast(
             "net:commit" => {
                 // Parse commit watermark
                 if let Some(through) = broadcast.payload.get("through").and_then(|v| v.as_u64()) {
-                    let _ = tx_back.send(NetworkMessage::Received(
-                        IncomingMessage::Commit { through }
-                    ));
+                    let _ = tx_back.send(NetworkMessage::Received(IncomingMessage::Commit {
+                        through,
+                    }));
                 }
             }
             "net:resync" => {
-                let _ = tx_back.send(NetworkMessage::Received(
-                    IncomingMessage::Resync(broadcast.payload.clone())
-                ));
+                let _ = tx_back.send(NetworkMessage::Received(IncomingMessage::Resync(
+                    broadcast.payload.clone(),
+                )));
             }
             "net:hello" => {
                 let _ = tx_back.send(NetworkMessage::Received(IncomingMessage::PeerJoined));
@@ -268,9 +273,10 @@ fn process_broadcast(
         // Regular command message
         match idaptik_net::envelope::decode_command(&broadcast.payload) {
             Ok((at, cmd)) => {
-                let _ = tx_back.send(NetworkMessage::Received(
-                    IncomingMessage::Command { at, cmd }
-                ));
+                let _ = tx_back.send(NetworkMessage::Received(IncomingMessage::Command {
+                    at,
+                    cmd,
+                }));
             }
             Err(_) => {
                 // Not a command, or decode error
