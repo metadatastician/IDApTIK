@@ -64,8 +64,8 @@ Still open: persistence/versioning and the long-term Rust↔Elixir wire encoding
 
 Run `./launcher.sh` for the player-facing menu: choose solo or multiplayer,
 then choose the Infiltrator or Hacker seat for multiplayer. Both paths launch
-the Bevy GUI. Direct multiplayer commands remain available through
-`./idaptik-multiplayer-launcher.sh` (`host` / `join`, see `--help`); connection
+the Bevy GUI. It is the sole player-facing entry point; relay and seat-process
+machinery lives under `scripts/` as a guarded internal component. Connection
 trouble is covered by
 [`docs/MULTIPLAYER-TROUBLESHOOTING.md`](docs/MULTIPLAYER-TROUBLESHOOTING.md).
 Before launch, the menu and `./launcher.sh --doctor` review the player machine,

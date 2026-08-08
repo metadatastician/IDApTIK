@@ -1,7 +1,7 @@
 # Multiplayer troubleshooting
 
 Known, reproduced failure modes of the multiplayer relay and launch path.
-`launcher.sh` and `idaptik-multiplayer-launcher.sh` now run the Bevy GUI;
+`launcher.sh` is the sole player-facing entry point and runs the Bevy GUI;
 `idaptik-netplay` remains a direct TUI/verifier binary rather than the
 player-facing launcher target. Add to this file when a new failure is
 confirmed; don't speculate about ones that haven't been hit.
@@ -15,7 +15,7 @@ confirmed; don't speculate about ones that haven't been hit.
 hitting it via an older checkout, a hand-typed address, or a similar NAT
 setup outside WSL2.
 
-`share_addresses()` in `idaptik-multiplayer-launcher.sh` used to print
+The internal `share_addresses()` helper used to print
 whatever `ip -4 route get 1.1.1.1 | grep -oP 'src \K[0-9.]+'` returned and
 label it `LAN:`. Under WSL2's default (NAT) networking, that command reports
 the **WSL2 virtual adapter's own address** (a `172.16.0.0/12` address — e.g.
@@ -29,8 +29,8 @@ A user hit this directly: shared the printed "LAN" address with a remote
 player, who got `ended_no_peer` because the address was never reachable in
 the first place — the relay itself was working fine.
 
-The launcher now detects this case (`is_wsl` / `wsl_natted` in
-`idaptik-multiplayer-launcher.sh`) and prints a warning plus the two routes
+The launcher now detects this case (`is_wsl` / `wsl_natted` in its internal
+multiplayer runtime) and prints a warning plus the two routes
 that actually work — a Tailscale/WireGuard tunnel (recommended), or a
 router port-forward *combined with* a Windows `netsh interface portproxy`
 hop into WSL2. WSL2 **mirrored** networking (Windows 11 22H2+) is unaffected
@@ -106,6 +106,6 @@ started by the host path.
 
 The `idaptik-netplay --interactive` binary still has a 15-second default join
 timeout and uses terminal raw mode. Those behaviours apply only when invoking
-that binary directly; neither launcher selects it now. If a direct TUI run
+that binary directly; the player launcher never selects it. If a direct TUI run
 leaves the terminal in raw/alternate-screen state, type `reset` (even blind)
 or open another terminal and stop `idaptik-netplay`.

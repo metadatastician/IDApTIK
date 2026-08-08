@@ -1,70 +1,15 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# Copyright (c) 2026 Jonathan D.A. Jewell (hyperpolymath) <j.d.a.jewell@open.ac.uk>
+# SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
 #
-# @a2ml-metadata begin
-# (
-#   id                   = "idaptik-multiplayer-launcher"
-#   type                 = "launcher"
-#   version              = "0.3.0"
-#   app-name             = "idaptik-multiplayer"
-#   app-display          = "IDApTIK Multiplayer"
-#   runtime-kind         = "gui-netplay"
-#   standards-compliance = [
-#     "launcher-standard.adoc"
-#   ]
-#   standard-spec-version = "0.3.0"
-#   generator             = "hand-authored"
-#   app-url                = ""
-#   modes                  = [
-#     "--start"
-#     "--stop"
-#     "--status"
-#     "--doctor"
-#     "--repair"
-#     "--flowdiags"
-#     "--man"
-#     "--auto"
-#     "--browser"
-#     "--web"
-#     "--integ"
-#     "--disinteg"
-#     "--help"
-#     "--version"
-#   ]
-#   platforms              = ["linux" "macos" "windows"]
-#   lifecycle-phases-covered = ["install" "run" "stop" "status" "uninstall"]
-#   lifecycle-phases-deferred = ["warmup" "personalize" "update" "repair"]
-# )
-# @a2ml-metadata end
-#
-# ============================================================================
-# idaptik-multiplayer-launcher.sh — two humans, one graphical Ghost Lobby.
-# ============================================================================
-# One player HOSTS (runs the relay + a seat), the other JOINS the host's
-# address. Both machines need this repo checked out; both seats read the same
-# deterministic run config (fixtures/session_relay/versus_script.json), so a
-# zero-flag host + a one-argument join land in the same lockstep world.
-#
-#   you:      ./idaptik-multiplayer-launcher.sh host
-#   friend:   ./idaptik-multiplayer-launcher.sh join <your-address>
-#
-# Over the internet the host's port 4000 must be reachable — a Tailscale/
-# WireGuard tunnel between the two machines is the easiest way (then the
-# address is the host's tailnet IP); otherwise forward TCP 4000 on the
-# host's router.
-#
-# If the peer cannot connect or the GUI does not open, see
-# docs/MULTIPLAYER-TROUBLESHOOTING.md. The WSL2 NAT address trap is detected
-# by share_addresses() below.
-# ============================================================================
+# Internal multiplayer runtime for launcher.sh. This is deliberately not a
+# launcher and has no lifecycle/UI aliases: players use ./launcher.sh only.
+# It owns the Phoenix relay process, release build, host/join seat execution,
+# readiness events, and peer-address discovery behind the canonical launcher.
 
 set -euo pipefail
 
-APP_DISPLAY="IDApTIK Multiplayer"
-VERSION="0.3.0"
-
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DOCTOR="$REPO_DIR/scripts/runtime-doctor.sh"
 RUN_CONFIG="$REPO_DIR/fixtures/session_relay/versus_script.json"
 BEVY_BIN="$REPO_DIR/target/release/idaptik-bevy"
@@ -93,14 +38,8 @@ progress() {
   printf '%s|%s\n' "$1" "$2" >> "$IDAPTIK_PROGRESS_FILE"
 }
 mark_ready() {
-  if [ -n "${IDAPTIK_READY_FILE:-}" ]; then
-    printf '%s\n' "$1" > "$IDAPTIK_READY_FILE"
-  else
-    case "$1" in
-      host\|*) printf '\n\033[1;32m● READY FOR JOINERS\033[0m\n' ;;
-      join\|*) printf '\n\033[1;32m● READY — JOINING HOST NOW\033[0m\n' ;;
-    esac
-  fi
+  [ -n "${IDAPTIK_READY_FILE:-}" ] || die "internal readiness channel is missing"
+  printf '%s\n' "$1" > "$IDAPTIK_READY_FILE"
 }
 
 # WSL2's virtual adapter is NAT'd behind Windows: an address from it is
@@ -117,9 +56,6 @@ wsl_natted() {
     *) return 1 ;;
   esac
 }
-
-build_sha() { git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown; }
-platform()  { echo "$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m)"; }
 
 need() {
   command -v "$1" >/dev/null 2>&1 || die "$1 is required $2 — $3"
@@ -222,7 +158,7 @@ share_addresses() {
     local ts
     ts="$(tailscale ip -4 2>/dev/null | head -1 || true)"
     if [ -n "$ts" ]; then
-      say "  tailnet:  ./idaptik-multiplayer-launcher.sh join $ts"
+      say "  tailnet address for ./launcher.sh: $ts"
       HOST_SHARE_ADDRESS="$ts"
       shared=1
     fi
@@ -247,7 +183,7 @@ share_addresses() {
       say "    portproxy to $lan (netsh interface portproxy)."
     fi
   elif [ -n "$lan" ]; then
-    say "  LAN:      ./idaptik-multiplayer-launcher.sh join $lan"
+    say "  LAN address for ./launcher.sh: $lan"
     HOST_SHARE_ADDRESS="$lan"
     shared=1
   fi
@@ -311,7 +247,7 @@ mode_host() {
   [ -n "${HOST_SHARE_ADDRESS:-}" ] || die "no peer-reachable host address is available"
   progress PASS "Peer route is ready at $HOST_SHARE_ADDRESS:$PORT"
   say "waiting in the lobby for the other seat… (relay keeps running after you quit;"
-  say "'./idaptik-multiplayer-launcher.sh --stop' ends it)"
+  say "'./launcher.sh --stop' ends it)"
   progress PASS "Host seat is launching for session $session as $role"
   mark_ready "host|$HOST_SHARE_ADDRESS|$PORT|$session|$role"
   run_seat host "127.0.0.1" "$(seat_url "127.0.0.1:$PORT")" "$role" "$session"
@@ -342,7 +278,7 @@ mode_status() {
   if pid="$(relay_pid)"; then
     say "relay: running (pid $pid, port $PORT, log $LOG_FILE)"
   elif relay_up; then
-    say "relay: answering on :$PORT (not started by this launcher)"
+    say "relay: answering on :$PORT (not started by this runtime)"
   else
     say "relay: not running"
   fi
@@ -353,57 +289,20 @@ mode_status() {
   fi
 }
 
-mode_help() {
-  cat <<HELP
-$APP_DISPLAY — two humans, one graphical Ghost Lobby.
-
-  $0 host [--role infiltrator|hacker] [--session NAME] [--rebuild]
-      Build the Bevy GUI, start the relay on :$PORT, print the address to
-      share, and sit down (default role: infiltrator).
-
-  $0 join <host|host:port|ws://…> [--role R] [--session NAME]
-      Build the Bevy GUI and join a friend's relay (default role: hacker).
-
-  Defaults match: a zero-flag 'host' and a one-argument 'join' meet in
-  session '$SESSION_DEFAULT' with complementary roles and the same
-  deterministic run config ($RUN_CONFIG).
-
-  Standard modes delegate to the main player-facing launcher:
-      --start (= graphical host)  --stop  --status  --doctor  --repair
-      --flowdiags  --man
-      --auto / --browser / --web (= launch menu)
-      --integ / --disinteg  --help  --version
-
-  Internet play: easiest is a Tailscale/WireGuard tunnel between the two
-  machines (join the host's tailnet IP); otherwise forward TCP $PORT.
-  Coordinate on a voice call for now — in-game comms arrive with the burble
-  fabric (lobby, signals, chat, Bolt invites).
-HELP
-}
-
 # ----------------------------------------------------------------------------
-# dispatch (standard modes + aliases + game modes)
+# internal dispatch — launcher.sh is the only player-facing entry point
 # ----------------------------------------------------------------------------
 
-MODE="${1:---auto}"
+MODE="${1:-}"
 [ $# -gt 0 ] && shift || true
+
+[ "${IDAPTIK_INTERNAL_RUNTIME:-0}" = "1" ] || \
+  die "this is an internal component; players must use $REPO_DIR/launcher.sh"
 
 case "$MODE" in
   host)          mode_host "$@" ;;
   join)          mode_join "$@" ;;
   __relay-stop)  stop_relay ;;
   __relay-status) mode_status ;;
-  --start)       exec "$REPO_DIR/launcher.sh" --host "$@" ;;
-  --stop)        exec "$REPO_DIR/launcher.sh" --stop ;;
-  --status)      exec "$REPO_DIR/launcher.sh" --status ;;
-  --doctor)      exec "$REPO_DIR/launcher.sh" --doctor ;;
-  --repair)      exec "$REPO_DIR/launcher.sh" --repair ;;
-  --flowdiags)   exec "$REPO_DIR/launcher.sh" --flowdiags ;;
-  --man)         exec "$REPO_DIR/launcher.sh" --man ;;
-  --auto|--browser|--web) exec "$REPO_DIR/launcher.sh" "$MODE" ;;
-  --integ)       exec "$REPO_DIR/launcher.sh" --integ "$@" ;;
-  --disinteg)    exec "$REPO_DIR/launcher.sh" --disinteg ;;
-  --version|-V)  say "idaptik-multiplayer-launcher $VERSION ($(build_sha)) [$(platform)]" ;;
-  --help|-h)   mode_help ;;
-  *)           die "unknown mode: $MODE (try --help)" ;;
+  *) die "internal multiplayer runtime; players must use $REPO_DIR/launcher.sh" ;;
 esac
