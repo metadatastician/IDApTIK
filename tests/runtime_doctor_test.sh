@@ -55,7 +55,14 @@ healthy_dry_run="$(env \
   XDG_RUNTIME_DIR="$FIXTURE/runtime" \
   "$REPO_DIR/launcher.sh" --host --role infiltrator 2>&1)"
 grep -q 'READY TO LAUNCH' <<<"$healthy_dry_run"
-grep -q 'DRY RUN:.*idaptik-multiplayer-launcher.sh host --role infiltrator' <<<"$healthy_dry_run"
+grep -q 'DRY RUN:.*scripts/multiplayer-runtime.sh host --role infiltrator' <<<"$healthy_dry_run"
+
+[ ! -e "$REPO_DIR/idaptik-multiplayer-launcher.sh" ]
+if internal_direct="$("$REPO_DIR/scripts/multiplayer-runtime.sh" host 2>&1)"; then
+  printf 'expected the internal multiplayer runtime to reject direct use\n' >&2
+  exit 1
+fi
+grep -q 'players must use.*/launcher.sh' <<<"$internal_direct"
 
 if unreachable="$(env \
   IDAPTIK_DIAG_IS_WSL=0 \

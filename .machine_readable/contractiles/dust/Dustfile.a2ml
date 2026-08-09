@@ -68,9 +68,10 @@ the repository tidy — stale build artifacts, editor cruft, and metadata drift
     surface, impair window movement/maximisation, and make coordination look
     like a game or multiplayer failure even though Bevy created its window.
 - prevention: |
-    Both launchers run `scripts/runtime-doctor.sh` before building, starting
-    the relay, or creating a game window. A Weston shared-memory EIO or missing
-    WSLg mount is blocking: the launcher exits non-zero and says that nothing
+    The canonical `launcher.sh` runs `scripts/runtime-doctor.sh` before
+    building, starting the relay, or creating a game window. A Weston
+    shared-memory EIO or missing WSLg mount is blocking: the launcher exits
+    non-zero and says that nothing
     launched. Software graphics and unavailable audio remain warnings.
 - remediation: |
     From Windows PowerShell as Administrator, run `wsl --update`, then

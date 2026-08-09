@@ -6,7 +6,7 @@
 # (
 #   id                   = "idaptik-launcher"
 #   type                 = "launcher"
-#   version              = "0.4.0"
+#   version              = "0.4.1"
 #   app-name             = "idaptik"
 #   app-display          = "IDApTIK"
 #   app-url              = ""
@@ -46,7 +46,7 @@ APP_NAME="idaptik"
 APP_DISPLAY="IDApTIK"
 APP_DESC="Asymmetric two-player infiltration game"
 APP_CATEGORIES="Game;Network;"
-VERSION="0.4.0"
+VERSION="0.4.1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP_NAME"
@@ -55,7 +55,7 @@ REPO_PATH_FILE="$CONFIG_DIR/repo-path"
 # An integrated copy lives outside the repository. It finds the source tree
 # through the path recorded by --integ; a source-tree invocation needs no
 # configuration and always wins over a stale recorded path.
-if [ -f "$SCRIPT_DIR/Cargo.toml" ] && [ -f "$SCRIPT_DIR/idaptik-multiplayer-launcher.sh" ]; then
+if [ -f "$SCRIPT_DIR/Cargo.toml" ] && [ -f "$SCRIPT_DIR/scripts/multiplayer-runtime.sh" ]; then
   REPO_DIR="$SCRIPT_DIR"
 elif [ -n "${IDAPTIK_REPO_DIR:-}" ]; then
   REPO_DIR="$IDAPTIK_REPO_DIR"
@@ -72,7 +72,7 @@ LOG_FILE="$STATE_DIR/game.log"
 PROGRESS_FILE="$STATE_DIR/startup.progress"
 READY_FILE="$STATE_DIR/startup.ready"
 PORT="${IDAPTIK_PORT:-4000}"
-MULTIPLAYER_LAUNCHER="$REPO_DIR/idaptik-multiplayer-launcher.sh"
+MULTIPLAYER_RUNTIME="$REPO_DIR/scripts/multiplayer-runtime.sh"
 RUNTIME_DOCTOR="$REPO_DIR/scripts/runtime-doctor.sh"
 
 say()  { printf '[%s] %s\n' "$APP_NAME" "$*"; }
@@ -113,14 +113,14 @@ pid_is_game() {
   kill -0 "$pid" 2>/dev/null || return 1
   command="$(ps -p "$pid" -o args= 2>/dev/null || true)"
   case "$command" in
-    *idaptik-bevy*|*launcher.sh\ __run-*|*idaptik-multiplayer-launcher.sh*) return 0 ;;
+    *idaptik-bevy*|*launcher.sh\ __run-*|*scripts/multiplayer-runtime.sh*) return 0 ;;
     *) return 1 ;;
   esac
 }
 
 require_repo() {
   [ -f "$REPO_DIR/Cargo.toml" ] || die "repository not found at $REPO_DIR (set IDAPTIK_REPO_DIR or rerun --integ from the repository)"
-  [ -x "$MULTIPLAYER_LAUNCHER" ] || die "multiplayer launcher missing or not executable: $MULTIPLAYER_LAUNCHER"
+  [ -x "$MULTIPLAYER_RUNTIME" ] || die "internal multiplayer runtime missing or not executable: $MULTIPLAYER_RUNTIME"
   [ -x "$RUNTIME_DOCTOR" ] || die "runtime diagnostics missing or not executable: $RUNTIME_DOCTOR"
 }
 
@@ -200,6 +200,7 @@ start_game() {
   fi
 
   nohup env \
+    IDAPTIK_INTERNAL_RUNTIME=1 \
     IDAPTIK_PREFLIGHT_DONE=1 \
     IDAPTIK_PROGRESS_FILE="$PROGRESS_FILE" \
     IDAPTIK_READY_FILE="$READY_FILE" \
@@ -240,8 +241,20 @@ start_game() {
     tail -n 30 "$LOG_FILE" >&2 || true
     die "readiness was withdrawn; joiners must not start"
   fi
+  local ready_kind ready_host ready_port _ready_session ready_role peer_role
+  IFS='|' read -r ready_kind ready_host ready_port _ready_session ready_role < "$READY_FILE"
+  [ "$ready_kind" = "$profile" ] || die "invalid readiness record for $profile: $ready_kind"
   case "$profile" in
-    host) printf '\n\033[1;32m● READY FOR JOINERS\033[0m — share the address above only now.\n' ;;
+    host)
+      case "$ready_role" in
+        infiltrator) peer_role="hacker" ;;
+        hacker) peer_role="infiltrator" ;;
+        *) die "invalid host readiness record: $ready_role" ;;
+      esac
+      printf '\n\033[1;32m● READY FOR JOINERS\033[0m\n'
+      say "joiner address: $ready_host:$ready_port"
+      say "give the other player: ./launcher.sh --join $ready_host:$ready_port --role $peer_role"
+      ;;
     join) printf '\n\033[1;32m● READY — JOINING HOST NOW\033[0m\n' ;;
     solo) printf '\n\033[1;32m● READY — OPENING SOLO GUI\033[0m\n' ;;
   esac
@@ -254,12 +267,12 @@ start_solo() {
 
 start_host() {
   local role="$1"
-  start_game host "" "multiplayer host · $role" "$MULTIPLAYER_LAUNCHER" host --role "$role"
+  start_game host "" "multiplayer host · $role" "$MULTIPLAYER_RUNTIME" host --role "$role"
 }
 
 start_join() {
   local host="$1" role="$2"
-  start_game join "$host" "multiplayer join · $role · $host" "$MULTIPLAYER_LAUNCHER" join "$host" --role "$role"
+  start_game join "$host" "multiplayer join · $role · $host" "$MULTIPLAYER_RUNTIME" join "$host" --role "$role"
 }
 
 choose_role() {
@@ -359,8 +372,8 @@ stop_game() {
 stop_all() {
   local status=0
   stop_game || status=1
-  if [ -x "$MULTIPLAYER_LAUNCHER" ]; then
-    "$MULTIPLAYER_LAUNCHER" __relay-stop || status=1
+  if [ -x "$MULTIPLAYER_RUNTIME" ]; then
+    IDAPTIK_INTERNAL_RUNTIME=1 "$MULTIPLAYER_RUNTIME" __relay-stop || status=1
   fi
   return "$status"
 }
@@ -380,10 +393,10 @@ mode_status() {
     say "game: stopped"
     [ ! -e "$READY_FILE" ] || say "readiness: stale record present (run --stop before relaunching)"
   fi
-  if [ -x "$MULTIPLAYER_LAUNCHER" ]; then
-    "$MULTIPLAYER_LAUNCHER" __relay-status && status=0 || true
+  if [ -x "$MULTIPLAYER_RUNTIME" ]; then
+    IDAPTIK_INTERNAL_RUNTIME=1 "$MULTIPLAYER_RUNTIME" __relay-status && status=0 || true
   else
-    say "relay: unavailable (multiplayer launcher not found)"
+    say "relay: unavailable (internal multiplayer runtime not found)"
   fi
   return "$status"
 }
