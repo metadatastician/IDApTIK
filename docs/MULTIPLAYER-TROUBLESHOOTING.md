@@ -59,8 +59,15 @@ can force Bevy onto the slow llvmpipe renderer.
 
 The launcher checks both `/mnt/shared_memory` and the current WSLg Weston boot
 log. If the mount is missing or Weston reports `rdp_allocate_shared_memory`
-with an input/output error, launch is blocked before any process starts. From
-Windows PowerShell as Administrator run:
+with an input/output error, a WSL-hosted Bevy window is unsafe. When Windows
+interop, the `x86_64-pc-windows-gnu` Rust target, and the MinGW linker are
+available, the launcher automatically builds and starts a native Windows Bevy
+client instead. The Phoenix relay and Tailscale endpoint remain in WSL; the
+local Windows client reaches that relay through `127.0.0.1`, while a remote
+peer uses the displayed tailnet address.
+
+If that fallback is unavailable, launch remains blocked. From Windows
+PowerShell as Administrator run:
 
 ```powershell
 wsl --update

@@ -45,6 +45,36 @@ fi
 grep -q '\[FAIL\].*WSLg Copy Mode' <<<"$copy_mode"
 grep -q 'restart Windows' <<<"$copy_mode"
 
+windows_fallback="$(env \
+  IDAPTIK_CLIENT_PLATFORM=windows \
+  IDAPTIK_DIAG_WINDOWS_INTEROP=1 \
+  IDAPTIK_DIAG_IS_WSL=1 \
+  IDAPTIK_DIAG_SKIP_TOOLS=1 \
+  IDAPTIK_DIAG_DISPLAY=:0 \
+  IDAPTIK_DIAG_WSLG_DIR="$FIXTURE/wslg" \
+  IDAPTIK_DIAG_SHARED_MEMORY="$FIXTURE/missing_shared_memory" \
+  IDAPTIK_DIAG_WESTON_LOG="$FIXTURE/wslg/weston.log" \
+  "$DOCTOR" report solo 2>&1)"
+grep -q '\[PASS\].*native Windows Bevy client selected' <<<"$windows_fallback"
+grep -q 'WSLg is bypassed' <<<"$windows_fallback"
+grep -q 'READY TO LAUNCH' <<<"$windows_fallback"
+
+fallback_dry_run="$(env \
+  IDAPTIK_DIAG_IS_WSL=1 \
+  IDAPTIK_DIAG_WINDOWS_INTEROP=1 \
+  IDAPTIK_DIAG_SKIP_TOOLS=1 \
+  IDAPTIK_DIAG_DISPLAY=:0 \
+  IDAPTIK_DIAG_WSLG_DIR="$FIXTURE/wslg" \
+  IDAPTIK_DIAG_SHARED_MEMORY="$FIXTURE/missing_shared_memory" \
+  IDAPTIK_DIAG_WESTON_LOG="$FIXTURE/wslg/weston.log" \
+  IDAPTIK_LAUNCHER_DRY_RUN=1 \
+  XDG_STATE_HOME="$FIXTURE/fallback-state" \
+  XDG_RUNTIME_DIR="$FIXTURE/fallback-runtime" \
+  "$REPO_DIR/launcher.sh" --solo 2>&1)"
+grep -q 'using the native Windows Bevy client instead' <<<"$fallback_dry_run"
+grep -q '\[PASS\].*native Windows Bevy client selected' <<<"$fallback_dry_run"
+grep -q 'DRY RUN:.*launcher.sh __run-solo' <<<"$fallback_dry_run"
+
 healthy_dry_run="$(env \
   IDAPTIK_DIAG_IS_WSL=0 \
   IDAPTIK_DIAG_SKIP_TOOLS=1 \
