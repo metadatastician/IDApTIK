@@ -1,5 +1,5 @@
 .\" SPDX-License-Identifier: CC-BY-SA-4.0
-.TH IDAPTIK-LAUNCHER 1 "August 2026" "IDApTIK 0.4.1" "Player Commands"
+.TH IDAPTIK-LAUNCHER 1 "August 2026" "IDApTIK 0.4.2" "Player Commands"
 .SH NAME
 idaptik-launcher \- diagnose, repair, build, and launch IDApTIK solo or multiplayer
 .SH SYNOPSIS
@@ -73,7 +73,10 @@ A warning is a degradation; a cross is blocking and nothing should launch.
 .SH WSLG COPY MODE
 If Windows shows a penguin taskbar item prefixed [WARN: COPY MODE], WSLg failed
 its shared-memory window transport.  The launcher detects the Weston
-rdp_allocate_shared_memory error or missing /mnt/shared_memory and stops before
+rdp_allocate_shared_memory error or missing /mnt/shared_memory.  When Windows
+interop, the x86_64-pc-windows-gnu Rust target, and the MinGW linker are
+available, it bypasses WSLg with a native Windows Bevy client while retaining
+the Phoenix relay and Tailscale endpoint in WSL.  Otherwise it stops before
 launch.  In Windows PowerShell as Administrator run:
 .PP
 .nf

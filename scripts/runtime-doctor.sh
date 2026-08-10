@@ -34,12 +34,21 @@ is_wsl() {
   fi
 }
 
+windows_interop_available() {
+  if [ -n "${IDAPTIK_DIAG_WINDOWS_INTEROP:-}" ]; then
+    [ "$IDAPTIK_DIAG_WINDOWS_INTEROP" = "1" ]
+  else
+    command -v cmd.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1
+  fi
+}
+
 display_value="${IDAPTIK_DIAG_DISPLAY-${DISPLAY:-}}"
 wayland_value="${IDAPTIK_DIAG_WAYLAND_DISPLAY-${WAYLAND_DISPLAY:-}}"
 wslg_dir="${IDAPTIK_DIAG_WSLG_DIR:-/mnt/wslg}"
 shared_memory="${IDAPTIK_DIAG_SHARED_MEMORY:-/mnt/shared_memory}"
 weston_log="${IDAPTIK_DIAG_WESTON_LOG:-$wslg_dir/weston.log}"
 pulse_server="${IDAPTIK_DIAG_PULSE_SERVER-${PULSE_SERVER:-}}"
+client_platform="${IDAPTIK_CLIENT_PLATFORM:-linux}"
 
 check_repository() {
   if [ -f "$REPO_DIR/Cargo.toml" ] && [ -f "$REPO_DIR/mise.toml" ]; then
@@ -95,6 +104,19 @@ check_tools() {
     fail rust "pinned toolchain is missing; run './launcher.sh --repair'"
   fi
 
+  if [ "$client_platform" = "windows" ]; then
+    if rustup target list --installed 2>/dev/null | grep -qx 'x86_64-pc-windows-gnu'; then
+      pass "Windows target" "x86_64-pc-windows-gnu is installed"
+    else
+      fail "Windows target" "missing; run 'rustup target add x86_64-pc-windows-gnu'"
+    fi
+    if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+      pass "Windows linker" "MinGW cross-linker resolves"
+    else
+      fail "Windows linker" "x86_64-w64-mingw32-gcc is missing"
+    fi
+  fi
+
   if [ "$PROFILE" = "host" ] || [ "$PROFILE" = "all" ]; then
     if (cd "$REPO_DIR" && "$mise_bin" exec -- mix --version >/dev/null 2>&1); then
       pass elixir "pinned Mix/OTP toolchain resolves"
@@ -114,6 +136,16 @@ check_display() {
     Linux*) ;;
     *) info display "native window diagnostics are currently Linux/WSLg-specific"; return ;;
   esac
+
+  if [ "$client_platform" = "windows" ] && is_wsl; then
+    if windows_interop_available; then
+      pass display "native Windows Bevy client selected; WSLg is bypassed"
+      info wslg "Copy Mode does not affect the Windows-native client"
+    else
+      fail "Windows interop" "cmd.exe or wslpath is unavailable; cannot launch the Windows client"
+    fi
+    return
+  fi
 
   if [ -n "$display_value" ] || [ -n "$wayland_value" ]; then
     pass display "GUI endpoint advertised (${wayland_value:-$display_value})"
