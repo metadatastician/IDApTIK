@@ -70,9 +70,15 @@ the repository tidy — stale build artifacts, editor cruft, and metadata drift
 - prevention: |
     The canonical `launcher.sh` runs `scripts/runtime-doctor.sh` before
     building, starting the relay, or creating a game window. A Weston
-    shared-memory EIO or missing WSLg mount is blocking: the launcher exits
-    non-zero and says that nothing
-    launched. Software graphics and unavailable audio remain warnings.
+    shared-memory EIO or missing WSLg mount is blocking unless the machine
+    can run the native Windows fallback: with Windows interop available
+    (`cmd.exe` + `wslpath`), the `x86_64-pc-windows-gnu` Rust target
+    installed, and the MinGW cross-linker present, the launcher builds and
+    runs a native Windows Bevy client instead — WSLg is bypassed, while the
+    Phoenix relay and the Tailscale endpoint stay in WSL. Where any fallback
+    prerequisite is missing, Copy Mode remains blocking: the launcher exits
+    non-zero and says that nothing launched. Software graphics and
+    unavailable audio remain warnings.
 - remediation: |
     From Windows PowerShell as Administrator, run `wsl --update`, then
     `wsl --shutdown`; reopen the distribution and run `./launcher.sh --doctor`.
@@ -95,5 +101,9 @@ the repository tidy — stale build artifacts, editor cruft, and metadata drift
 - fault-tolerance: |
     The preflight prevents abandoned PIDs, duplicate penguin taskbar items,
     stale lobby state, and the false impression that remote inputs are broken.
-    `--flowdiags` opens a no-JavaScript HTML decision flow in the Windows
-    browser so it remains usable when WSLg itself is broken.
+    When the native Windows fallback engages, the runtime owns the detached
+    Windows GUI process (tasklist via interop) so the Linux parent is not
+    reaped away from its Phoenix child, and the doctor reports WSLg as
+    bypassed rather than broken. `--flowdiags` opens a no-JavaScript HTML
+    decision flow in the Windows browser so it remains usable when WSLg
+    itself is broken.

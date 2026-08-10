@@ -6,7 +6,7 @@
 # (
 #   id                   = "idaptik-launcher"
 #   type                 = "launcher"
-#   version              = "0.4.1"
+#   version              = "0.4.2"
 #   app-name             = "idaptik"
 #   app-display          = "IDApTIK"
 #   app-url              = ""
@@ -46,7 +46,7 @@ APP_NAME="idaptik"
 APP_DISPLAY="IDApTIK"
 APP_DESC="Asymmetric two-player infiltration game"
 APP_CATEGORIES="Game;Network;"
-VERSION="0.4.1"
+VERSION="0.4.2"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/$APP_NAME"
@@ -101,6 +101,40 @@ platform() {
   printf '%s-%s' "$os" "$arch"
 }
 
+is_wsl() {
+  if [ -n "${IDAPTIK_DIAG_IS_WSL:-}" ]; then
+    [ "$IDAPTIK_DIAG_IS_WSL" = "1" ]
+  else
+    grep -qi microsoft "${IDAPTIK_DIAG_PROC_VERSION:-/proc/version}" 2>/dev/null
+  fi
+}
+
+wslg_copy_mode_active() {
+  local wslg_dir="${IDAPTIK_DIAG_WSLG_DIR:-/mnt/wslg}"
+  local shared_memory="${IDAPTIK_DIAG_SHARED_MEMORY:-/mnt/shared_memory}"
+  local weston_log="${IDAPTIK_DIAG_WESTON_LOG:-$wslg_dir/weston.log}"
+  [ ! -d "$shared_memory" ] || {
+    [ -r "$weston_log" ] &&
+      grep -qE 'rdp_allocate_shared_memory: Failed to open' "$weston_log"
+  }
+}
+
+windows_interop_available() {
+  if [ -n "${IDAPTIK_DIAG_WINDOWS_INTEROP:-}" ]; then
+    [ "$IDAPTIK_DIAG_WINDOWS_INTEROP" = "1" ]
+  else
+    command -v cmd.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1
+  fi
+}
+
+select_client_platform() {
+  [ -z "${IDAPTIK_CLIENT_PLATFORM:-}" ] || return 0
+  if is_wsl && wslg_copy_mode_active && windows_interop_available; then
+    export IDAPTIK_CLIENT_PLATFORM=windows
+    warn "WSLg Copy Mode is broken; using the native Windows Bevy client instead"
+  fi
+}
+
 build_sha() {
   git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || printf 'unknown'
 }
@@ -127,6 +161,7 @@ require_repo() {
 runtime_preflight() {
   local profile="$1" target="${2:-}"
   require_repo
+  select_client_platform
   if ! "$RUNTIME_DOCTOR" preflight "$profile" "$target"; then
     die "runtime preflight failed; run './launcher.sh --doctor' for the full report"
   fi
@@ -148,11 +183,17 @@ run_solo() {
   trust_mise
   cd "$REPO_DIR"
   progress PASS "Pinned Rust dependencies are available"
+  local bevy_bin="$REPO_DIR/target/debug/idaptik-bevy"
   progress STEP "Building the solo GUI (Cargo reuses completed work)"
-  "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy
-  progress PASS "Solo GUI build is complete"
+  if [ "${IDAPTIK_CLIENT_PLATFORM:-linux}" = "windows" ]; then
+    bevy_bin="$REPO_DIR/target/x86_64-pc-windows-gnu/debug/idaptik-bevy.exe"
+    "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy --target x86_64-pc-windows-gnu
+  else
+    "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy
+  fi
+  progress PASS "Solo GUI build is complete (${IDAPTIK_CLIENT_PLATFORM:-linux} client)"
   mark_ready "solo"
-  exec "$REPO_DIR/target/debug/idaptik-bevy" --local
+  exec "$bevy_bin" --local
 }
 
 progress() {
