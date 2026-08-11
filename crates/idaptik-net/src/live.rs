@@ -37,7 +37,7 @@ use tokio::time::Instant;
 
 /// Live-session parameters.
 pub struct LiveConfig {
-    /// Session identifier: the seat joins `session:<id>`.
+    /// Session identifier: the seat joins `game:<id>` (burble game-session fabric).
     pub session_id: String,
     pub role: Role,
     /// Fresh seat: how long to wait for the peer's hello. Rejoining seat: how
@@ -124,8 +124,8 @@ pub async fn run_live_seat<T: SessionTransport, F: LiveFrontend>(
 
     client
         .join(
-            &format!("session:{}", cfg.session_id),
-            json!({ "role": cfg.role.as_str() }),
+            &format!("game:{}", cfg.session_id),
+            json!({ "role": cfg.role.as_str(), "game": "idaptik" }),
         )
         .await?;
     push_control(client, &hello).await?;

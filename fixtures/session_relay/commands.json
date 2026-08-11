@@ -9,6 +9,8 @@
   { "cmd": "SetButton", "button": "Right", "down": false },
   { "cmd": "Interact" },
   { "cmd": "ThrowUsb" },
+  { "cmd": "NetSsh", "node": 0 },
+  { "cmd": "NetHack", "node": 1 },
   { "cmd": "Pause", "on": true },
   { "cmd": "Pause", "on": false },
   { "cmd": "ForceCrisis" },

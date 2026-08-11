@@ -39,7 +39,7 @@ use tokio::time::Instant;
 /// inside the [`PhoenixClient`] — swapping transports is a constructor choice
 /// (ADR-0006 §2), invisible here.
 pub struct SessionConfig {
-    /// Session identifier: the seat joins `session:<id>`.
+    /// Session identifier: the seat joins `game:<id>` (burble game-session fabric).
     pub session_id: String,
     pub role: Role,
     /// How long to wait in `WaitingForPeer` before a clean no-peer end.
@@ -95,8 +95,8 @@ pub async fn run_scripted_seat<T: SessionTransport>(
     // -- Join, then the hello barrier (WaitingForPeer) -----------------------
     client
         .join(
-            &format!("session:{}", cfg.session_id),
-            json!({ "role": cfg.role.as_str() }),
+            &format!("game:{}", cfg.session_id),
+            json!({ "role": cfg.role.as_str(), "game": "idaptik" }),
         )
         .await?;
     push_control(client, &hello).await?;

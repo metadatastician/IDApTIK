@@ -85,10 +85,11 @@ alongside matchmaking/presence, where a server-held world is needed anyway).
 
 ## Consequences
 
-- Elixir stays logic-free: the diff greps clean of scoring, FSM, and tick math.
-  The only game-adjacent knowledge in `server/` is the `Command` tag → seat
-  table, which is protocol routing, not rules.
-- Clients own simulation cost and pacing (tick cadence is theirs); the server
+- The relay stays logic-free: the diff greps clean of scoring, FSM, and tick
+  math. The only game-adjacent knowledge is the `Command` tag → seat table
+  (now in `Burble.Games.Idaptik` in the burble repo), which is protocol routing,
+  not rules.
+- Clients own simulation cost and pacing (tick cadence is theirs); the relay
   scales by connection count, not by session CPU.
 - The `seq` envelope is the seam where lockstep input-delay scheduling will
   attach when real clients arrive; today it only de-duplicates.
@@ -121,3 +122,27 @@ sparse command stream cannot say on its own) and `net:resync` (a
 pending commands). `net:hello` gained a `rejoin` flag and its `proto` moved
 to 2. All of it rides the existing `"event"` pass-through; the relay still
 strips exactly `"seq"` and interprets nothing.
+
+## Amendment (2026-08-11): relay now lives in burble
+
+The relay implementation has been **moved from IDApTIK to burble**. As of estate
+ruling 2026-08-04, burble is the estate's gaming communication platform, and its
+`game:<session_id>` channel (burble PR #182) provides the same relay-only
+lockstep topology at full parity with IDApTIK's former `SessionChannel`.
+
+- The `BurbleWeb.GameChannel` joins on `"game:"* topics and relays
+  `"command"`/`"event"` messages verbatim, stripping only the `"seq"` envelope
+  exactly as IDApTIK's `SessionChannel` did.
+- Role enforcement is driven by a **game profile registry** (`Burble.Games`)
+  instead of a hardcoded table: each game (including IDApTIK as `"idaptik"`)
+  declares its `command_roles()` mapping, which the channel consults at join
+  time. The IDApTIK profile (`Burble.Games.Idaptik`) carries the complete
+  command table including `NetSsh`/`NetHack` (fixing the bug that prompted
+  IDApTIK PR #71).
+- The `IdaptikServerWeb.SessionChannel` and the entire `server/` directory
+  have been **removed** from IDApTIK. The client code (`crates/idaptik-net`,
+  `crates/idaptik-bevy`) now joins `game:<id>` with `game: "idaptik"` params.
+- The wire contract (`fixtures/session_relay/`) is unchanged; the four-leg
+  loopback gate (ADR-0006 §4) now runs against burble in both CI suites.
+- The relay remains transport-agnostic (ADR-0006 §2); burble uses Bandit
+  + Phoenix Channels (ADR-0002), the same stack.

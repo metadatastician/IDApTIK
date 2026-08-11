@@ -1,9 +1,10 @@
 # Architecture
 
 IDApTIK is a polyglot game monorepo. **Rust owns gameplay truth** (an
-engine-agnostic, deterministic, event-sourced simulation); **Elixir owns
-multiplayer** (a transport-agnostic session relay); frontends are thin drivers
-over the same typed `Command`/`Event` wire.
+engine-agnostic, deterministic, event-sourced simulation); **multiplayer
+session relaying lives in burble** (the estate's gaming communication platform,
+estate ruling 2026-08-04); frontends are thin drivers over the same typed
+`Command`/`Event` wire.
 
 For the reasoning behind each choice, see the ADRs in [`docs/adr/`](docs/adr/).
 The proposed cross-repository epistemic state-machine seam is documented in
@@ -17,8 +18,8 @@ The proposed cross-repository epistemic state-machine seam is documented in
 │   ├── idaptik-core/  #   engine-agnostic sim: netsim + scenario + Moletaire companion
 │   ├── idaptik-ffi/   #   C ABI surface (JSON in / JSON out) over the core
 │   ├── idaptik-tui/   #   ratatui/crossterm frontend + --headless/--replay/--export verifier
-│   └── idaptik-bevy/  #   selected Bevy side-on 2.5D frontend (ADR-0008)
-├── server/            # Elixir/Phoenix session relay (Bandit + Phoenix Channels)
+│   ├── idaptik-bevy/  #   selected Bevy side-on 2.5D frontend (ADR-0008)
+│   └── idaptik-net/   #   Phoenix Channels client over burble game-session fabric (ADR-0006)
 ├── config/            # Nickel typed config: scenario-schema.ncl + fixtures (incl. bad_*.ncl)
 ├── docs/adr/          # Architecture Decision Records
 ├── fixtures/          # cross-language wire fixtures
@@ -70,12 +71,15 @@ equivalence. Intended host bridge is Zig (ADR-0001).
 drivers: they read input, push `Command`s, and render the `Event`/snapshot
 stream. The core never depends on them (ADR-0003 and ADR-0008).
 
-## Multiplayer (`server/`)
+## Multiplayer (burble game-session fabric)
 
-An Elixir/Phoenix app (Bandit + Phoenix Channels, no LiveView) that relays the
-typed `Command`/`Event` stream between the two asymmetric roles over
-`session:<id>` channels. The relay is **transport-agnostic** and holds no
-gameplay authority — it forwards; the core (run on a client) decides (ADR-0005).
+Multiplayer session relaying lives in the **burble** repository
+(`metadatastician/burble/server/lib/burble_web/channels/game_channel.ex`),
+which is the estate's designated gaming communication platform (estate ruling
+2026-08-04). The `crates/idaptik-net` crate carries the Phoenix Channels client
+that connects to burble's `game:<id>` channels over `/voice/socket/websocket`
+(ADR-0006). The relay is **transport-agnostic** and holds no gameplay authority
+— it forwards; the core (run on each client) decides (ADR-0005).
 
 ## Build & toolchain
 

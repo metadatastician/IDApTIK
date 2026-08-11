@@ -14,10 +14,13 @@ churniest layer, and must land **last**.
 
 Everything under it is now real:
 
-- **The relay** (ADR-0005, `server/lib/idaptik_server_web/channels/session_channel.ex`)
+- **The relay** (ADR-0005, now in burble at
+  `server/lib/burble_web/channels/game_channel.ex` as the `game:` lane)
   relays the typed `Command`/`Event` JSON verbatim over a Phoenix Channel with
   role enforcement, `peer_joined`/`peer_left` notifications, and an optional
   `seq` de-duplication envelope. Wire fixtures live in `fixtures/session_relay/`.
+  The relay was ported from IDApTIK's `SessionChannel` to burble's `GameChannel`
+  with full parity (fabric slice 1, burble PR #182).
 - **The frontend** (`crates/idaptik-bevy`) is a real Ghost Lobby renderer: a
   render-free `SimDriverPlugin` (`src/driver.rs`) steps `GhostLobbySim` at a
   fixed 60 Hz from a queued `Command` stream — the same wire API the TUI and
@@ -120,10 +123,11 @@ tests. The seam that makes both true is **client-side, in a new
     relay deployment (the reachable rendezvous, §3) and bridges to the
     relay's ordinary WebSocket endpoint.
 
-The relay stays transport-agnostic by construction: `SessionChannel` already
+The relay stays transport-agnostic by construction: `GameChannel` (in burble)
 reads exactly one key of each payload and speaks standard Phoenix framing over
-whatever socket Bandit accepted. **No burble knowledge ever enters `server/`.**
-Swapping burble for a plain socket is a constructor choice in the client;
+whatever socket Bandit accepted. **No burble-specific knowledge enters the
+relay logic itself** (the `game:` lane is a general-purpose gaming channel).
+Swapping transports is a constructor choice in the client;
 the loopback test (§4) runs the same scripted session over both transports to
 keep that swap honest.
 
@@ -188,7 +192,7 @@ The eventual implementation is done when, against the components now on
    asymmetric roles against one shared deterministic run (same seed, same
    merged command stream, per ADR-0004/0005).
 2. **Traffic on burble, relay agnostic.** All `command`/`event` traffic rides
-   burble; `server/` diffs empty of transport knowledge; constructing the
+   burble; the relay in burble is transport-agnostic; constructing the
    client with `PlainWebSocketTransport` instead passes the same suite.
 3. **Loss is handled.** Killing either client mid-run drives the other
    through `PeerLost` to either a resynced `Live` (rejoin within grace) or a
@@ -304,3 +308,26 @@ The relay is untouched — still relay-only ADR-0005, no new events, no state;
 everything above is client-side vocabulary on the existing `"event"`
 pass-through. Slices 2–3 (`BurbleTransport`, gossamer wrap) remain gated on
 the unchanged §5 unblock conditions.
+
+## Status note (2026-08-11): fabric slice 2 complete — burble is production relay
+
+As of estate ruling 2026-08-04 (fabric spec in burble PR #181), **slice 2 is
+complete**: `crates/idaptik-net` now points at burble's `game:` lane (PR #182) and
+the four-leg loopback gate passes against burble in both CI suites.
+
+- The `SessionTransport` seam ( §2) and Phoenix client remain unchanged in
+  design; the constructor now connects to burble's `/voice/socket/websocket`
+  endpoint as a guest and joins `game:<id>` with `game: "idaptik"` params.
+- `PlainWebSocketTransport` is still the test/fallback transport forever ( §2),
+  but now it talks to burble's Bandit + Phoenix stack instead of IDApTIK's
+  former `server/`. The burble game lane is at full parity with IDApTIK's
+  `SessionChannel` (including the `NetSsh`/`NetHack` fix that landed in both
+  repos via separate PRs).
+- **The `server/` directory has been removed from IDApTIK** (issue #74).
+  Session relaying now lives exclusively in burble.
+- The loopback gate's §4 contract is unchanged and continues to run; the only
+  observable difference is that the throwaway relay is now burble instead of
+  IDApTIK's own server.
+- `BurbleTransport` ( §2) remains deferred on burble shipping its embeddable
+  client module ( §5 unblock condition, still unmet). When it lands, it slots
+  in beside `PlainWebSocketTransport` as a second `SessionTransport` implementation.

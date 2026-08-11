@@ -1,7 +1,7 @@
 //! `idaptik-net`: the client-side session-transport seam (ADR-0006 §2).
 //!
-//! The relay (`server/`) is transport-agnostic by construction; everything
-//! transport-shaped lives here, client-side:
+//! The burble game-session fabric (`game:` lane) is transport-agnostic by construction;
+//! everything transport-shaped lives here, client-side:
 //!
 //! - [`transport::SessionTransport`] — a reliable, ordered, bidirectional text
 //!   message pipe. Nothing Phoenix-specific, nothing burble-specific.

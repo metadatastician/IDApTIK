@@ -1,6 +1,6 @@
 [package]
 name = "idaptik-net"
-description = "Client-side session transport (ADR-0006): SessionTransport seam, Phoenix Channels client, PlainWebSocketTransport, and the two-seat lockstep loopback client."
+description = "Client-side session transport (ADR-0006): SessionTransport seam, Phoenix Channels client over burble game-session fabric, PlainWebSocketTransport, and the two-seat lockstep loopback client."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

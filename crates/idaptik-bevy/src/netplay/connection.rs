@@ -147,15 +147,20 @@ async fn run_single_connection(
 
     let mut client = PhoenixClient::new(transport);
 
-    // Create session topic
-    let topic = format!("session:{}", config.session_id);
+    // Create session topic (burble game-session fabric)
+    let topic = format!("game:{}", config.session_id);
+
+    // Build join params for burble (game id and role are required)
+    let join_params = serde_json::json!({
+        "game": "idaptik",
+        "role": config.role.as_str(),
+    });
 
     // Build hello payload from script configuration
     // We construct it manually since we don't have the ScriptFile in this thread
     let hello_payload = serde_json::json!({
         "event": HELLO_TAG,
         "proto": NET_PROTO,
-        "role": config.role.as_str(),
         "seed": config.seed,
         "difficulty": &config.difficulty,
         "reduced_motion": config.reduced_motion,
@@ -164,11 +169,17 @@ async fn run_single_connection(
         "rejoin": false, // false for fresh connections
     });
 
-    // Join session
+    // Join session with burble-compatible params
     let _join_response = client
-        .join(&topic, hello_payload)
+        .join(&topic, join_params)
         .await
         .map_err(|e| format!("Join session: {}", e))?;
+
+    // Send hello as the first control message after joining
+    client
+        .push("event", hello_payload)
+        .await
+        .map_err(|e| format!("Send hello: {}", e))?;
 
     // Notify Bevy that we're connected
     let _ = tx_back.send(NetworkMessage::Status(NetplayStatus::WaitingForPeer));

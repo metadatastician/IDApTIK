@@ -19,9 +19,12 @@ deployment configuration, and published releases. The most sensitive areas
 are:
 
 - `crates/idaptik-ffi`: the unsafe C-ABI boundary used by non-Rust consumers;
-- `server/`: the network-facing Elixir/Phoenix session relay;
+- `crates/idaptik-net`: the network-facing client over burble game-session fabric;
 - `.github/workflows/`: privileged automation and supply-chain configuration;
 - snapshot, package, and multiplayer wire validation at trust boundaries.
+
+Note: the session relay itself now lives in the burble repository
+(`metadatastician/burble/server/lib/burble_web/channels/game_channel.ex`).
 
 Do not perform denial-of-service testing, social engineering, or testing
 against infrastructure or accounts you do not own.

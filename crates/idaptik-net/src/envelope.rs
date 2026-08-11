@@ -53,9 +53,9 @@ impl std::str::FromStr for Role {
 }
 
 /// Which seat may send a command — the client-side mirror of the relay's
-/// `@command_roles` table (`server/.../session_channel.ex`). The relay enforces
-/// this; the client uses it to split a script and to route either-seat
-/// commands deterministically.
+/// `command_roles()` from the game profile (`Burble.Games.Idaptik` in burble).
+/// The relay enforces this; the client uses it to split a script and to route
+/// either-seat commands deterministically.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Seat {
     Infiltrator,
