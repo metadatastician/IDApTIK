@@ -12,7 +12,12 @@ set -euo pipefail
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUNTIME_DOCTOR="$REPO_DIR/scripts/runtime-doctor.sh"
 RUN_CONFIG="$REPO_DIR/fixtures/session_relay/versus_script.json"
-BEVY_BIN="$REPO_DIR/target/release/idaptik-bevy"
+CLIENT_PLATFORM="${IDAPTIK_CLIENT_PLATFORM:-linux}"
+case "$CLIENT_PLATFORM" in
+  linux) BEVY_BIN="$REPO_DIR/target/release/idaptik-bevy" ;;
+  windows) BEVY_BIN="$REPO_DIR/target/x86_64-pc-windows-gnu/release/idaptik-bevy.exe" ;;
+  *) printf 'error: unsupported IDAPTIK_CLIENT_PLATFORM %q\n' "$CLIENT_PLATFORM" >&2; exit 1 ;;
+esac
 
 PORT="${IDAPTIK_PORT:-4000}"
 SESSION_DEFAULT="ghost-lobby"
@@ -95,9 +100,14 @@ build_seat() {
   # an older executable that happens to exist in target/release.
   say "checking the Bevy netplay client (a first build takes a few minutes)…"
   progress STEP "Building the Bevy GUI; joiners must wait until this completes"
-  (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release --locked -q -p idaptik-bevy)
+  if [ "$CLIENT_PLATFORM" = "windows" ]; then
+    (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release --locked -q \
+      -p idaptik-bevy --target x86_64-pc-windows-gnu)
+  else
+    (cd "$REPO_DIR" && "$MISE_BIN" exec -- cargo build --release --locked -q -p idaptik-bevy)
+  fi
   [ -x "$BEVY_BIN" ] || die "build produced no $BEVY_BIN"
-  progress PASS "Bevy GUI build is complete"
+  progress PASS "Bevy GUI build is complete ($CLIENT_PLATFORM client)"
 }
 
 relay_pid() {
@@ -207,18 +217,75 @@ seat_url() {
   esac
 }
 
+windows_client_pid() {
+  (cd /mnt/c/Windows && cmd.exe /D /C tasklist \
+    /FI "IMAGENAME eq idaptik-bevy.exe" /FO CSV /NH 2>/dev/null) |
+    tr -d '\r' |
+    sed -n 's/^"idaptik-bevy\.exe","\([0-9][0-9]*\)".*/\1/p' |
+    head -1
+}
+
+windows_pid_is_running() {
+  local pid="$1"
+  (cd /mnt/c/Windows && cmd.exe /D /C tasklist \
+    /FI "PID eq $pid" /FO CSV /NH 2>/dev/null) |
+    tr -d '\r' |
+    grep -q "^\"idaptik-bevy.exe\",\"$pid\""
+}
+
+run_windows_client() {
+  local pid="" waited=0
+  [ -z "$(windows_client_pid)" ] || die "a Windows IDApTIK client is already running; close it or use './launcher.sh --stop'"
+
+  # WSL interop detaches a Windows GUI process when this runtime itself was
+  # backgrounded by launcher.sh. Capture the resulting Windows PID and keep
+  # this Linux owner alive so its Phoenix child relay is not reaped with it.
+  "$@"
+  while [ -z "$pid" ] && [ "$waited" -lt 10 ]; do
+    pid="$(windows_client_pid)"
+    [ -n "$pid" ] || sleep 1
+    waited=$((waited + 1))
+  done
+  [ -n "$pid" ] || die "Windows reported no idaptik-bevy.exe after launch"
+  say "Windows client: PID $pid"
+
+  cleanup_windows_client() {
+    if windows_pid_is_running "$pid"; then
+      (cd /mnt/c/Windows && cmd.exe /D /C taskkill /PID "$pid" /T /F >/dev/null 2>&1) || true
+    fi
+  }
+  trap cleanup_windows_client EXIT
+  trap 'cleanup_windows_client; exit 143' HUP INT TERM
+  while windows_pid_is_running "$pid"; do sleep 1; done
+  trap - EXIT HUP INT TERM
+}
+
 run_seat() { # $1 host|join  $2 target  $3 url  $4 role  $5 session
   local mode="$1" target="$2" url="$3" role="$4" session="$5"
-  say "seat: $role · session: $session · relay: $url · frontend: Bevy GUI"
+  local run_config="$RUN_CONFIG"
+  if [ "$CLIENT_PLATFORM" = "windows" ]; then
+    run_config="$(wslpath -w "$RUN_CONFIG")"
+  fi
+  say "seat: $role · session: $session · relay: $url · frontend: Bevy GUI ($CLIENT_PLATFORM)"
   say "keys: arrows/WASD move · E interact · Q throw · 1-4 uplinks · Tab changes view · Esc quits"
   case "$mode" in
     host)
-      exec "$BEVY_BIN" --host --url "$url" --session "$session" \
-        --role "$role" --script "$RUN_CONFIG"
+      if [ "$CLIENT_PLATFORM" = "windows" ]; then
+        run_windows_client "$BEVY_BIN" --host --url "$url" --session "$session" \
+          --role "$role" --script "$run_config"
+      else
+        exec "$BEVY_BIN" --host --url "$url" --session "$session" \
+          --role "$role" --script "$run_config"
+      fi
       ;;
     join)
-      exec "$BEVY_BIN" --join "$target" --url "$url" --session "$session" \
-        --role "$role" --script "$RUN_CONFIG"
+      if [ "$CLIENT_PLATFORM" = "windows" ]; then
+        run_windows_client "$BEVY_BIN" --join "$target" --url "$url" --session "$session" \
+          --role "$role" --script "$run_config"
+      else
+        exec "$BEVY_BIN" --join "$target" --url "$url" --session "$session" \
+          --role "$role" --script "$run_config"
+      fi
       ;;
     *) die "internal error: unknown seat mode $mode" ;;
   esac

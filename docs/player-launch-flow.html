@@ -30,7 +30,7 @@
   <h2>Host</h2>
   <section class="flow">
     <div class="node pass"><strong>1. Runtime diagnosis</strong><br>Machine, OS/kernel, WSLg transport, graphics, audio, Rust, Elixir, network route and Tailscale are checked before anything launches.</div>
-    <div class="node fail"><strong>If you see <code>[WARN: COPY MODE]</code></strong><br>Stop. In Windows PowerShell as Administrator run:<pre>wsl --update
+    <div class="node warn"><strong>If WSLg enters <code>[WARN: COPY MODE]</code></strong><br>The launcher uses a native Windows Bevy client when Windows interop and its cross-build tools are available. The relay and Tailscale route remain in WSL. If fallback prerequisites fail, in Windows PowerShell as Administrator run:<pre>wsl --update
 wsl --shutdown</pre>Reopen Debian. Restart Windows if it remains.</div>
     <div class="node pass"><strong>2. Build</strong><br>Wait for <em>✓ Bevy GUI build is complete</em>. Cargo may take several minutes on the first machine. Do not invite anyone while it says building.</div>
     <div class="node pass"><strong>3. Relay and route</strong><br>The Phoenix/Bandit relay must answer on port 4000. Under WSL2 NAT, Tailscale must be installed, running and authenticated.</div>
@@ -47,7 +47,7 @@ wsl --shutdown</pre>Reopen Debian. Restart Windows if it remains.</div>
 
   <h2>Friendly fault map</h2>
   <section class="split">
-    <div class="node fail"><strong>Penguin icon; window will not open</strong><br>WSLg Copy Mode. Use the Windows update/shutdown recovery above.</div>
+    <div class="node warn"><strong>Penguin icon; WSLg window will not open</strong><br>The launcher should select the Windows-native client. If it reports missing Windows target/linker/interop prerequisites, repair those or use the Windows update/shutdown recovery above.</div>
     <div class="node warn"><strong>Software renderer / llvmpipe</strong><br>The game may run slowly. Update the Windows GPU driver; verify <code>/dev/dxg</code>.</div>
     <div class="node warn"><strong>No audio device</strong><br>Non-blocking. WSLg audio is unavailable; gameplay and networking can continue.</div>
     <div class="node fail"><strong>Dependency missing</strong><br>Run <code>./launcher.sh --repair</code>, then <code>./launcher.sh --doctor</code>.</div>
