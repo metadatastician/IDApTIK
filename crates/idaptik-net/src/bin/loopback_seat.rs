@@ -1,6 +1,6 @@
 //! One seat of the ADR-0006 §4 loopback gate.
 //!
-//! Joins `session:<id>` on a running relay over `PlainWebSocketTransport`,
+//! Joins `game:<id>` on a running burble server over `PlainWebSocketTransport`,
 //! plays one role of a headless script against the peer seat, and writes the
 //! determinism artifact — the exact `HeadlessOutput` blob `idaptik-tui
 //! --headless` prints — to `--out`. The orchestrator

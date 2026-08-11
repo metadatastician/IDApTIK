@@ -1,8 +1,8 @@
 //! The session-relay wire fixture round-trips through the Rust types unchanged.
 //!
-//! `fixtures/session_relay/` (repo root) is shared with the Elixir relay's
-//! channel tests (`server/test/idaptik_server_web/channels/session_channel_test.exs`):
-//! the Elixir side proves the relay passes every fixture value through
+//! `fixtures/session_relay/` (repo root) is shared with the burble relay's
+//! channel tests (`server/test/burble_web/channels/game_channel_test.exs`):
+//! the Elixir side (in burble) proves the relay passes every fixture value through
 //! verbatim; this side proves each of those values *is* a `Command` / `Event`
 //! — it deserializes into the Rust type and re-serializes to the identical
 //! JSON. Together they are the cross-language mapping proof issue #5 asks for.
@@ -74,6 +74,8 @@ fn command_fixture_covers_the_whole_alphabet() {
         "Uplink",
         "Pivot",
         "Unpivot",
+        "NetSsh",
+        "NetHack",
         "ForceCrisis",
         "ForceExtract",
         "ForceFail",

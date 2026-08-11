@@ -29,10 +29,10 @@ use std::time::Duration;
 #[derive(Debug, Parser)]
 #[command(
     name = "idaptik-netplay",
-    about = "One live seat of the two-player slice: delay-lockstep over the relay (ADR-0006)"
+    about = "One live seat of the two-player slice: delay-lockstep over burble game-session fabric (ADR-0006)"
 )]
 struct Cli {
-    /// The relay's Phoenix socket endpoint.
+    /// The burble server's Phoenix socket endpoint.
     #[arg(long, default_value = "ws://127.0.0.1:4000/socket/websocket")]
     url: String,
     /// Session id: both seats must pass the same one.

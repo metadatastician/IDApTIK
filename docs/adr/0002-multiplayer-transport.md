@@ -46,7 +46,10 @@ Rationale:
   `WebSockAdapter` handler on Bandit alone; the framework weight is worth it for
   multiplayer.
 
-## What hex pulls (server/mix.exs, when scaffolded)
+## What hex pulls (now in burble's server/mix.exs)
+
+The IDApTIK repository no longer contains Elixir code. The session relay lives
+in burble, which uses:
 
 - `{:phoenix, "~> 1.7"}` — Channels, endpoint, socket (Bandit is its default
   adapter; nothing extra to wire for WebSockets)
@@ -54,6 +57,8 @@ Rationale:
 - `{:phoenix_pubsub, "~> 2.1"}` — pub/sub backbone (clustered later if needed)
 - `{:jason, "~> 1.4"}` — JSON, until/unless we adopt a binary wire format
 - **Not** `{:phoenix_live_view, ...}`
+
+For the burble dependencies, see `metadatastician/burble/server/mix.exs`.
 
 A binary wire format (protobuf/flatbuffers/MessagePack) for the Rust↔Elixir
 boundary is deferred to its own ADR once the protocol is designed; Channels are
@@ -66,3 +71,24 @@ payload-agnostic, so this decision does not block on it.
   framing) over Bandit's WebSocket.
 - If we ever want a browser-based spectator/among-us-style lobby UI, LiveView can
   be added *alongside* for that specific surface without disturbing gameplay.
+
+## Amendment (2026-08-11): burble is the session fabric
+
+As of estate ruling 2026-08-04, the **burble** platform (`metadatastician/burble`) is
+the designated gaming communication platform for IDApTIK. The session relay that
+was previously implemented in `server/` has been **removed**; all session
+relaying now happens through burble's `game:<session_id>` channel (fabric slice
+1, burble PR #182).
+
+- The `game:` lane in burble provides the same byte-preserving JSON relay of
+  `Command`/`Event` payloads as the former IDApTIK `session_channel.ex`, with the
+  addition of the missing `NetSsh`/`NetHack` hacker verbs (fixed in IDApTIK PR #71
+  and present in burble's `Burble.Games.Idaptik` profile from inception).
+- The client-side transport (`crates/idaptik-net`) now joins `game:<id>` with
+  `{"game": "idaptik", "role": "infiltrator" | "hacker"}` params and connects to
+  burble's `/voice/socket/websocket` endpoint as a guest.
+- burble uses Bandit as its HTTP/WebSocket adapter and Phoenix Channels for
+  messaging — the same stack chosen by this ADR; this amendment records the
+  **deployment** change, not a transport change.
+- The loopback gate (ADR-0006 §4) now uses burble in both IDApTIK and burble
+  CI.

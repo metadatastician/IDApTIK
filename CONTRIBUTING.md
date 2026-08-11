@@ -35,7 +35,8 @@ local-history scan at any time with `just secret-scan`.
   and independent of Bevy.
 - `crates/idaptik-bevy` is a presentation/input adapter over typed
   `Command`/`Event` and snapshot surfaces.
-- `server/` relays multiplayer sessions; it does not own gameplay decisions.
+- `crates/idaptik-net` carries the Phoenix Channels client over burble's
+  game-session fabric; multiplayer session relaying lives in burble.
 - IDApTIK owns `contracts/idaptik/v1`; Universal Modding Studio consumes it
   without becoming a runtime dependency.
 - Ruby, Python, JavaScript, and their package/tooling ecosystems are not part
@@ -43,7 +44,7 @@ local-history scan at any time with `just secret-scan`.
 - Do not flatten the licence layers: code is AGPL-3.0-or-later, content is
   CC-BY-SA-4.0, and the IDApTIK/Moletaire names and marks remain trademarked.
 
-Changes to `crates/idaptik-ffi`, `server/`, workflows, licences, or versioned
+Changes to `crates/idaptik-ffi`, `crates/idaptik-net`, workflows, licences, or versioned
 contracts receive additional scrutiny.
 
 ## Checks
@@ -57,7 +58,6 @@ just config-check
 just loopback-check
 cargo test -p idaptik-bevy
 cargo clippy -p idaptik-bevy --all-targets -- -D warnings
-cd server && mix format --check-formatted
 ```
 
 Checks must fail when required tooling or validation is absent; do not turn a

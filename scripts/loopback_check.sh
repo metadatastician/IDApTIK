@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The ADR-0006 §4 loopback gate, PlainWebSocketTransport configuration.
+# The ADR-0006 §4 loopback gate, PlainWebSocketTransport over burble game-session fabric.
 #
-# Seat processes on one host, a throwaway local relay, shared fixture scripts.
+# Seat processes on one host, a throwaway local burble server, shared fixture scripts.
 # PASS requires:
 #
 #   1. determinism  — both batch seats' artifacts are byte-identical, AND
@@ -19,7 +19,7 @@
 #                     the reference — the rejoined process reconstructs the
 #                     whole run it half-missed.
 #
-# Requirements are hard: a missing toolchain FAILS the gate (estate doctrine —
+# Requirements are hard: a missing toolchain or burble repo FAILS the gate (estate doctrine —
 # a gate that skips is a gate that lies).
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -28,12 +28,13 @@ SCRIPT="${1:-fixtures/session_relay/capture_script.json}"
 LIVE_SCRIPT="${2:-fixtures/session_relay/live_script.json}"
 SUPERVISED_SCRIPT="${3:-fixtures/session_relay/supervised_script.json}"
 PORT="${IDAPTIK_LOOPBACK_PORT:-4013}"
-URL="ws://127.0.0.1:${PORT}/socket/websocket"
+URL="ws://127.0.0.1:${PORT}/voice/socket/websocket?guest=true&display_name=loopback"
 
 command -v mix >/dev/null 2>&1 || { echo "FAIL: mix (Elixir) is required — run 'just setup'"; exit 1; }
 command -v cargo >/dev/null 2>&1 || { echo "FAIL: cargo (Rust) is required"; exit 1; }
 [ -f "$SCRIPT" ] || { echo "FAIL: script not found: $SCRIPT"; exit 1; }
 [ -f "$LIVE_SCRIPT" ] || { echo "FAIL: live script not found: $LIVE_SCRIPT"; exit 1; }
+[ -f "../burble/server/mix.exs" ] || { echo "FAIL: burble not found at ../burble — clone it first"; exit 1; }
 
 echo "== build (seat binaries + reference runner)"
 cargo build -q -p idaptik-net -p idaptik-tui
@@ -41,9 +42,9 @@ SEAT=target/debug/idaptik-loopback-seat
 NETPLAY=target/debug/idaptik-netplay
 TUI=target/debug/idaptik-tui
 
-echo "== relay (throwaway, port ${PORT})"
-(cd server && mix deps.get >/dev/null)
-(cd server && IDAPTIK_PORT="$PORT" exec mix phx.server >/tmp/idaptik_loopback_relay.log 2>&1) &
+echo "== burble server (throwaway, port ${PORT})"
+(cd ../burble/server && mix deps.get >/dev/null)
+(cd ../burble/server && PORT="$PORT" exec mix phx.server >/tmp/idaptik_loopback_relay.log 2>&1) &
 RELAY_PID=$!
 cleanup() {
     # mix execs the BEAM in the same process thanks to `exec`; kill the tree

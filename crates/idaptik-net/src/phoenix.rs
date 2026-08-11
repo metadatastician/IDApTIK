@@ -11,7 +11,7 @@
 //! heartbeating.
 //!
 //! One channel per client: the session slice joins exactly one
-//! `session:<id>` topic (ADR-0006 §3), so multiplexing is complexity with no
+//! `game:<id>` topic (burble game-session fabric, ADR-0006 §3), so multiplexing is complexity with no
 //! consumer. Replies are awaited in-line (pushes are sequential in the seat
 //! state machine); broadcasts that arrive while awaiting a reply are buffered,
 //! never dropped.

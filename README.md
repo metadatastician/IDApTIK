@@ -83,7 +83,7 @@ crates/idaptik-core     engine-agnostic gameplay truth — the network sim + Gho
 crates/idaptik-ffi      C-ABI surface for Zig/Idris2 consumers (ADR-0001)
 crates/idaptik-tui      ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)
 crates/idaptik-bevy     selected Bevy rendering frontend (ADR-0008)
-server/                    Elixir: Bandit + Phoenix Channels (ADR-0002)
+crates/idaptik-net      Phoenix Channels client over burble game-session fabric (ADR-0006)
 config/                    Nickel — typed, schema-checked game/network config
 docs/adr/                  architecture decision records
 ```
