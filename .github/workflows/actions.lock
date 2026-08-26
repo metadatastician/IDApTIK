@@ -6,7 +6,7 @@ workflows:
     '.github/workflows/ci.yml':
         - 'erlef/setup-beam@v1.24.1'
     '.github/workflows/codeql.yml':
-        - 'github/codeql-action@v4.37.6'
+        - 'github/codeql-action@v4.37.7'
     '.github/workflows/pages.yml':
         - 'actions/deploy-pages@v5.0.0'
         - 'actions/upload-pages-artifact@v5.0.0'
@@ -34,8 +34,8 @@ dependencies:
         commit: 'sha1-54075bcc5e249e4758d363f27d099f55d843f124'
         owner_id: 47606891
         repo_id: 331103973
-    'github/codeql-action@v4.37.6':
-        ref: 'v4.37.6'
-        commit: 'sha1-5595ccaf912efad79be6eef63a5619ff05969be3'
+    'github/codeql-action@v4.37.7':
+        ref: 'v4.37.7'
+        commit: 'sha1-ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd'
         owner_id: 9919
         repo_id: 259445878
