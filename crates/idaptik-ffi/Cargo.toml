@@ -1,6 +1,6 @@
 [package]
 name = "idaptik-ffi"
-description = "C-ABI surface over idaptik-core, for FFI consumers (Zig bridge, Idris2 ABI models)."
+description = "Current Rust-exported C ABI over idaptik-core; Zig/Idris2 policy remediation is tracked in issue #103."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

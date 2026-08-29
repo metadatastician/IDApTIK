@@ -48,6 +48,23 @@ jobs:
       - name: cargo fmt --all -- --check
         run: cargo fmt --all -- --check
 
+  supply-chain:
+    name: supply-chain (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.20.2 --locked
+      - name: Check advisories, dependencies, licences, and sources
+        run: cargo deny check --hide-inclusion-graph
+
   test-ghost:
     name: test-ghost (core/tui/ffi + clippy + fmt)
     runs-on: ubuntu-latest
@@ -87,8 +104,11 @@ jobs:
         run: cargo clippy -p idaptik-bevy --all-targets -- -D warnings
 
   session-loopback:
-    name: session-loopback (relay mix test + two-seat determinism gate)
+    name: session-loopback (Burble relay + two-seat determinism gate)
     runs-on: ubuntu-latest
+    env:
+      # Known-compatible game-session lane plus the post-merge socket fixes.
+      BURBLE_REF: ef6756cf1591406d434c5c04c3c018e935836e4c
     steps:
       - name: Checkout
         run: |
@@ -96,6 +116,12 @@ jobs:
           git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
           git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach --force FETCH_HEAD
+      - name: Checkout pinned Burble game-session fabric
+        run: |
+          git init ../burble
+          git -C ../burble remote add origin https://github.com/metadatastician/burble.git
+          git -C ../burble fetch --no-tags --depth=1 origin "$BURBLE_REF"
+          git -C ../burble checkout --detach --force FETCH_HEAD
       - name: Provision pinned Rust toolchain (rust-toolchain.toml)
         run: rustup show
       - name: Provision Erlang/Elixir (versions mirror mise.toml)
@@ -105,13 +131,7 @@ jobs:
           elixir-version: "1.19.5"
       - name: Install just (task runner, same recipe as local)
         run: cargo install just --version 1.46.0 --locked
-      - name: Relay unit tests (mix test — first time these run in CI)
-        run: |
-          mix local.hex --force
-          mix local.rebar --force
-          just server-setup
-          just server-test
-      - name: just loopback-check (ADR-0006 §4 gate)
+      - name: just loopback-check (Burble + ADR-0006 §4 gate)
         run: just loopback-check
 
   config-scenario-check:

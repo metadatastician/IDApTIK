@@ -33,3 +33,46 @@ impl fmt::Display for NetError {
 }
 
 impl std::error::Error for NetError {}
+
+impl From<burble_client::Error> for NetError {
+    fn from(error: burble_client::Error) -> Self {
+        match error {
+            burble_client::Error::Url(error) => Self::Transport(error.to_string()),
+            burble_client::Error::WebSocket(error) => Self::Transport(error.to_string()),
+            burble_client::Error::Transport(error) => match error.downcast::<Self>() {
+                Ok(error) => *error,
+                Err(error) => Self::Transport(error.to_string()),
+            },
+            burble_client::Error::Json(error) => Self::Protocol(error.to_string()),
+            burble_client::Error::Protocol(message) => Self::Protocol(message),
+            burble_client::Error::Rejected { status, response } => {
+                Self::Session(format!("push rejected ({status}): {response}"))
+            }
+            burble_client::Error::Closed => Self::Closed,
+            burble_client::Error::Timeout(operation) => Self::Timeout(operation),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NetError;
+
+    #[test]
+    fn burble_adapter_error_recovers_closed_and_timeout_semantics() {
+        let closed = burble_client::Error::Transport(Box::new(NetError::Closed)).into();
+        assert!(matches!(closed, NetError::Closed));
+
+        let timeout =
+            burble_client::Error::Transport(Box::new(NetError::Timeout("fixture"))).into();
+        assert!(matches!(timeout, NetError::Timeout("fixture")));
+    }
+
+    #[test]
+    fn unknown_burble_adapter_error_remains_a_transport_error() {
+        let error = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "fixture pipe");
+        let converted: NetError = burble_client::Error::Transport(Box::new(error)).into();
+
+        assert!(matches!(converted, NetError::Transport(message) if message == "fixture pipe"));
+    }
+}

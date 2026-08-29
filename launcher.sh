@@ -691,7 +691,8 @@ Recovery example:
   $0 --flowdiags
 
 Environment:
-  IDAPTIK_PORT              Relay port (current: $PORT; default: 4000)
+  IDAPTIK_PORT              Burble relay port (current: $PORT; default: 4000)
+  IDAPTIK_BURBLE_DIR        Burble checkout (default: sibling ../burble)
   IDAPTIK_REPO_DIR          Override repository location for an installed copy
   IDAPTIK_LAUNCHER_DRY_RUN  Set to 1 to print the selected launch command
   IDAPTIK_STARTUP_TIMEOUT   Readiness wait in seconds (default: 1800)

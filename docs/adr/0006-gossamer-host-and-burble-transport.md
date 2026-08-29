@@ -316,7 +316,7 @@ complete**: `crates/idaptik-net` now points at burble's `game:` lane (PR #182) a
 the four-leg loopback gate passes against burble in both CI suites.
 
 - The `SessionTransport` seam ( §2) and Phoenix client remain unchanged in
-  design; the constructor now connects to burble's `/voice/socket/websocket`
+  design; the constructor now connects to burble's `/voice/websocket`
   endpoint as a guest and joins `game:<id>` with `game: "idaptik"` params.
 - `PlainWebSocketTransport` is still the test/fallback transport forever ( §2),
   but now it talks to burble's Bandit + Phoenix stack instead of IDApTIK's
@@ -331,3 +331,17 @@ the four-leg loopback gate passes against burble in both CI suites.
 - `BurbleTransport` ( §2) remains deferred on burble shipping its embeddable
   client module ( §5 unblock condition, still unmet). When it lands, it slots
   in beside `PlainWebSocketTransport` as a second `SessionTransport` implementation.
+
+## Status note (2026-08-28): Burble client boundary adopted
+
+Burble PR #203 satisfied the Rust-client part of the §5 unblock condition with
+the standalone `burble-client` crate. IDApTIK now pins that crate to the merged
+commit and delegates Phoenix V2 framing, reply correlation, broadcast
+buffering, topic filtering, and heartbeats to it. A thin adapter preserves
+IDApTIK's `SessionTransport` seam and `NetError` vocabulary, so the lockstep
+state machines and plain-WebSocket fallback remain unchanged.
+
+This removes the duplicated Phoenix implementation. It does **not** claim the
+remaining gossamer hosting condition or a distinct voice/data-channel
+`BurbleTransport` is complete; those remain separate from using Burble's
+canonical client for the existing game-session WebSocket lane.

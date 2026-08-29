@@ -119,17 +119,10 @@ fmt-check:
 lint:
     cargo clippy --workspace --all-targets -- -D warnings
 
-# --- Elixir (multiplayer / session) --------------------------------------------
-# Bandit + Phoenix Channels, not LiveView (see ADR-0002). Activates with server/.
-
-server-setup:
-    cd server && mix deps.get
-
-server:
-    cd server && mix phx.server
-
-server-test:
-    cd server && mix test
+# Audit the complete lock graph against deny.toml. A missing cargo-deny binary
+# is a hard failure: install the pinned version used by CI (0.20.2).
+supply-chain:
+    cargo deny check --hide-inclusion-graph
 
 # --- Config (Nickel) -----------------------------------------------------------
 

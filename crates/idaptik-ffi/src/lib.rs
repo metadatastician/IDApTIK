@@ -1,9 +1,10 @@
 //! C-ABI surface over [`idaptik_core`].
 //!
-//! This is the stable boundary that non-Rust code binds to: the **Zig** FFI
-//! bridge for APIs, and the **Idris2** models that specify the ABI contracts
-//! (ADR-0001). Keep this layer thin — it owns only pointer/lifetime handling and
-//! delegates every decision to `idaptik-core`.
+//! This is the current boundary that non-Rust code binds to. It is exported
+//! directly from Rust; the estate-required Zig adapter and Idris2 ABI models do
+//! not exist yet and are tracked in issue #103 (ADR-0001). Keep this layer thin:
+//! it owns only pointer/lifetime handling and delegates decisions to
+//! `idaptik-core`.
 //!
 //! Regenerate the C header with cbindgen (`just ffi-header`, or from this
 //! crate's directory):

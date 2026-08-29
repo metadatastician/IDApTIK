@@ -5,22 +5,24 @@
 project = "IDApTIK"
 version = "0.1.0"
 type = "game"
-last-updated = "2026-07-28"
+last-updated = "2026-08-28"
 branch = "main"
 build-status = "Envelope vertical slice implemented; player-facing GUI incomplete"
-test-status = "Rust core/TUI/FFI/net (378 tests), Nickel contracts, Elixir relay, two-seat loopback, and the UMS round trip are CI-gated"
+test-status = "Rust core/TUI/FFI/net, Bevy frontend, Nickel contracts, and the Burble-backed two-seat loopback are CI-gated; the cross-repository UMS round trip is not currently CI-gated"
 
 [project-context]
 description = "Asymmetric two-player infiltration game. One player infiltrates a physical space; the other hacks a grounded network simulation."
 subtitle = "Invisible Door: Action Point Trauma Inc. Kickers"
 truth-language = "rust"
 session-language = "elixir"
-ffi-language = "zig"
-abi-model-language = "idris2"
+ffi-language-policy = "zig"
+ffi-policy-status = "missing: current exported C ABI is implemented directly in Rust; tracked in issue #103"
+abi-model-language-policy = "idris2"
+abi-model-status = "missing: no Idris2 sources or package exist yet; tracked in issue #103"
 config-language = "nickel"
 selected-renderer = "bevy"
 planned-host = "gossamer"
-planned-transport = "burble"
+session-transport = "burble"
 runtime-dependencies = ["bevy", "bandit", "phoenix_channels", "nickel"]
 
 [roadmap]
@@ -31,10 +33,10 @@ phase-goal = "Turn the proven Ghost Lobby/TUI/netplay slice into a coherent play
 [component-status]
 core = { status = "live", notes = "Deterministic event-sourced Ghost Lobby, building runtime, grounded network, actors, snapshots, package loading, and replay." }
 net = { status = "live", notes = "Two-seat delay lockstep, pacing, pause, peer loss, digest checks, snapshot resync, and interactive client." }
-ffi = { status = "live", notes = "C ABI drives the real Ghost Lobby simulation with JSON command/event and snapshot parity." }
+ffi = { status = "policy-gap", notes = "The Rust-exported C ABI drives the real Ghost Lobby simulation with JSON command/event and snapshot parity, but the required Zig adapter and Idris2 ABI model are absent; tracked in issue #103." }
 tui = { status = "live", notes = "Playable reference frontend plus headless, replay, and export verification." }
 bevy-frontend = { status = "selected-partial", notes = "Working renderer, HUD, keymap, interpolation, and parity tests; full player-facing shell and visual validation remain." }
-server = { status = "live", notes = "Bandit/Phoenix typed Command/Event relay with role routing, de-duplication, and loopback evidence." }
+burble-relay = { status = "external-live", notes = "The relay lives in sibling metadatastician/burble. IDApTIK pins a known-compatible revision in CI and gates role routing, de-duplication, determinism, peer loss, lockstep, and snapshot resync through its game lane." }
 config = { status = "live", notes = "Nickel schemas, positive exports, semantic Rust round-trip, and negative fixtures." }
 ums-package = { status = "live-v1", notes = "IDApTIK-owned v1 package syntax, loader, semantic validation, deterministic execution, snapshot/restore, and replay." }
 ums-roundtrip = { status = "tested", notes = "Every UMS ADR-0014 clause met as of 2026-07-28. RoundTripResult.accepted exports the loader's parsed view of the authored envelope; UMS diffs it against the profile source and fails on any difference. Deliberately excludes `scenario`, which the compiler copies from this repository's own fixture verbatim -- comparing it would be a tautology." }
@@ -46,7 +48,7 @@ moletaire = { status = "tested-seam", notes = "Deterministic companion module ex
 items = [
   { item = "Bevy is the selected graphical frontend; Fyrox is retired", ref = "ADR-0008" },
   { item = "IDApTIK owns the versioned UMS package boundary", ref = "ADR-0007" },
-  { item = "Elixir is a relay-only session layer for the current vertical slice", ref = "ADR-0005" },
+  { item = "Elixir session life is supplied by the external Burble game lane; IDApTIK owns deterministic gameplay and the client contract", ref = "ADR-0006" },
   { item = "Enaction Engine is the runtime kernel; UMS is the authoring studio; a shipped game runs with neither UMS source nor binaries present", ref = "enaction ADR-0013" },
   { item = "IDApTIK may depend one-way on enaction-* under three stated conditions; never on idaptik-ums or slavia-core", ref = "ADR-0009" },
   { item = "The evidence ledger and VSM supervisor stay in idaptik-core until a three-part extraction trigger fires", ref = "ADR-0010" },
