@@ -6,6 +6,8 @@ integration boundaries.
 - [**Estate status**](ESTATE-STATUS.md) — start here: where IDApTIK sits in the
   four-repository estate, what is enforced rather than written down, and what is open
 - [ESM contract and repository boundaries](esm-contract-and-repo-boundaries.md)
+- [IDApTIK cognitive-model working architecture](idaptik-cognitive-model.adoc)
+- [Observer-relative evidence ledger](evidence-ledger-design.adoc)
 - [UMS package contract ownership](ums-package-contract.md)
 - [Repository architecture](../ARCHITECTURE.md)
 

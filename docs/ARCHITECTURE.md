@@ -1,6 +1,6 @@
 # Architecture
 
-IDApTIK is a polyglot game monorepo. **Rust owns gameplay truth** (an
+IDApTIK is a polyglot game monorepo. **Rust/Crusoe owns gameplay truth** (an
 engine-agnostic, deterministic, event-sourced simulation); **multiplayer
 session relaying lives in burble** (the estate's gaming communication platform,
 estate ruling 2026-08-04); frontends are thin drivers over the same typed
@@ -14,7 +14,7 @@ The proposed cross-repository epistemic state-machine seam is documented in
 
 ```
 .
-├── crates/            # Rust Cargo workspace (edition 2024, AGPL-3.0-or-later)
+├── crates/            # Rust/Crusoe Cargo workspace (edition 2024, AGPL-3.0-or-later)
 │   ├── idaptik-core/  #   engine-agnostic sim: netsim + scenario + Moletaire companion
 │   ├── idaptik-ffi/   #   C ABI surface (JSON in / JSON out) over the core
 │   ├── idaptik-tui/   #   ratatui/crossterm frontend + --headless/--replay/--export verifier
@@ -85,7 +85,7 @@ is **transport-agnostic** and holds no gameplay authority
 ## Build & toolchain
 
 `just` orchestrates `cargo` (Rust), `mix` (Elixir), and `nickel` (config).
-Toolchains are pinned via `mise.toml` and `rust-toolchain.toml`. Key gates:
+Rust/Crusoe toolchains are pinned via `mise.toml` and `rust-toolchain.toml`. Key gates:
 
 - `just test-ghost` — `cargo test` (core/tui/ffi) + `cargo clippy -D warnings` +
   `cargo fmt --check`.

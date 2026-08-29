@@ -161,7 +161,7 @@ points:
 
 Each `load_*` **format-gates on `payload.format` then validates** before the runtime
 trusts the content. The building model is also the ground truth for an
-`idaptik-edit/1` **edit-script contract** (metadatastician/idaptik-ums) whose verbs
+`idaptik-edit/1` **edit-script contract** (metadatastician/universal-modding-studio) whose verbs
 (add/move/remove floors, rooms, portals, circuits, zones) target exactly these ids
 and shapes: *"the ids and shapes here are that contract's ground truth."* There is
 no in-repo `dlc-manifest` or procedural generator — that is UMS-side, and it feeds

@@ -86,7 +86,7 @@
       "required": ["deterministic", "snapshot_format", "required_events"],
       "properties": {
         "deterministic": { "const": true },
-        "snapshot_format": { "const": "idaptik-ghost-lobby-runtime-v2" },
+        "snapshot_format": { "const": "idaptik-ghost-lobby-runtime-v3" },
         "required_events": {
           "type": "array",
           "minItems": 1,

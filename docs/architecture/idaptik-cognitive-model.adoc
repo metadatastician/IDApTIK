@@ -1,0 +1,98 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= IDApTIK cognitive-model working architecture
+:toc:
+
+Status: design hypothesis. This document does not claim a completed shared
+cognitive kernel, evidence reasoner, action verifier or proof.
+
+== Purpose and ownership
+
+IDApTIK is the first executable environment for the estate's cognitive-model
+work. Its current working hypothesis combines affective appraisal, an
+observer-relative epistemic state, relational inference, conative candidate
+selection and an explicit policy/verification gate.
+
+The game owns IDApTIK propositions, actors, scenarios and policy. Host-neutral
+reduction semantics settle in Enaction Engine only after the extraction trigger
+in ADR-0010 is met. Universal Modding Studio authors and validates profiles and
+packages; it does not become runtime semantic authority. Idris2 ABIs own formal
+cross-language contracts, and Zig implements their FFI surfaces.
+
+== Working loop
+
+[source,text]
+----
+world and bodily input
+  -> affective appraisal
+  -> observer-relative epistemic update
+  -> inference and competing hypotheses
+  -> candidate action
+  -> policy and verification
+  -> world transition
+  -> new observation
+----
+
+This is a feedback loop, not a one-way inference pipeline. A verifier veto or
+substitution must become a provenance-bearing event; it must not silently alter
+the selected action.
+
+== Evidence and false hypotheses
+
+An observer must be able to hold a rational but false explanation and later
+revise it without erasing the original trace. State therefore retains explicit
+ignorance, competing explanations, provenance, source reliability, conflict and
+supersession.
+
+The USB/fridge-note and vent/front-door cases are the first deception fixtures.
+They test whether an NPC can make a justified but false attribution, act under
+uncertainty and revise the attribution when new evidence arrives.
+
+Dempster--Shafer-style belief masses are a candidate substrate for questions
+with a declared finite frame. They are not presumed to solve open-ended
+relational inference: miniKanren variables and an enumerated frame have
+different semantics. `evidence-ledger-design.adoc` keeps that boundary open.
+
+All numeric confidence or mass used in deterministic gameplay is fixed-point.
+No reduction may depend on wall-clock timing, hash iteration order, process
+identity or renderer state.
+
+== VSM-shaped supervision
+
+The working Viable System Model analogy is recursive:
+
+* NPCs are operational units.
+* Patrols coordinate and regulate those units.
+* Factions form higher-level recursive systems.
+* A director may forecast player tactics.
+* Policy constrains adaptation and intervention.
+
+This analogy does not authorize a hidden omniscient director. Every
+intervention must be explicit, bounded, observer-appropriate and
+provenance-bearing.
+
+== Runtime and interop boundaries
+
+Gameplay truth remains in deterministic Rust/Crusoe. Any future BEAM-hosted
+native computation uses SNIFs through a WebAssembly sandbox, never a raw NIF.
+Any FFI surface follows the estate chain: Idris2 owns the ABI contract, Zig
+implements the unified hexadeca-compatible FFI, and generated C headers expose
+it to other consumers. These rules do not imply that those future adapters
+already exist.
+
+== Proof status
+
+Proof claims require confirmed checker evidence for the stated module and
+property. An Idris2 module, a typechecking declaration, a generated header, a
+Zig implementation or a workflow scaffold is not by itself a proof. Existing
+confirmed claims are preserved with their scope; missing deciders, extraction
+links, parity checks and other proof obligations remain explicit gaps. The
+assurance of an Idris2-to-Zig seam is bounded by its weaker Zig side.
+
+== Promotion criteria
+
+A cognitive mechanism becomes a shared contract only after executable fixtures
+demonstrate deterministic replay, provenance-complete revision, explicit
+conflict handling, observer-relative information boundaries, bounded resource
+use and explainable policy decisions. Until then it remains an IDApTIK design
+and experiment.

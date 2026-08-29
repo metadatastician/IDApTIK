@@ -52,13 +52,13 @@ Development runs in vehicle-named phases, smallest viable thing first:
 
 The Rust era's stack is being pinned as decisions are made, and each decision is recorded as an ADR under [`docs/adr/`](docs/adr/) rather than asserted here and quietly contradicted later.
 
-- **Gameplay truth:** Rust — an engine-agnostic core, with **Bevy** as the
+- **Gameplay truth:** Rust/Crusoe — an engine-agnostic core, with **Bevy** as the
   selected graphical frontend over it
   ([ADR-0008](docs/adr/0008-select-bevy-and-retire-fyrox.md)).
 - **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
-- **FFI / ABI policy:** **Zig** for the adapter and **Idris2** for ABI
+- **FFI / ABI policy:** **Zig unified hexadeca APIs/FFIs** for the adapter and **Idris2** for ABI
   contracts. The current implementation still exports its C ABI directly from
-  Rust and contains neither Zig nor Idris2 source; remediation is tracked in
+  Rust/Crusoe and contains neither Zig nor Idris2 source; remediation is tracked in
   [#103](https://github.com/metadatastician/IDApTIK/issues/103)
   ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
 - **Config:** **Nickel** (typed configuration).
@@ -113,13 +113,10 @@ temporary artifact to IDApTIK's real package loader, executes a grounded camera
 uplink, snapshots, restores, replays, and fails unless events and final state
 match.
 
-**Status:** that recipe is not yet on any `main` branch. It and the
-`ums-profiles` crate it needs currently exist only on the
-`idaptik-ums-canonical` branch `agent/idaptik-roundtrip`, pending the UMS
-repository consolidation. What *is* gated here is the game side of the
-boundary: `crates/idaptik-core/src/package.rs` loads, validates, runs,
-snapshots, restores and replay-checks a package under IDApTIK's own
-`cargo test`. The cross-repository round trip runs in no CI.
+**Status:** implemented and CI-gated in Universal Modding Studio. The UMS
+profile compiler consumes this repository's `contracts/idaptik/v1`, then the
+real IDApTIK loader executes, snapshots, restores and replay-checks the emitted
+package. UMS remains absent from the shipped game runtime.
 
 The current Enaction evidence covers extracted interpolation parity; IDApTIK
 still uses Bevy's fixed-step accumulator, so no broader timing adoption is
@@ -146,8 +143,8 @@ Contributions come in under the Developer Certificate of Origin (DCO 1.1); sign 
 Envelope-stage vertical slice. The deterministic Ghost Lobby simulation, TUI,
 delay-lockstep netplay, Bevy renderer, and UMS v1 package boundary are
 implemented. IDApTIK's Rust suites, Bevy frontend, Nickel contracts, and the
-Burble-backed two-seat session path are CI-gated; the cross-repository UMS
-round trip is not currently a CI gate. The next milestone is a coherent
+Burble-backed two-seat session path and cross-repository UMS round trip are
+CI-gated. The next milestone is a coherent
 player-facing Bevy shell with first art, real-window validation, and documented
 mechanics.
 

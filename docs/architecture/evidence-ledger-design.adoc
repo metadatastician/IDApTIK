@@ -1,0 +1,214 @@
+// SPDX-License-Identifier: CC-BY-SA-4.0
+// SPDX-FileCopyrightText: 2026 Jonathan D.A. Jewell <j.d.a.jewell@open.ac.uk>
+= Observer-relative evidence ledger
+:toc:
+
+Status: design draft v0.2. The structures and policies below are proposed
+contracts, not a claim of production implementation or proof.
+
+== Purpose and boundary
+
+The ledger represents what one observer can justify from available evidence.
+It preserves ignorance, competing explanations, source provenance, conflict,
+time and revision. It never consults hidden world truth while constructing an
+observer's state.
+
+The ledger is not the world model, a planner or a truth oracle. It supplies
+queries and provenance-bearing changes to the epistemic state. A profile policy
+may use those queries when proposing an action; the ledger does not choose or
+execute the action.
+
+IDApTIK owns its current fixtures and game policy. Host-neutral ledger and
+reduction semantics move to Enaction Engine only under ADR-0010's extraction
+rule. UMS may author and validate a versioned ledger profile but is not a
+runtime dependency or semantic authority.
+
+== Frame of discernment
+
+Each finite-frame ledger declares the hypotheses for one question:
+
+[source,text]
+----
+Frame {
+  frame_id,
+  version,
+  hypotheses: [HypothesisId],
+  open_world: bool,
+  exclusivity: Exclusive | Overlapping,
+  unknown_id: optional HypothesisId
+}
+----
+
+Example route-attribution hypotheses are `front-door`, `ventilation` and
+`unknown`. If a frame is incomplete, mass remains on a set of alternatives or
+on unknown; it is never silently redistributed to named hypotheses.
+
+A frame does not automatically cover an open-ended relational proposition
+language. Evidence outside declared frames and the interaction between
+miniKanren variables and finite focal sets remain open design questions.
+
+== Basic belief assignment
+
+For deterministic replay, mass uses integer units:
+
+[source,text]
+----
+Mass = uint32 in 0..10_000
+
+Bpa {
+  frame_id,
+  focal_sets: [(FocalSet, Mass)],
+  uncommitted_mass: Mass,
+  provenance: [EvidenceId]
+}
+----
+
+A focal element is a sorted, duplicate-free set of hypothesis IDs. The
+invariants are:
+
+. every hypothesis belongs to the declared frame;
+. focal sets are canonicalized before comparison;
+. focal masses plus uncommitted mass equal 10,000;
+. an empty focal set is forbidden in normalized state and retained only as
+  explicit conflict during combination;
+. serialization order is canonical.
+
+`Bel(A)` sums masses wholly contained in `A`. `Pl(A)` sums masses whose focal
+sets intersect `A`, including mass that has not ruled `A` out. A policy retains
+the interval `[Bel(A), Pl(A)]` until it explicitly requests a point decision.
+
+== Evidence items
+
+[source,text]
+----
+Evidence {
+  evidence_id,
+  observer,
+  source,
+  observed_at,
+  received_at,
+  reliability: Mass,
+  freshness: Mass,
+  bpa,
+  observation_kind,
+  supporting_trace_events,
+  expires_at,
+  independence_group,
+  notes
+}
+----
+
+Observation and receipt time are separate so a delayed report cannot appear to
+have been known earlier. `independence_group` prevents double-counting two
+reports derived from the same camera event.
+
+Reliability discounts an evidence item rather than rewriting the observer's
+prior. Discounted mass moves to unknown or uncommitted mass. Reliability comes
+from a named source policy and is never learned silently from the hidden answer.
+
+== Time and revision
+
+Evidence is append-only and the current view is derived. Expiry or decay emits
+a new derived event; it does not delete history. Recommended events are:
+
+* `EvidenceReceived`
+* `EvidenceDiscounted`
+* `EvidenceCombined`
+* `EvidenceConflictDetected`
+* `HypothesisIntervalChanged`
+* `EvidenceExpired`
+* `BeliefRevisionRecorded`
+
+Decay is a named, versioned policy using deterministic integer arithmetic.
+
+== Combination and conflict
+
+Combination policy is part of the versioned ledger profile:
+
+* `IndependentConjunctive`
+* `Cautious`
+* `Disjunctive`
+* `SourcePriority`
+* `RetainConflict`
+
+Highly conflicting evidence is not automatically normalized with Dempster's
+rule. Conflict mass remains observable and produces a diagnostic. Policy may
+discount, separate, escalate or gather more evidence.
+
+Conflict is useful game state: high conflict can justify split coverage or
+corroboration, while low conflict can justify committing resources. The action
+remains a profile-policy decision rather than a ledger result.
+
+== ESM and decision interfaces
+
+[source,text]
+----
+observation
+  -> EvidenceReceived
+  -> ledger query (belief, plausibility, conflict, unknown)
+  -> epistemic-state event
+  -> supervisory proposal
+  -> policy and verification
+  -> candidate action event
+----
+
+The query surface is:
+
+[source,text]
+----
+EvidenceQuery {
+  frame_id,
+  proposition,
+  belief,
+  plausibility,
+  conflict,
+  unknown,
+  supporting_evidence,
+  contrary_evidence
+}
+----
+
+Example thresholds belong to a named profile policy, never to the ledger
+kernel. A policy might preserve front-door coverage at a belief threshold,
+assign an operator to vents at a plausibility threshold, or gather more
+evidence when conflict is high.
+
+== Deterministic encoding and estate seams
+
+Canonical encoding sorts frame IDs, focal-set members and evidence IDs; uses
+fixed-point mass; includes explicit policy and version fields; and never relies
+on map iteration order. Combine, discount, decay and query operations require
+replay, overflow and rounding tests.
+
+Cross-language implementations follow the estate seam policy: Idris2 owns the
+ABI contract, Zig implements the unified hexadeca-compatible FFI, and the C
+header is generated. Any future BEAM-hosted native computation runs as a SNIF
+inside the approved WebAssembly sandbox, never as a raw NIF. Rust components
+are Rust/Crusoe components. These are boundary requirements, not claims that a
+ledger ABI, FFI or SNIF exists today.
+
+Proof claims require confirmed checker evidence for the named property.
+Scaffolding, signatures, types and workflows are recorded as scaffolding until
+they prove and exercise the stated obligation. Gaps remain explicit.
+
+== Conformance fixtures
+
+The first fixtures cover:
+
+. USB interest that rationally but incorrectly raises `wants-usb`;
+. fridge-note evidence that revises the earlier attribution;
+. vent/front-door evidence with mass on both alternatives;
+. two reports derived from one camera event, proving no double-counting;
+. delayed evidence that cannot affect an earlier decision;
+. high-conflict reports that retain conflict;
+. open-world mass that remains unknown;
+. snapshot and replay equivalence;
+. stable tie-breaking and canonical serialization.
+
+== Promotion criteria
+
+The ledger does not become a shared public runtime contract until fixtures
+demonstrate deterministic replay, provenance-complete revision, bounded focal
+growth and memory, explicit conflict handling, observer-relative information
+boundaries and decisions explainable entirely from ledger queries and declared
+policy.
