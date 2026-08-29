@@ -21,21 +21,21 @@ impl<T: SessionTransport> burble_client::TextTransport for TransportAdapter<T> {
         self.0
             .send_text(text)
             .await
-            .map_err(|error| burble_client::Error::Protocol(error.to_string()))
+            .map_err(|error| burble_client::Error::Transport(Box::new(error)))
     }
 
     async fn recv_text(&mut self) -> Result<Option<String>, burble_client::Error> {
         self.0
             .recv_text()
             .await
-            .map_err(|error| burble_client::Error::Protocol(error.to_string()))
+            .map_err(|error| burble_client::Error::Transport(Box::new(error)))
     }
 
     async fn close(&mut self) -> Result<(), burble_client::Error> {
         self.0
             .close()
             .await
-            .map_err(|error| burble_client::Error::Protocol(error.to_string()))
+            .map_err(|error| burble_client::Error::Transport(Box::new(error)))
     }
 }
 

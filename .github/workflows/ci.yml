@@ -108,7 +108,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       # Known-compatible game-session lane plus the post-merge socket fixes.
-      BURBLE_REF: 80307f00dcc51494735fe8f4ba2c64bdd198ac1c
+      BURBLE_REF: ef6756cf1591406d434c5c04c3c018e935836e4c
     steps:
       - name: Checkout
         run: |

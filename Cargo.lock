@@ -2016,8 +2016,8 @@ checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 
 [[package]]
 name = "burble-client"
-version = "1.0.0"
-source = "git+https://github.com/metadatastician/burble?rev=80307f00dcc51494735fe8f4ba2c64bdd198ac1c#80307f00dcc51494735fe8f4ba2c64bdd198ac1c"
+version = "2.0.0"
+source = "git+https://github.com/metadatastician/burble?rev=ef6756cf1591406d434c5c04c3c018e935836e4c#ef6756cf1591406d434c5c04c3c018e935836e4c"
 dependencies = [
  "futures-util",
  "serde_json",
