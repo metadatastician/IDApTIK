@@ -10,6 +10,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BURBLE_DIR="${IDAPTIK_BURBLE_DIR:-$REPO_DIR/../burble}"
 RUNTIME_DOCTOR="$REPO_DIR/scripts/runtime-doctor.sh"
 RUN_CONFIG="$REPO_DIR/fixtures/session_relay/versus_script.json"
 CLIENT_PLATFORM="${IDAPTIK_CLIENT_PLATFORM:-linux}"
@@ -66,6 +67,16 @@ need() {
   command -v "$1" >/dev/null 2>&1 || die "$1 is required $2 — $3"
 }
 
+burble_mix() {
+  # Resolve the pinned BEAM from IDApTIK's trusted mise config while executing
+  # Mix inside Burble's project directory.
+  # $1/$@ are intentionally expanded by the child bash.
+  # shellcheck disable=SC2016
+  "$MISE_BIN" exec -C "$REPO_DIR" -- bash -c \
+    'cd "$1" && shift && exec "$@"' _ "$BURBLE_DIR/server" \
+    env MIX_ENV=test PHX_SERVER=true IDAPTIK_PORT="$PORT" mix "$@"
+}
+
 preflight_common() {
   local profile="$1" target="${2:-}"
   if [ "${IDAPTIK_PREFLIGHT_DONE:-0}" != "1" ]; then
@@ -89,6 +100,8 @@ preflight_common() {
 
 preflight_host() {
   preflight_common host
+  [ -f "$BURBLE_DIR/server/mix.exs" ] || \
+    die "Burble is required at $BURBLE_DIR — clone metadatastician/burble beside IDApTIK or set IDAPTIK_BURBLE_DIR"
   (cd "$REPO_DIR" && "$MISE_BIN" exec -- mix --version >/dev/null) || \
     die "the pinned Elixir/OTP toolchain is unavailable — run 'mise install'"
   need curl "to poll relay readiness (host only)" "install curl from your package manager"
@@ -129,10 +142,14 @@ start_relay() {
   mkdir -p "$LOG_DIR"
   say "starting the relay on :$PORT (log: $LOG_FILE)…"
   progress STEP "Starting the Phoenix/Bandit relay on port $PORT"
-  (cd "$REPO_DIR/server" && "$MISE_BIN" exec -- mix deps.get >/dev/null)
-  # IDAPTIK_BIND=all: the dev endpoint binds loopback-only by default, which
-  # would make every remote join fail — hosting is the whole point here.
-  (cd "$REPO_DIR/server" && IDAPTIK_BIND=all IDAPTIK_PORT="$PORT" exec "$MISE_BIN" exec -- mix phx.server >>"$LOG_FILE" 2>&1) &
+  # Burble's test environment is its offline-capable local profile. Set the
+  # launcher-selected bind/port before delegating to Phoenix's normal server
+  # task, preserving Burble's application startup order.
+  burble_mix deps.get >/dev/null
+  burble_mix compile >/dev/null
+  burble_mix run --no-start -e \
+    'port = System.fetch_env!("IDAPTIK_PORT") |> String.to_integer(); endpoint = Application.get_env(:burble, BurbleWeb.Endpoint, []); Application.put_env(:burble, BurbleWeb.Endpoint, Keyword.merge(endpoint, server: true, http: [ip: {0, 0, 0, 0}, port: port]), persistent: true); Mix.Tasks.Phx.Server.run([])' \
+    >>"$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
   local waited=0
   until relay_up; do
@@ -212,8 +229,8 @@ seat_url() {
   # Accept a bare host, host:port, or a full ws:// url.
   case "$1" in
     ws://*|wss://*) printf '%s' "$1" ;;
-    *:*)            printf 'ws://%s/socket/websocket' "$1" ;;
-    *)              printf 'ws://%s:%s/socket/websocket' "$1" "$PORT" ;;
+    *:*)            printf 'ws://%s/voice/websocket' "$1" ;;
+    *)              printf 'ws://%s:%s/voice/websocket' "$1" "$PORT" ;;
   esac
 }
 

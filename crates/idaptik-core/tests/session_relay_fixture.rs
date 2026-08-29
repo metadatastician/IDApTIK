@@ -1,7 +1,8 @@
 //! The session-relay wire fixture round-trips through the Rust types unchanged.
 //!
 //! `fixtures/session_relay/` (repo root) is shared with the burble relay's
-//! channel tests (`server/test/burble_web/channels/game_channel_test.exs`):
+//! channel tests in the sibling Burble repository
+//! (`server/test/burble_web/channels/game_channel_test.exs` there):
 //! the Elixir side (in burble) proves the relay passes every fixture value through
 //! verbatim; this side proves each of those values *is* a `Command` / `Event`
 //! — it deserializes into the Rust type and re-serializes to the identical

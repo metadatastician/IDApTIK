@@ -14,6 +14,8 @@ idaptik-core = { workspace = true }
 idaptik-net = { workspace = true }
 idaptik-tui = { workspace = true }
 bevy = { workspace = true }
+# Keep native Wayland while avoiding the font parser used only for CSD title text.
+bevy_winit = { workspace = true }
 tokio = { workspace = true }
 clap = { workspace = true }
 serde_json = { workspace = true }

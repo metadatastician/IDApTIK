@@ -14,9 +14,9 @@ lineage = "Attempt four. #1 IDApTIK (TypeScript/Excalibur) -> #2 IDApixiTIK (Aff
 
 [architecture]
 truth = "crates/idaptik-core — engine-agnostic gameplay truth (network sim + scenario); no rendering."
-ffi = "crates/idaptik-ffi — C-ABI surface for Zig/Idris2 consumers (ADR-0001)."
+ffi = "crates/idaptik-ffi — current Rust-exported C ABI; required Zig adapter and Idris2 model are missing and tracked in issue #103 (ADR-0001)."
 frontends = ["crates/idaptik-tui (ratatui/crossterm, verifier)", "crates/idaptik-bevy (Bevy)", "crates/idaptik-fyrox (Fyrox)"]
-server = "server/ — Elixir/OTP session relay (Bandit + Phoenix Channels)."
+server = "external metadatastician/burble — Elixir/OTP game-session relay (Bandit + Phoenix Channels), pinned and live-gated by IDApTIK."
 config = "config/ — Nickel typed, schema-checked game/level/network config."
 
 [related-projects]
@@ -27,8 +27,8 @@ projects = [
   { name = "nickel", relationship = "config-language", notes = "Typed configuration for game/level/network; schemas under config/." },
   { name = "gossamer", relationship = "host", notes = "Host window for the two-player windowed slice (ADR-0006)." },
   { name = "burble", relationship = "transport", notes = "Transport for the gossamer-hosted two-player slice (ADR-0006)." },
-  { name = "zig", relationship = "ffi", notes = "C ABI + cross-compilation for the FFI edge (ADR-0001)." },
-  { name = "idris2", relationship = "abi-model", notes = "Models the ABI contracts at the FFI edge (ADR-0001)." },
+  { name = "zig", relationship = "ffi-policy", notes = "Required adapter/cross-compilation language; not yet implemented (#103, ADR-0001)." },
+  { name = "idris2", relationship = "abi-model-policy", notes = "Required ABI contract/proof language; not yet implemented (#103, ADR-0001)." },
 ]
 
 [boundaries]

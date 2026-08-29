@@ -86,7 +86,7 @@ relaying now happens through burble's `game:<session_id>` channel (fabric slice
   and present in burble's `Burble.Games.Idaptik` profile from inception).
 - The client-side transport (`crates/idaptik-net`) now joins `game:<id>` with
   `{"game": "idaptik", "role": "infiltrator" | "hacker"}` params and connects to
-  burble's `/voice/socket/websocket` endpoint as a guest.
+  burble's `/voice/websocket` endpoint as a guest.
 - burble uses Bandit as its HTTP/WebSocket adapter and Phoenix Channels for
   messaging — the same stack chosen by this ADR; this amendment records the
   **deployment** change, not a transport change.

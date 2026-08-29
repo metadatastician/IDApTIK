@@ -27,14 +27,20 @@ cd "$(dirname "$0")/.."
 SCRIPT="${1:-fixtures/session_relay/capture_script.json}"
 LIVE_SCRIPT="${2:-fixtures/session_relay/live_script.json}"
 SUPERVISED_SCRIPT="${3:-fixtures/session_relay/supervised_script.json}"
-PORT="${IDAPTIK_LOOPBACK_PORT:-4013}"
-URL="ws://127.0.0.1:${PORT}/voice/socket/websocket?guest=true&display_name=loopback"
+# Burble's test environment is deliberately offline-capable (no VeriSimDB)
+# and binds its isolated endpoint on 4002. The development environment is not
+# suitable for this gate: it requires a live VeriSimDB before the endpoint can
+# start. Hosted runners are isolated, so the fixed test port cannot collide
+# across jobs.
+PORT=4002
+URL="ws://127.0.0.1:${PORT}/voice/websocket?guest=true&display_name=loopback"
+BURBLE_DIR="${IDAPTIK_BURBLE_DIR:-../burble}"
 
 command -v mix >/dev/null 2>&1 || { echo "FAIL: mix (Elixir) is required — run 'just setup'"; exit 1; }
 command -v cargo >/dev/null 2>&1 || { echo "FAIL: cargo (Rust) is required"; exit 1; }
 [ -f "$SCRIPT" ] || { echo "FAIL: script not found: $SCRIPT"; exit 1; }
 [ -f "$LIVE_SCRIPT" ] || { echo "FAIL: live script not found: $LIVE_SCRIPT"; exit 1; }
-[ -f "../burble/server/mix.exs" ] || { echo "FAIL: burble not found at ../burble — clone it first"; exit 1; }
+[ -f "$BURBLE_DIR/server/mix.exs" ] || { echo "FAIL: burble not found at $BURBLE_DIR — clone it first"; exit 1; }
 
 echo "== build (seat binaries + reference runner)"
 cargo build -q -p idaptik-net -p idaptik-tui
@@ -43,8 +49,11 @@ NETPLAY=target/debug/idaptik-netplay
 TUI=target/debug/idaptik-tui
 
 echo "== burble server (throwaway, port ${PORT})"
-(cd ../burble/server && mix deps.get >/dev/null)
-(cd ../burble/server && PORT="$PORT" exec mix phx.server >/tmp/idaptik_loopback_relay.log 2>&1) &
+# Compile before starting the readiness clock. A cold hosted runner can spend
+# more than a minute compiling Burble's dependencies; counting that as server
+# startup previously killed a healthy first build before it could bind.
+(cd "$BURBLE_DIR/server" && env MIX_ENV=test mix deps.get && env MIX_ENV=test mix compile)
+(cd "$BURBLE_DIR/server" && MIX_ENV=test PHX_SERVER=true exec mix phx.server >/tmp/idaptik_loopback_relay.log 2>&1) &
 RELAY_PID=$!
 cleanup() {
     # mix execs the BEAM in the same process thanks to `exec`; kill the tree

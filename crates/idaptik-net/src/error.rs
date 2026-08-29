@@ -33,3 +33,19 @@ impl fmt::Display for NetError {
 }
 
 impl std::error::Error for NetError {}
+
+impl From<burble_client::Error> for NetError {
+    fn from(error: burble_client::Error) -> Self {
+        match error {
+            burble_client::Error::Url(error) => Self::Transport(error.to_string()),
+            burble_client::Error::WebSocket(error) => Self::Transport(error.to_string()),
+            burble_client::Error::Json(error) => Self::Protocol(error.to_string()),
+            burble_client::Error::Protocol(message) => Self::Protocol(message),
+            burble_client::Error::Rejected { status, response } => {
+                Self::Session(format!("push rejected ({status}): {response}"))
+            }
+            burble_client::Error::Closed => Self::Closed,
+            burble_client::Error::Timeout(operation) => Self::Timeout(operation),
+        }
+    }
+}

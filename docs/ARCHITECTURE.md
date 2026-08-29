@@ -76,9 +76,10 @@ stream. The core never depends on them (ADR-0003 and ADR-0008).
 Multiplayer session relaying lives in the **burble** repository
 (`metadatastician/burble/server/lib/burble_web/channels/game_channel.ex`),
 which is the estate's designated gaming communication platform (estate ruling
-2026-08-04). The `crates/idaptik-net` crate carries the Phoenix Channels client
-that connects to burble's `game:<id>` channels over `/voice/socket/websocket`
-(ADR-0006). The relay is **transport-agnostic** and holds no gameplay authority
+2026-08-04). The `crates/idaptik-net` crate adapts Burble's pinned
+`burble-client` Phoenix implementation to IDApTIK's transport/error seams and
+connects to `game:<id>` channels over `/voice/websocket` (ADR-0006). The relay
+is **transport-agnostic** and holds no gameplay authority
 — it forwards; the core (run on each client) decides (ADR-0005).
 
 ## Build & toolchain

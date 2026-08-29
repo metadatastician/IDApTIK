@@ -17,7 +17,7 @@ pub struct PlainWebSocketTransport {
 }
 
 impl PlainWebSocketTransport {
-    /// Connect to a WebSocket URL (e.g. `ws://127.0.0.1:4000/socket/websocket`).
+    /// Connect to a WebSocket URL (e.g. `ws://127.0.0.1:4000/voice/websocket`).
     /// The Phoenix `vsn=2.0.0` query parameter is appended if absent, so callers
     /// pass the endpoint and the protocol layer stays in one place.
     pub async fn connect(url: &str) -> Result<Self, NetError> {

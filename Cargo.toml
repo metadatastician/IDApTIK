@@ -21,8 +21,8 @@ authors = ["IDApTIK contributors"]
 repository = "https://github.com/metadatastician/IDApTIK"
 
 [workspace.dependencies]
-idaptik-core = { path = "crates/idaptik-core" }
-idaptik-tui = { path = "crates/idaptik-tui" }
+idaptik-core = { path = "crates/idaptik-core", version = "0.1.0" }
+idaptik-tui = { path = "crates/idaptik-tui", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 # `float_roundtrip` guarantees bit-exact f64 JSON round-trips (snapshots/exports).
 serde_json = { version = "1", features = ["float_roundtrip"] }
@@ -31,8 +31,13 @@ ratatui = "0.30"
 crossterm = "0.29"
 clap = { version = "4", features = ["derive"] }
 bevy = "0.19"
+bevy_winit = { version = "0.19.1", default-features = false, features = ["wayland-csd-adwaita-notitle"] }
 # The client-side session transport (ADR-0006 §2): async runtime + WebSocket.
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
-idaptik-net = { path = "crates/idaptik-net" }
+idaptik-net = { path = "crates/idaptik-net", version = "0.1.0" }
+burble-client = { git = "https://github.com/metadatastician/burble", rev = "80307f00dcc51494735fe8f4ba2c64bdd198ac1c", version = "1.0.0" }
 tokio-tungstenite = "0.30"
 futures-util = "0.3"
+
+[patch.crates-io]
+bevy_winit = { path = "vendor/bevy_winit" }

@@ -18,10 +18,11 @@ Read `AGENTS.md`, `README.md`, `GOVERNANCE.md`,
 - `crates/idaptik-ffi` — C-ABI surface for non-Rust consumers.
 - `crates/idaptik-tui` — playable reference frontend and headless verifier.
 - `crates/idaptik-bevy` — selected graphical frontend (ADR-0008).
-- `server/` — Bandit + Phoenix Channels relay.
+- sibling `../burble/server/` — Bandit + Phoenix Channels relay; override with
+  `IDAPTIK_BURBLE_DIR` when the checkout lives elsewhere.
 - `config/` — typed Nickel configuration and negative fixtures.
 - `contracts/idaptik/v1/` — game-owned UMS package contract.
-- `docs/adr/` — ADR-0001 through ADR-0008.
+- `docs/adr/` — architecture decision records.
 - `.machine_readable/descriptiles/` — project state and supporting metadata.
 - `.machine_readable/contractiles/` — machine-readable operating contracts.
 

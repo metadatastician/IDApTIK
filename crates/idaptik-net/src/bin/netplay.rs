@@ -33,7 +33,7 @@ use std::time::Duration;
 )]
 struct Cli {
     /// The burble server's Phoenix socket endpoint.
-    #[arg(long, default_value = "ws://127.0.0.1:4000/socket/websocket")]
+    #[arg(long, default_value = "ws://127.0.0.1:4000/voice/websocket")]
     url: String,
     /// Session id: both seats must pass the same one.
     #[arg(long)]

@@ -56,7 +56,11 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
   selected graphical frontend over it
   ([ADR-0008](docs/adr/0008-select-bevy-and-retire-fyrox.md)).
 - **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
-- **FFI / ABI edges:** **Zig** (C ABI, cross-compilation) and **Idris2** (modelling the ABI contracts) ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
+- **FFI / ABI policy:** **Zig** for the adapter and **Idris2** for ABI
+  contracts. The current implementation still exports its C ABI directly from
+  Rust and contains neither Zig nor Idris2 source; remediation is tracked in
+  [#103](https://github.com/metadatastician/IDApTIK/issues/103)
+  ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
 - **Config:** **Nickel** (typed configuration).
 - **Toolchains:** pinned in `mise.toml` + `rust-toolchain.toml`; `just` runs tasks. Provision with `just setup` (or `just bootstrap` for a fast, prebuilt-only bring-up), and check with `just doctor`.
 
@@ -80,7 +84,7 @@ their own build/reachability checklist and green joining result.
 
 ```
 crates/idaptik-core     engine-agnostic gameplay truth — the network sim + Ghost Lobby scenario, no rendering
-crates/idaptik-ffi      C-ABI surface for Zig/Idris2 consumers (ADR-0001)
+crates/idaptik-ffi      Current Rust-exported C ABI; Zig/Idris2 policy gap (#103)
 crates/idaptik-tui      ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)
 crates/idaptik-bevy     selected Bevy rendering frontend (ADR-0008)
 crates/idaptik-net      Phoenix Channels client over burble game-session fabric (ADR-0006)
@@ -88,7 +92,11 @@ config/                    Nickel — typed, schema-checked game/network config
 docs/adr/                  architecture decision records
 ```
 
-`just` runs the common tasks (`just doctor`, `just test`, `just run-bevy`, `just server`, `just config-check`); toolchains are pinned in `mise.toml` + `rust-toolchain.toml`.
+`just` runs the common tasks (`just doctor`, `just test`, `just run-bevy`,
+`just loopback-check`, `just config-check`); toolchains are pinned in
+`mise.toml` + `rust-toolchain.toml`. The loopback gate starts a throwaway
+server from the sibling `metadatastician/burble` checkout; IDApTIK no longer
+contains its own relay server.
 
 ## UMS-authored package proof
 
@@ -136,8 +144,10 @@ Contributions come in under the Developer Certificate of Origin (DCO 1.1); sign 
 ## Status
 
 Envelope-stage vertical slice. The deterministic Ghost Lobby simulation, TUI,
-typed session relay, delay-lockstep netplay, Bevy renderer, and UMS v1 package
-boundary are implemented and CI-gated. The next milestone is a coherent
+delay-lockstep netplay, Bevy renderer, and UMS v1 package boundary are
+implemented. IDApTIK's Rust suites, Bevy frontend, Nickel contracts, and the
+Burble-backed two-seat session path are CI-gated; the cross-repository UMS
+round trip is not currently a CI gate. The next milestone is a coherent
 player-facing Bevy shell with first art, real-window validation, and documented
 mechanics.
 

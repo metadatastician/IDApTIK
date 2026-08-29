@@ -22,7 +22,7 @@ already real:
 |---|---|
 | Deterministic event-sourced sim (core), TUI client, headless/replay | **[DONE]** — the TUI is a full playable interface |
 | **Multiplayer**: seat split, relay (Elixir/Phoenix), live delay-lockstep netplay with pause + drop/rejoin resync | **[DONE]** — PR #34 + PR #37; byte-identical to the headless reference under CI gates |
-| Multiplayer remaining: gossamer window hosting, burble voice transport | **[GATED]** — ADR-0006 §5 unblock conditions unmet upstream (no wasm surface in gossamer; burble has no Rust client) |
+| Multiplayer remaining: gossamer window hosting, burble voice transport | **[PARTIALLY UNBLOCKED 2026-08-28]** — Burble's Rust client is now adopted; the gossamer hosting surface and distinct voice/data transport remain gated (ADR-0006) |
 | Ghost Lobby scenario (the "odd level or two") | **[DONE]** — our vertical-slice testbed |
 | Bevy renderer crate | **[SELECTED, PARTIAL]** — real and tested, but not a player-facing GUI yet; the Fyrox stub was retired by ADR-0008 |
 | Nickel config schema + scenario fixtures | **[DONE]** |

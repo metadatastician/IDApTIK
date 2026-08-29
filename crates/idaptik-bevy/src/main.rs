@@ -49,7 +49,7 @@ struct Cli {
     #[arg(long, value_name = "NAME", default_value = "ghost-lobby")]
     session: String,
 
-    /// Relay URL (default: ws://127.0.0.1:1984/socket/websocket, or use IDAPTIK_PORT)
+    /// Relay URL (default: ws://127.0.0.1:1984/voice/websocket, or use IDAPTIK_PORT)
     #[arg(long, value_name = "URL")]
     url: Option<String>,
 
@@ -115,7 +115,7 @@ fn make_netplay_config(cli: &Cli) -> idaptik_bevy::netplay::NetplayConfig {
     use idaptik_bevy::netplay::NetplayMode;
 
     let port = std::env::var("IDAPTIK_PORT").unwrap_or_else(|_| "1984".into());
-    let default_url = format!("ws://127.0.0.1:{}/socket/websocket", port);
+    let default_url = format!("ws://127.0.0.1:{}/voice/websocket", port);
 
     idaptik_bevy::netplay::NetplayConfig {
         mode: if cli.host {

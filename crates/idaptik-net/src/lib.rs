@@ -6,12 +6,11 @@
 //! - [`transport::SessionTransport`] — a reliable, ordered, bidirectional text
 //!   message pipe. Nothing Phoenix-specific, nothing burble-specific.
 //! - [`ws::PlainWebSocketTransport`] — `tokio-tungstenite` over TCP. Per
-//!   ADR-0006 this is "the test transport and the fallback transport, forever";
-//!   a `BurbleTransport` slots in beside it when burble ships an embeddable
-//!   client (ADR-0006 §5 unblock condition — unmet as of 2026-07-21).
-//! - [`phoenix::PhoenixClient`] — the Phoenix Channels wire protocol (V2 JSON
-//!   serializer: join/push/reply/heartbeat), implemented once, over any
-//!   `SessionTransport`.
+//!   ADR-0006 this remains the test and fallback transport.
+//! - [`phoenix::PhoenixClient`] — an IDApTIK error/transport adapter around the
+//!   canonical `burble-client` Phoenix implementation. Protocol framing,
+//!   reply buffering, topic filtering, and heartbeats now live at the Burble
+//!   boundary instead of being duplicated here.
 //! - [`envelope`] — the relay envelope around the typed `Command` JSON: `seq`
 //!   (relay de-duplication, ADR-0005) and `at` (lockstep tick scheduling —
 //!   authored and consumed by clients, invisible to the relay, which strips
