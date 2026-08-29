@@ -1,6 +1,6 @@
 # Repository instructions
 
-IDApTIK is an asymmetric two-player infiltration game: Rust owns gameplay
+IDApTIK is an asymmetric two-player infiltration game: Rust/Crusoe owns gameplay
 truth, Elixir/OTP owns multiplayer session life. It is a member repository of
 The Metadatastician estate and adopts that estate's governance profile via
 `docs/PROJECT-GOVERNANCE-BINDING.adoc`.
@@ -27,7 +27,7 @@ Do not edit generated files directly; none are currently declared. Do not
 change licences, upstream coined names, or evidence-status labels (in
 `docs/PROJECT-ASSURANCE-PROFILE.adoc`) as a side effect of an unrelated change.
 
-## The stack is Rust and Elixir — attempts 1–3 are dead
+## The stack is Rust/Crusoe and Elixir — attempts 1–3 are dead
 
 `README.md` documents four incarnations. Agents routinely read that lineage
 table as current and propose work against a codebase that no longer exists:
@@ -37,7 +37,7 @@ table as current and propose work against a codebase that no longer exists:
 | 1 | IDApTIK | TypeScript / Excalibur | dead |
 | 2 | IDApixiTIK | AffineScript / PixiJS | dead |
 | 3 | idaptik | AffineScript / PixiJS | dead |
-| 4 | **IDApTIK** | **Rust / Elixir** | **live — this repo** |
+| 4 | **IDApTIK** | **Rust/Crusoe / Elixir** | **live — this repo** |
 
 There is no JavaScript runtime here: no browser, no Canvas, no
 `requestAnimationFrame`, no npm, no PixiJS, no Excalibur. A proposal written
@@ -59,9 +59,10 @@ workflow tooling.
 
 Two further confusions worth pre-empting:
 
-- **miniKanren is not in this repository.** It lives in
-  `metadatastician/idaptik-ums` (the Unified Mission System, the level-design
-  tool) and it is Python.
+- **miniKanren is not in this repository.** Its Rust implementation lives in
+  `metadatastician/universal-modding-studio` (UMS, the Universal Modding
+  Studio). IDApTIK owns game truth and the package contract; UMS owns the
+  authoring and solving surface.
 - **AffineScript is not the current language.** It is a separate language of the
   maintainer's, used in dead attempts 2 and 3 and a possible future target. It
   is not what this repo is written in.
@@ -81,7 +82,7 @@ Two further confusions worth pre-empting:
 - **Netplay.** `crates/idaptik-net` holds a sans-IO delay-lockstep core behind a
   two-seat byte-identical loopback gate.
 
-There is no garbage collector — this is Rust. "Avoid GC pauses" is not a design
+There is no garbage collector — this is Rust/Crusoe. "Avoid GC pauses" is not a design
 goal here; it is free. Bevy is the selected graphical frontend (ADR-0008).
 Fyrox was retired because its evaluation crate remained a bring-up stub while
 Bevy acquired the renderer, parity tests and hosted-client design.

@@ -42,7 +42,7 @@
 //! live here, mirroring [`crate::scenario::actor::load_actor_pack`].
 //!
 //! The UMS side has additionally declared an `idaptik-edit/1` edit-script
-//! contract (metadatastician/idaptik-ums PR #2): its verbs (add/move/remove
+//! contract (metadatastician/universal-modding-studio PR #2): its verbs (add/move/remove
 //! floors, rooms, portals, circuits, zones) target exactly this building
 //! model, so the ids and shapes here are that contract's ground truth.
 

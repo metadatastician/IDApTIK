@@ -99,7 +99,8 @@ char *idap_ghost_lobby_tick_json(struct GhostLobbyHandle *ptr, const char *comma
 
 /**
  * Serialise a full, restorable `RuntimeSnapshot` of the run at the current
- * tick (format tag `idaptik-ghost-lobby-runtime-v2`) as an owned JSON string.
+ * tick (format tag `idaptik_core::scenario::snapshot::SNAPSHOT_FORMAT`) as an
+ * owned JSON string.
  * Free it with [`idap_string_free`]. Returns an `{"error":"..."}` object on a
  * recoverable failure; null only when `ptr` is null or allocation fails.
  *

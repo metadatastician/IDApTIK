@@ -5,7 +5,7 @@
   "game_id": "idaptik",
   "profile_id": "idaptik",
   "scenario_format": "idaptik-ghost-lobby-v2",
-  "snapshot_format": "idaptik-ghost-lobby-runtime-v2",
+  "snapshot_format": "idaptik-ghost-lobby-runtime-v3",
   "schema": "package.schema.json",
   "authoritative_fixture": "fixtures/ghost-lobby-scenario.json",
   "semantic_validation_ids": [
