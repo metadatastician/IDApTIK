@@ -12,6 +12,12 @@ default:
 
 # --- Environment ---------------------------------------------------------------
 
+# On a machine without `just` yet, run `./install.sh` directly. Flags pass
+# through, e.g. `just install --no-build` or `just install --full`.
+# One-shot fresh-clone install (Debian/Ubuntu/WSL2): rustup, Rust, mise tools, Bevy libs (sudo), build, doctor.
+install *ARGS:
+    bash install.sh {{ARGS}}
+
 # Install the pinned toolchains (mise) + Rust targets. Erlang/Elixir build from
 # source on first run and take a while; subsequent runs are cached.
 setup:
@@ -34,6 +40,13 @@ secret-scan:
 bevy-linux-deps:
     sudo apt-get update
     sudo apt-get install -y pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+# WSL2 fallback client, used by launcher.sh when WSLg Copy Mode is broken: the
+# Windows Rust target plus the MinGW cross-linker (Debian/Ubuntu).
+windows-client-deps:
+    rustup target add x86_64-pc-windows-gnu
+    sudo apt-get update
+    sudo apt-get install -y gcc-mingw-w64-x86-64
 
 # Fast bootstrap for ephemeral/web sessions: mise + prebuilt tools only
 # (skips the slow Erlang/Elixir source builds). Called by the SessionStart hook.

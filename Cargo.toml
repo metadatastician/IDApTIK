@@ -39,5 +39,11 @@ burble-client = { git = "https://github.com/metadatastician/burble", rev = "ef67
 tokio-tungstenite = "0.30"
 futures-util = "0.3"
 
+# Debug builds of the Bevy dependency tree carry gigabytes of DWARF; linking that
+# into idaptik-bevy thrashes a ~4 GiB WSL2 VM for hours without finishing. Keep
+# full debug info for IDApTIK's own crates, drop it for third-party ones.
+[profile.dev.package."*"]
+debug = false
+
 [patch.crates-io]
 bevy_winit = { path = "vendor/bevy_winit" }
