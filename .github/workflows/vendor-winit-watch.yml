@@ -1,0 +1,43 @@
+# Watch upstream bevy_winit releases for the retirement condition of the
+# vendored feature patch (issue #105). Runs weekly and on demand; the check
+# fails — with removal steps — once a published release exposes independently
+# selectable Wayland CSD features, so the vendor patch cannot silently
+# outlive its welcome.
+#
+# No third-party actions are used, so this workflow has no actions.lock entry.
+
+name: vendor-winit-watch
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watch:
+    name: watch (bevy_winit retirement condition)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Check published bevy_winit releases for the retirement condition
+        run: bash scripts/vendor_bevy_winit_check.sh watch
+      - name: Record the required retirement steps
+        if: failure()
+        run: |
+          {
+            echo "## bevy_winit vendor patch: retirement condition met"
+            echo
+            echo "A published bevy_winit release now exposes independently selectable"
+            echo "Wayland CSD features. Remove the vendor patch per issue #105:"
+            echo "drop \`[patch.crates-io]\` and \`vendor/bevy_winit\`, select the upstream"
+            echo "feature in \`Cargo.toml\`, rerun \`just vendor-winit-check\` and the Bevy CI jobs."
+          } >> "$GITHUB_STEP_SUMMARY"

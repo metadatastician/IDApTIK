@@ -6,6 +6,11 @@
 # launcher and has no lifecycle/UI aliases: players use ./launcher.sh only.
 # It owns the Phoenix relay process, release build, host/join seat execution,
 # readiness events, and peer-address discovery behind the canonical launcher.
+#
+# Environment: IDAPTIK_PORT (relay port, default 4000), IDAPTIK_BURBLE_DIR
+# (Burble checkout, default sibling ../burble), IDAPTIK_CLIENT_PLATFORM
+# (linux|windows), IDAPTIK_RELAY_STARTUP_TIMEOUT (relay readiness wait in
+# seconds, default 60; primarily a fixture knob).
 
 set -euo pipefail
 
@@ -147,14 +152,24 @@ start_relay() {
   # task, preserving Burble's application startup order.
   burble_mix deps.get >/dev/null
   burble_mix compile >/dev/null
-  burble_mix run --no-start -e \
-    'port = System.fetch_env!("IDAPTIK_PORT") |> String.to_integer(); endpoint = Application.get_env(:burble, BurbleWeb.Endpoint, []); Application.put_env(:burble, BurbleWeb.Endpoint, Keyword.merge(endpoint, server: true, http: [ip: {0, 0, 0, 0}, port: port]), persistent: true); Mix.Tasks.Phx.Server.run([])' \
+  # Backgrounded as an *exec chain* so $! is the relay process itself. A
+  # backgrounded function would leave $! pointing at a wrapper subshell, and
+  # stop_relay's kill/pkill -P pair can then orphan the real relay process
+  # (found by tests/launcher_fixture_test.sh).
+  ( exec "$MISE_BIN" exec -C "$REPO_DIR" -- bash -c \
+      'cd "$1" && shift && exec "$@"' _ "$BURBLE_DIR/server" \
+      env MIX_ENV=test PHX_SERVER=true IDAPTIK_PORT="$PORT" mix run --no-start -e \
+      'port = System.fetch_env!("IDAPTIK_PORT") |> String.to_integer(); endpoint = Application.get_env(:burble, BurbleWeb.Endpoint, []); Application.put_env(:burble, BurbleWeb.Endpoint, Keyword.merge(endpoint, server: true, http: [ip: {0, 0, 0, 0}, port: port]), persistent: true); Mix.Tasks.Phx.Server.run([])' ) \
     >>"$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
+  # Seconds to wait for the relay to answer before diagnosing (default 60).
+  # Also a fixture knob: tests/launcher_fixture_test.sh shrinks it so the
+  # never-answered diagnosis is observable without a minute of wall time.
+  local relay_timeout="${IDAPTIK_RELAY_STARTUP_TIMEOUT:-60}"
   local waited=0
   until relay_up; do
     waited=$((waited + 1))
-    [ "$waited" -ge 60 ] && { tail -20 "$LOG_FILE" >&2 || true; die "relay never answered on :$PORT (see $LOG_FILE)"; }
+    [ "$waited" -ge "$relay_timeout" ] && { tail -20 "$LOG_FILE" >&2 || true; die "relay never answered on :$PORT (see $LOG_FILE)"; }
     kill -0 "$(cat "$PID_FILE")" 2>/dev/null || { tail -20 "$LOG_FILE" >&2 || true; die "relay died during startup (see $LOG_FILE)"; }
     sleep 1
   done

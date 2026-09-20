@@ -6,6 +6,8 @@
 #                                 validator AND every bad_*.ncl fixture is rejected
 #   Bevy frontend             -> selected renderer tests + warnings-as-errors Clippy
 #   session loopback          -> relay tests + two-seat determinism/resync
+#   fixture suites            -> shell fixtures (doctor, launcher, vendor gate)
+#   must-check                -> Mustfile physical-state probes
 #
 # The Rust toolchain (channel + clippy/rustfmt/rust-src + wasm32 target) is pinned
 # by rust-toolchain.toml, which rustup installs automatically on first use.
@@ -27,6 +29,85 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Shell fixture suites + Mustfile probes. These need nothing but the checkout
+  # and (for the rust-formatted probe) the pinned Rust toolchain, so they run
+  # before anything slow.
+  fixtures-and-must:
+    name: fixtures-and-must (shell suites + Mustfile probes)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Shell fixture suites (doctor, launcher, vendor gate)
+        run: |
+          bash tests/runtime_doctor_test.sh
+          bash tests/launcher_fixture_test.sh
+          bash tests/vendor_winit_check_test.sh
+      - name: Mustfile physical-state probes
+        run: bash scripts/must_check.sh
+
+# Idris2 ABI model gate (issue #103): bootstrap Idris 2 0.8.0 with a source
+# built Chez (no system deps beyond libc), then run the model gate.
+#
+# Deliberately no actions/cache (and no new `uses:` entries): the estate
+# manages actions through .github/workflows/actions.lock, and the toolchain
+# build is deterministic. Cost: roughly 20-25 minutes on a standard runner.
+  abi-model:
+    name: abi-model (Idris2 gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Bootstrap Chez + Idris2 (recipe: crates/idaptik-ffi/abi/README.md)
+        run: |
+          mkdir -p /tmp/idris-bootstrap && cd /tmp/idris-bootstrap
+          git clone --depth 1 --branch v10.4.1 --recurse-submodules --shallow-submodules \
+            https://github.com/cisco/ChezScheme.git ChezScheme
+          cd ChezScheme
+          ./configure --threads --disable-curses --disable-x11 \
+            --installprefix=/tmp/idris-bootstrap/chez-native
+          make -j"$(nproc)" && make install
+          cd /tmp/idris-bootstrap
+          git clone https://github.com/idris-lang/Idris2.git
+          cd Idris2 && git checkout v0.8.0
+          export PATH=/tmp/idris-bootstrap/chez-native/bin:$PATH
+          export LD_LIBRARY_PATH=/tmp/idris-bootstrap/chez-native/lib
+          # On a fresh clone, `make bootstrap` stops early building the RefC
+          # support (gmp.h) before ever reaching the compiler stages. Building
+          # the C support library first satisfies the bootstrap's support
+          # target, so the bootstrap then runs stage 1 + stage 2 and only its
+          # final install-refc step can fail - harmless for the Chez codegen.
+          make -C support/c
+          make bootstrap SCHEME=/tmp/idris-bootstrap/chez-native/bin/scheme || true
+          test -x build/exec/idris2
+          export IDRIS2_DATA=/tmp/idris-bootstrap/Idris2/support
+          export IDRIS2_PREFIX=/tmp/idris-bootstrap/idris-install
+          for lib in prelude base linear network; do
+            (cd libs/$lib && ../../build/exec/idris2 --install $lib.ipkg)
+          done
+          mkdir -p bin
+          cat > bin/idris2 <<'WRAPPER'
+          #!/usr/bin/env bash
+          export PATH="/tmp/idris-bootstrap/chez-native/bin:$PATH"
+          export LD_LIBRARY_PATH="/tmp/idris-bootstrap/chez-native/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export IDRIS2_DATA=/tmp/idris-bootstrap/Idris2/support
+          export IDRIS2_PACKAGE_PATH="/tmp/idris-bootstrap/idris-install/idris2-0.8.0${IDRIS2_PACKAGE_PATH:+:$IDRIS2_PACKAGE_PATH}"
+          exec /tmp/idris-bootstrap/Idris2/build/exec/idris2 "$@"
+          WRAPPER
+          sed -i 's/^          //' bin/idris2 && chmod +x bin/idris2
+      - name: ABI model gate
+        run: bash scripts/abi_model_check.sh
+
   # Fails in seconds on a formatting problem, instead of after a full test and
   # clippy cycle. `just test-ghost` still ends with the same check, so the local
   # gate stays complete and this job is a fast path, not a replacement.
@@ -64,6 +145,29 @@ jobs:
         run: cargo install cargo-deny --version 0.20.2 --locked
       - name: Check advisories, dependencies, licences, and sources
         run: cargo deny check --hide-inclusion-graph
+
+  # Gate for the vendored bevy_winit feature patch (issue #105): source and
+  # manifest parity with the published crate, font-parser-free resolved graph,
+  # and the fixture coverage that keeps the gate itself honest. The bevy-frontend
+  # job covers that the selected Wayland+X11 build actually compiles.
+  vendor-parity:
+    name: vendor-parity (bevy_winit patch gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Fixture self-test (clean + firing fixtures, no network)
+        run: bash tests/vendor_winit_check_test.sh
+      - name: Vendored copy matches the published crate
+        run: bash scripts/vendor_bevy_winit_check.sh parity
+      - name: Font-parser-free graph with title-free CSD active
+        run: bash scripts/vendor_bevy_winit_check.sh graph
 
   test-ghost:
     name: test-ghost (core/tui/ffi + clippy + fmt)

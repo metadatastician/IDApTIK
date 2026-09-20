@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MPL-2.0
-# 0-AI-MANIFEST.a2ml — AI manifest for the 6a2 directory (IDApTIK)
+# 0-AI-MANIFEST.a2ml — AI manifest for the descriptiles directory (IDApTIK)
 
 ## Purpose
 
-This manifest declares the AI-assistant context for the 6a2 machine-readable
-metadata directory of IDApTIK.
+This manifest declares the AI-assistant context for the descriptiles
+directory (historically the "6a2" machine-readable metadata directory) of
+IDApTIK. The repository-wide AI manifest lives at
+`.machine_readable/0-AI-MANIFEST.a2ml` and outranks this one.
 
 ## Canonical Locations
 
@@ -18,8 +20,6 @@ The 6 core A2ML files MUST exist in this directory:
 
 ## Invariants
 
-- No duplicate metadata files in the repository root (root holds only the
-  top-level 0-AI-MANIFEST.a2ml and k9iser.toml).
 - Single source of truth: this directory is authoritative for project
   metadata; keep STATE.a2ml in sync with README.md and docs/adr/.
 - No stale metadata.

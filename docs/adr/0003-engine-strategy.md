@@ -28,8 +28,9 @@ rendering.
    speed. Until then, whichever frontend is behind must not accrete game logic —
    logic belongs in core.
 
-The FFI/ABI surface (`idaptik-ffi`, exercised with Zig/Idris2 per ADR-0001)
-also targets the core, not a specific engine.
+The FFI/ABI surface (`idaptik-ffi`, modelled in Idris2 under `abi/` — the
+Zig adapter half of the ADR-0001 seam is still open, see issue #103) also
+targets the core, not a specific engine.
 
 ## Consequences
 

@@ -57,8 +57,9 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
   ([ADR-0008](docs/adr/0008-select-bevy-and-retire-fyrox.md)).
 - **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
 - **FFI / ABI policy:** **Zig unified hexadeca APIs/FFIs** for the adapter and **Idris2** for ABI
-  contracts. The current implementation still exports its C ABI directly from
-  Rust/Crusoe and contains neither Zig nor Idris2 source; remediation is tracked in
+  contracts. The C ABI is still exported directly from Rust/Crusoe, but the Idris2 ABI
+  model now exists (`crates/idaptik-ffi/abi`, gated by `just abi-model-check`); the Zig
+  adapter and the Hexadeca/serde-wire conformance work remain open in
   [#103](https://github.com/metadatastician/IDApTIK/issues/103)
   ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
 - **Config:** **Nickel** (typed configuration).
@@ -84,7 +85,7 @@ their own build/reachability checklist and green joining result.
 
 ```
 crates/idaptik-core     engine-agnostic gameplay truth — the network sim + Ghost Lobby scenario, no rendering
-crates/idaptik-ffi      Current Rust-exported C ABI; Zig/Idris2 policy gap (#103)
+crates/idaptik-ffi      Rust-exported C ABI + Idris2 ABI model (abi/); Zig adapter still missing (#103)
 crates/idaptik-tui      ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)
 crates/idaptik-bevy     selected Bevy rendering frontend (ADR-0008)
 crates/idaptik-net      Phoenix Channels client over burble game-session fabric (ADR-0006)

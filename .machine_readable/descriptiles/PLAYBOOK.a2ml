@@ -40,11 +40,11 @@ k9-generate = "k9iser generate --manifest k9iser.toml --output generated/k9iser"
 k9-build = "k9iser build --manifest k9iser.toml   # validate real configs against the generated K9 contracts (run from repo root)"
 
 [incident-response]
-# 1. Check .machine_readable/6a2/STATE.a2ml for the current phase and status.
+# 1. Check .machine_readable/descriptiles/STATE.a2ml for the current phase and status.
 # 2. Review recent commits and CI (.github/workflows/ci.yml).
 # 3. Run `just doctor` to confirm toolchains, then `just test` and `just config-check`.
 
 [release-process]
-# 1. Update version in .machine_readable/6a2/STATE.a2ml + META.a2ml and Cargo workspace.
+# 1. Update version in .machine_readable/descriptiles/STATE.a2ml + META.a2ml and Cargo workspace.
 # 2. Confirm the phase gate (Envelope -> Wheel -> ...) is genuinely met — no release claim without a hard pass.
 # 3. Sign commits (git commit -s, DCO 1.1); tag and push.
