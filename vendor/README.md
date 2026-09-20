@@ -15,3 +15,24 @@ are preserved beside the vendored source.
 
 Remove this patch after a released Bevy version exposes independent Wayland CSD
 features and IDApTIK has upgraded to it.
+
+## Maintenance obligations are gated
+
+The obligations below are executable, not aspirational (issue #105):
+
+- `just vendor-winit-check` compares this copy with the published crate
+  (source, licences, manifest — allowing only the documented feature split)
+  and asserts the resolved graph stays free of the font-parser path with the
+  title-free CSD feature active. It runs in CI (`vendor-parity` job) and must
+  be rerun on every Bevy upgrade.
+- `just vendor-winit-watch` checks published `bevy_winit` releases for the
+  retirement condition; the scheduled `vendor-winit-watch` workflow fails once
+  a release makes this patch removable.
+- `just vendor-winit-test` keeps the gate itself honest with clean and firing
+  fixtures.
+
+Verified 2026-09-20: the latest stable Bevy is v0.19.1 (this copy), and both
+`v0.20.0-rc.1` and `main` still define
+`wayland = ["winit/wayland", "winit/wayland-csd-adwaita"]` — the split has not
+landed upstream, so the patch remains required.
+

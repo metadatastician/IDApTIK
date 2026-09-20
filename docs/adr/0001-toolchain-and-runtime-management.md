@@ -76,3 +76,9 @@ it is ready. IDApTIK is a natural dogfooding target at that point.
   toolchain anywhere; `just doctor` reports what is present.
 - Versions mirror the opsm estate where they overlap, so the projects agree.
 - Idris2 remains a deliberate, documented extra step rather than a silent failure.
+- Zig and Idris2 are the FFI/ABI boundary languages. The Idris2 ABI *model*
+  now exists (`crates/idaptik-ffi/abi`, gated by `just abi-model-check` and
+  CI), but the Zig *adapter* does not: the C ABI is still exported directly
+  from Rust and consumed as such. The remaining boundary work — the Zig
+  adapter and the serde-wire conformance suite — is tracked in
+  [issue #103](https://github.com/metadatastician/IDApTIK/issues/103).

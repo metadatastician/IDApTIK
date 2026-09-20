@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Fixture coverage for scripts/vendor_bevy_winit_check.sh (issues #105/#102).
+#
+# Every gate needs a clean fixture that passes and firing fixtures that fail
+# for the intended reason. The parity checks run against a locally staged
+# "published" crate (the vendored tree with the documented feature split
+# reverted), and the watch checks against staged sparse-index JSONL, so this
+# test needs no network. Missing tools must fail the gate, never skip it.
+
+set -euo pipefail
+
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CHECKER="$REPO_DIR/scripts/vendor_bevy_winit_check.sh"
+FIXTURE="$(mktemp -d)"
+trap 'rm -rf "$FIXTURE"' EXIT
+
+VENDOR_VERSION="$(awk -F'"' '/^version = /{print $2; exit}' "$REPO_DIR/vendor/bevy_winit/Cargo.toml")"
+[ -n "$VENDOR_VERSION" ] || { printf 'cannot read vendored version\n' >&2; exit 1; }
+
+failures=0
+expect_pass() { # $1 description, rest = command
+  local desc="$1"; shift
+  if "$@" >/dev/null 2>&1; then
+    printf '  ok (clean): %s\n' "$desc"
+  else
+    printf '  FAIL: expected success: %s\n' "$desc" >&2
+    failures=$((failures + 1))
+  fi
+}
+
+expect_fail() { # $1 description, $2 expected message, rest = command
+  local desc="$1" want="$2"; shift 2
+  local out
+  if out="$("$@" 2>&1)"; then
+    printf '  FAIL: expected failure: %s\n' "$desc" >&2
+    failures=$((failures + 1))
+  elif ! grep -qF "$want" <<<"$out"; then
+    printf '  FAIL: %s failed for the wrong reason:\n%s\n' "$desc" "$out" >&2
+    failures=$((failures + 1))
+  else
+    printf '  ok (fires): %s\n' "$desc"
+  fi
+}
+
+# Build a "published" crate directory: the vendored tree with the feature
+# split reverted to the single upstream `wayland` definition.
+make_published_dir() { # $1 = destination dir
+  local dir="$1"
+  cp -r "$REPO_DIR/vendor/bevy_winit" "$dir"
+  awk -v repl='wayland = ["winit/wayland", "winit/wayland-csd-adwaita"]' '
+    state == 0 && /^wayland = \[/ { print repl; state = 1; next }
+    state == 1 && /^x11 = \[/ { state = 0 }
+    state == 1 { next }
+    { print }
+  ' "$REPO_DIR/vendor/bevy_winit/Cargo.toml" > "$dir/Cargo.toml"
+}
+
+make_crate() { # $1 = crate tarball path, $2 = inner dir name
+  local inner="$FIXTURE/stage/$2"
+  rm -rf "$FIXTURE/stage"
+  mkdir -p "$FIXTURE/stage"
+  make_published_dir "$inner"
+  tar -czf "$1" -C "$FIXTURE/stage" "$2"
+}
+
+# A scratch repository for mutations on the vendored side.
+make_scratch_repo() { # $1 = scratch dir
+  mkdir -p "$1/scripts" "$1/vendor"
+  cp "$CHECKER" "$1/scripts/vendor_bevy_winit_check.sh"
+  cp "$REPO_DIR/Cargo.toml" "$1/Cargo.toml"
+  cp -r "$REPO_DIR/vendor/bevy_winit" "$1/vendor/bevy_winit"
+}
+
+index_line() { # $1 = version, $2 = wayland json array, $3 = extra features json, $4 = yanked
+  printf '{"name":"bevy_winit","vers":"%s","features":{"default":["x11"],"x11":["winit/x11"],"wayland":%s%s},"deps":[],"yanked":%s}\n' \
+    "$1" "$2" "$3" "$4"
+}
+
+FORCED_WAYLAND='["winit/wayland","winit/wayland-csd-adwaita"]'
+
+printf 'parity fixtures:\n'
+
+# Clean: the staged published crate matches the vendored tree modulo the split.
+make_crate "$FIXTURE/published-$VENDOR_VERSION.crate" "bevy_winit-$VENDOR_VERSION"
+expect_pass "vendored copy matches the published crate" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/published-$VENDOR_VERSION.crate" "$CHECKER" parity
+
+# Firing: source drift.
+make_crate "$FIXTURE/src-drift.crate" "bevy_winit-$VENDOR_VERSION"
+printf '\n// drift\n' >> "$FIXTURE/stage/bevy_winit-$VENDOR_VERSION/src/lib.rs"
+tar -czf "$FIXTURE/src-drift.crate" -C "$FIXTURE/stage" "bevy_winit-$VENDOR_VERSION"
+expect_fail "source drift is rejected" "drifted from the published crate" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/src-drift.crate" "$CHECKER" parity
+
+# Firing: manifest drift beyond the documented split.
+make_crate "$FIXTURE/manifest-drift.crate" "bevy_winit-$VENDOR_VERSION"
+sed -i 's/^version = "0.30"$/version = "0.31"/' "$FIXTURE/stage/bevy_winit-$VENDOR_VERSION/Cargo.toml"
+tar -czf "$FIXTURE/manifest-drift.crate" -C "$FIXTURE/stage" "bevy_winit-$VENDOR_VERSION"
+expect_fail "manifest drift beyond the split is rejected" "beyond the documented feature split" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/manifest-drift.crate" "$CHECKER" parity
+
+# Firing: upstream changed its own wayland feature (patch premise moved).
+make_crate "$FIXTURE/upstream-moved.crate" "bevy_winit-$VENDOR_VERSION"
+sed -i 's/^wayland = .*/wayland = ["winit\/wayland"]/' "$FIXTURE/stage/bevy_winit-$VENDOR_VERSION/Cargo.toml"
+tar -czf "$FIXTURE/upstream-moved.crate" -C "$FIXTURE/stage" "bevy_winit-$VENDOR_VERSION"
+expect_fail "upstream wayland change is surfaced" "published feature 'wayland' changed upstream" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/upstream-moved.crate" "$CHECKER" parity
+
+# Firing: tarball layout does not match the vendored version.
+make_crate "$FIXTURE/wrong-version.crate" "bevy_winit-0.0.0"
+expect_fail "tarball/version mismatch is rejected" "did not contain bevy_winit-$VENDOR_VERSION" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/wrong-version.crate" "$CHECKER" parity
+
+# Firing: the vendored split itself is wrong (scratch repo).
+make_scratch_repo "$FIXTURE/scratch"
+sed -i 's/^wayland = .*/wayland = ["winit\/wayland", "winit\/wayland-csd-adwaita"]/' \
+  "$FIXTURE/scratch/vendor/bevy_winit/Cargo.toml"
+expect_fail "wrong vendored wayland feature is rejected" "must be exactly" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/published-$VENDOR_VERSION.crate" \
+  "$FIXTURE/scratch/scripts/vendor_bevy_winit_check.sh" parity
+
+# Firing: one of the split features is missing from the vendored manifest
+# (scratch repo); the manifest text still matches, so the shape check fires.
+make_scratch_repo "$FIXTURE/scratch2"
+awk '
+  /^wayland-csd-adwaita = \[/ { skipping = 1 }
+  skipping {
+    if ($0 ~ /\][,]?[[:space:]]*$/) { skipping = 0 }
+    next
+  }
+  { print }
+' "$FIXTURE/scratch2/vendor/bevy_winit/Cargo.toml" > "$FIXTURE/scratch2/vendor/bevy_winit/Cargo.toml.new"
+mv "$FIXTURE/scratch2/vendor/bevy_winit/Cargo.toml.new" "$FIXTURE/scratch2/vendor/bevy_winit/Cargo.toml"
+expect_fail "a missing split feature is rejected" "must preserve Bevy's original titled decorations" \
+  env IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/published-$VENDOR_VERSION.crate" \
+  "$FIXTURE/scratch2/scripts/vendor_bevy_winit_check.sh" parity
+
+# Firing: missing tools are failures, not skips. The minimal PATH carries the
+# tools the checker needs besides the one under test.
+mkdir -p "$FIXTURE/minimal-bin"
+for tool in bash awk grep diff mktemp wc sort; do
+  ln -sf "$(command -v "$tool")" "$FIXTURE/minimal-bin/$tool"
+done
+expect_fail "missing tar fails parity" "tar is required" \
+  env PATH="$FIXTURE/minimal-bin" IDAPTIK_BEVY_WINIT_CRATE="$FIXTURE/published-$VENDOR_VERSION.crate" "$CHECKER" parity
+expect_fail "missing jq fails watch" "jq is required" \
+  env PATH="$FIXTURE/minimal-bin" IDAPTIK_BEVY_WINIT_INDEX=/dev/null "$CHECKER" watch
+
+printf 'watch fixtures:\n'
+
+# Clean: today's reality — no released version above the vendored one drops
+# the forced titled CSD (0.20.0-rc.1 still forces it).
+{
+  index_line "$VENDOR_VERSION" "$FORCED_WAYLAND" '' false
+  index_line "0.20.0-rc.1" "$FORCED_WAYLAND" '' false
+} > "$FIXTURE/index-no-split.jsonl"
+expect_pass "forced CSD upstream keeps the patch required" \
+  env IDAPTIK_BEVY_WINIT_INDEX="$FIXTURE/index-no-split.jsonl" "$CHECKER" watch
+
+# Firing: a newer release ships a title-free CSD feature.
+{
+  index_line "$VENDOR_VERSION" "$FORCED_WAYLAND" '' false
+  index_line "0.20.0" "$FORCED_WAYLAND" \
+    ',"wayland-csd-notitle":["wayland","winit/wayland-csd-adwaita-notitle"]' false
+} > "$FIXTURE/index-notitle.jsonl"
+expect_fail "a notitle feature upstream triggers retirement" "RETIREMENT CONDITION MET" \
+  env IDAPTIK_BEVY_WINIT_INDEX="$FIXTURE/index-notitle.jsonl" "$CHECKER" watch
+
+# Firing: a newer release stops forcing the titled CSD.
+{
+  index_line "$VENDOR_VERSION" "$FORCED_WAYLAND" '' false
+  index_line "0.19.2" '["winit/wayland"]' '' false
+} > "$FIXTURE/index-unforced.jsonl"
+expect_fail "an unforced wayland upstream triggers retirement" "RETIREMENT CONDITION MET" \
+  env IDAPTIK_BEVY_WINIT_INDEX="$FIXTURE/index-unforced.jsonl" "$CHECKER" watch
+
+# Clean: a yanked release with the split does not count.
+{
+  index_line "$VENDOR_VERSION" "$FORCED_WAYLAND" '' false
+  index_line "0.20.0" "$FORCED_WAYLAND" \
+    ',"wayland-csd-notitle":["wayland","winit/wayland-csd-adwaita-notitle"]' true
+} > "$FIXTURE/index-yanked.jsonl"
+expect_pass "yanked split releases are ignored" \
+  env IDAPTIK_BEVY_WINIT_INDEX="$FIXTURE/index-yanked.jsonl" "$CHECKER" watch
+
+printf 'graph fixtures:\n'
+
+# Firing: no cargo on PATH is a failure, never a silent skip.
+expect_fail "missing cargo fails graph" "cargo is required" \
+  env PATH="$FIXTURE/minimal-bin" "$CHECKER" graph
+
+if [ "$failures" -ne 0 ]; then
+  printf 'vendor-winit check fixtures: %d FAILURES\n' "$failures" >&2
+  exit 1
+fi
+printf 'vendor-winit check fixtures: all clean and firing fixtures behaved\n'

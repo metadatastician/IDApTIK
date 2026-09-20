@@ -13,6 +13,7 @@ workflows:
         - 'actions/deploy-pages@v5.0.0'
         - 'actions/upload-pages-artifact@v5.0.0'
     '.github/workflows/secret-scanner.yml': []
+    '.github/workflows/vendor-winit-watch.yml': []
 dependencies:
     'actions/deploy-pages@v5.0.0':
         ref: 'v5.0.0'

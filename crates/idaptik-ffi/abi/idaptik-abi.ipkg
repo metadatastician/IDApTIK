@@ -1,0 +1,13 @@
+package idaptik-abi
+version = 0.1.0
+authors = "IDApTIK contributors"
+brief = "Idris2 model of the idaptik-ffi C ABI (issue #103)"
+
+sourcedir = "src"
+depends = base
+
+modules = Idaptik.Abi.CABI,
+           Idaptik.Abi.Handles,
+           Idaptik.Abi.Json,
+           Idaptik.Abi.Run,
+           Idaptik.Abi.Exports

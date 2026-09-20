@@ -31,6 +31,14 @@ allow = [
 multiple-versions = "warn"
 wildcards = "deny"
 allow-wildcard-paths = true
+# The vendored bevy_winit feature patch (issue #105) exists to keep Bevy's
+# Wayland CSD title text — and with it this font-parser path — out of the
+# graph. Keep these bans so the path cannot quietly return on a Bevy upgrade.
+deny = [
+  { name = "ttf-parser" },
+  { name = "ab_glyph" },
+  { name = "ab_glyph_rasterizer" },
+]
 
 [sources]
 unknown-registry = "deny"
