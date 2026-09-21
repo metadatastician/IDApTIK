@@ -62,6 +62,16 @@ jobs:
         run: ./scripts/idris_escape_scan.sh --self-test
       - name: Proof-escape scan (Idris2 ABI model)
         run: ./scripts/idris_escape_scan.sh
+      # Documentation claims (issue #119). Same placement and same ./scripts/
+      # invocation as the proof-escape gate above, for the same two reasons:
+      # no toolchain is needed, so a false digest or a lying step name is
+      # caught on every pull request; and running the file directly keeps the
+      # executable bit load-bearing, so a 100644 regression dies here at exit
+      # 126 rather than passing silently under `bash script`.
+      - name: Documentation-claims gate self-test (the gate must be able to fail)
+        run: ./scripts/doc_claims_check.sh --self-test
+      - name: Documentation-claims scan (digest coverage + step-name claims)
+        run: ./scripts/doc_claims_check.sh
 
 # Idris2 ABI model gate (issue #103): bootstrap Idris 2 0.8.0 with a source
 # built Chez (no system deps beyond libc), then run the model gate.

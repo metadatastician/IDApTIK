@@ -137,8 +137,8 @@ Near-future adaptive-architecture premise; Jessica (infiltrator), Marek
   table (already missing NetSsh/NetHack for the hacker), and the burble
   game-lane port. Adopt as a design goal, or keep two-seat?
 - **Q3 — The JS Phase-1 prototypes**: export the HTML files from Mistral's
-  sandbox into this repo (as `docs/prototypes/` reference material), or let
-  this triage document stand as the record?
+  sandbox into this repo (as **(proposed)** `docs/prototypes/` reference
+  material), or let this triage document stand as the record?
 - **Q4 — Trope implementation route**: agree that trope presets are UMS
   profile data (authoring side) rather than engine enums? (Matches the
   two-taxonomies reading: UMS = what you place, game = what you hack.)

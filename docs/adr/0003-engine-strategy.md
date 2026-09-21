@@ -38,6 +38,7 @@ targets the core, not a specific engine.
   thin, the core is the product.
 - The eventual engine decision is cheap, because switching frontends does not
   touch gameplay truth or the multiplayer boundary.
-- Workspace shape this implies (scaffolded in a later change):
-  `crates/idaptik-core`, `crates/idaptik-bevy`, `crates/idaptik-fyrox`,
-  `crates/idaptik-ffi`.
+- Workspace shape this implies: `crates/idaptik-core`, `crates/idaptik-bevy`
+  and `crates/idaptik-ffi`, all scaffolded since this decision, plus
+  **(intended)** `crates/idaptik-fyrox` — the Fyrox frontend, not yet
+  scaffolded.
