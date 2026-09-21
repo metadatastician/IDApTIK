@@ -43,7 +43,11 @@ exportedFunctions =
 ||| one free is possible.
 public export
 idap_demo_network : () -> CNullable (Handle NetworkKind Live)
-idap_demo_network () = CSome (LiveHandle (MkNetworkModel 4))
+||| Reconciled with the Rust truth: `idap_demo_network` exports the
+||| demonstration network with 6 devices (asserted by the ABI round-trip
+||| test `demo_network_roundtrips_through_the_abi` in
+||| crates/idaptik-ffi/src/lib.rs). The earlier idealisation said 4.
+idap_demo_network () = CSome (LiveHandle (MkNetworkModel 6))
 
 ||| Header: `void idap_network_free(struct NetworkHandle *ptr);`
 ||| Passing null is a no-op; a live handle transitions to Freed.

@@ -41,4 +41,19 @@ pub fn build(b: *std.Build) void {
     const run_conf = b.addRunArtifact(conformance);
     const conf_step = b.step("conformance", "Run the ABI conformance harness (needs the Rust cdylib)");
     conf_step.dependOn(&run_conf.step);
+
+    // Fuzz sweep: adversarial inputs through the live cdylib (issue #103).
+    const fuzz_mod = b.createModule(.{
+        .root_source_file = b.path("test/fuzz_test.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+    });
+    fuzz_mod.addImport("idaptik_ffi_adapter", mod);
+    fuzz_mod.addLibraryPath(.{ .cwd_relative = libdir });
+    fuzz_mod.linkSystemLibrary("idaptik_ffi", .{});
+    const fuzz = b.addTest(.{ .root_module = fuzz_mod });
+    const run_fuzz = b.addRunArtifact(fuzz);
+    const fuzz_step = b.step("fuzz", "Adversarial fuzz sweep against the cdylib");
+    fuzz_step.dependOn(&run_fuzz.step);
 }

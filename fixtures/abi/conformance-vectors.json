@@ -12,33 +12,41 @@
       "where": "demo_network_device_count",
       "idris_model": 4,
       "rust_truth": 6,
-      "disposition": "The conformance fixtures follow the Rust truth (the executable behaviour). The Idris model's MkNetworkModel 4 is an idealisation that must be reconciled by the model owners; recorded here so the divergence is visible instead of silently smoothed over."
+      "disposition": "RESOLVED on feature/issue-103-zig-adapter-conformance: the Idris model's MkNetworkModel now carries 6, matching the Rust truth. This entry remains as a record of the divergence the conformance layer caught."
     }
   ],
   "cases": [
     {
       "id": "demo_network_device_count",
       "kind": "network_device_count",
-      "expect": { "device_count": 6 }
+      "expect": {
+        "device_count": 6
+      }
     },
     {
       "id": "null_network_device_count_is_zero_and_free_null_noop",
       "kind": "network_device_count_null",
-      "expect": { "device_count": 0 }
+      "expect": {
+        "device_count": 0
+      }
     },
     {
       "id": "ghost_lobby_new_rejects_unknown_difficulty",
       "kind": "ghost_lobby_new",
       "seed": 1337,
       "difficulty": "nightmare",
-      "expect": { "handle": "null" }
+      "expect": {
+        "handle": "null"
+      }
     },
     {
       "id": "ghost_lobby_new_accepts_difficulty_case_insensitive",
       "kind": "ghost_lobby_new",
       "seed": 1337,
       "difficulty": "STANDARD",
-      "expect": { "handle": "live" }
+      "expect": {
+        "handle": "live"
+      }
     },
     {
       "id": "first_tick_returns_queued_startup_events",
@@ -48,7 +56,10 @@
       "commands": "[]",
       "expect": {
         "shape": "events_array",
-        "contains_in_order": ["RunStarted", "SeedAnnounced"]
+        "contains_in_order": [
+          "RunStarted",
+          "SeedAnnounced"
+        ]
       }
     },
     {
@@ -78,7 +89,9 @@
       "seed": 4242,
       "difficulty": "operator",
       "commands": "[{\"cmd\":\"SetButton\",\"button\":\"Right\",\"down\":true},{\"cmd\":\"Jump\"}]",
-      "expect": { "shape": "events_array" }
+      "expect": {
+        "shape": "events_array"
+      }
     },
     {
       "id": "determinism_same_seed_byte_identical_wires",
@@ -100,24 +113,32 @@
         "[]",
         "[]"
       ],
-      "expect": { "identical_runs": true }
+      "expect": {
+        "identical_runs": true
+      }
     },
     {
       "id": "snapshot_is_json_object",
       "kind": "snapshot",
       "seed": 7,
       "difficulty": "story",
-      "expect": { "shape": "json_object" }
+      "expect": {
+        "shape": "json_object"
+      }
     },
     {
       "id": "string_free_null_is_noop",
       "kind": "string_free_null",
-      "expect": { "no_crash": true }
+      "expect": {
+        "no_crash": true
+      }
     },
     {
       "id": "owned_wire_double_free_is_trapped_by_the_adapter",
       "kind": "owned_wire_double_free",
-      "expect": { "traps": true }
+      "expect": {
+        "traps": true
+      }
     }
   ]
 }

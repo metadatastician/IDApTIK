@@ -66,6 +66,12 @@ jobs:
           IDAPTIK_FFI_LIB: ${{ github.workspace }}/target/debug/libidaptik_ffi.so
         run: zig build conformance
 
+      - name: Fuzz — adversarial sweep + double-free trap probe
+        working-directory: crates/idaptik-ffi/zig-adapter
+        run: |
+          zig build fuzz
+          bash ../../../scripts/fuzz_double_free_probe.sh
+
   authority-pin:
     name: ABI authority digests unchanged
     runs-on: ubuntu-latest

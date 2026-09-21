@@ -36,3 +36,5 @@ erl_crash.dump
 crates/idaptik-ffi/abi/build/
 crates/idaptik-ffi/abi/smoke/build/
 .zig-cache/
+.probe
+.double-free-probe
