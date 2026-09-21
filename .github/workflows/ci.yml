@@ -61,6 +61,11 @@ jobs:
   abi-model:
     name: abi-model (Idris2 gate)
     runs-on: ubuntu-latest
+    env:
+      # The single constant both halves agree on. scripts/abi_model_check.sh
+      # searches this exact path (see its toolchain-resolution list), so the
+      # wrapper must be written here and nowhere else.
+      IDRIS2_BOOTSTRAP_BIN: /tmp/idris-bootstrap/bin
     steps:
       - name: Checkout
         run: |
@@ -95,8 +100,12 @@ jobs:
           for lib in prelude base linear network; do
             (cd libs/$lib && ../../build/exec/idris2 --install $lib.ipkg)
           done
-          mkdir -p bin
-          cat > bin/idris2 <<'WRAPPER'
+          # Absolute, not cwd-relative: this block's cwd is
+          # /tmp/idris-bootstrap/Idris2, so `mkdir -p bin` wrote the wrapper to
+          # .../Idris2/bin/idris2 while scripts/abi_model_check.sh searches
+          # /tmp/idris-bootstrap/bin/idris2 -- one directory apart (issue #124).
+          mkdir -p "$IDRIS2_BOOTSTRAP_BIN"
+          cat > "$IDRIS2_BOOTSTRAP_BIN/idris2" <<'WRAPPER'
           #!/usr/bin/env bash
           export PATH="/tmp/idris-bootstrap/chez-native/bin:$PATH"
           export LD_LIBRARY_PATH="/tmp/idris-bootstrap/chez-native/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
@@ -104,7 +113,13 @@ jobs:
           export IDRIS2_PACKAGE_PATH="/tmp/idris-bootstrap/idris-install/idris2-0.8.0${IDRIS2_PACKAGE_PATH:+:$IDRIS2_PACKAGE_PATH}"
           exec /tmp/idris-bootstrap/Idris2/build/exec/idris2 "$@"
           WRAPPER
-          sed -i 's/^          //' bin/idris2 && chmod +x bin/idris2
+          # (No de-indent pass: YAML strips the block scalar's common indentation,
+          # so the heredoc body already lands at column 0.)
+          chmod +x "$IDRIS2_BOOTSTRAP_BIN/idris2"
+          # Step environments do not survive into the next step; publish both the
+          # PATH entry and an explicit IDRIS2 so the gate cannot miss the toolchain.
+          echo "$IDRIS2_BOOTSTRAP_BIN" >> "$GITHUB_PATH"
+          echo "IDRIS2=$IDRIS2_BOOTSTRAP_BIN/idris2" >> "$GITHUB_ENV"
       - name: ABI model gate
         run: bash scripts/abi_model_check.sh
 
