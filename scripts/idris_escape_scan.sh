@@ -331,10 +331,27 @@ fi
 # the scan above to find -- the escape here is an ABSENCE.
 [ -d "$ROOT" ] || fail "scan root does not exist: $ROOT"
 if [ -f "$ROOT/$IPKG" ]; then
-  modules="$(sed -n '/^modules/,$p' "$ROOT/$IPKG" \
-    | tr ',' '\n' | sed -E 's/^[[:space:]]*modules[[:space:]]*=[[:space:]]*//' \
+  # The module list runs from `modules =` to the next top-level directive --
+  # NOT to end of file. An ipkg may carry `opts`, `depends` or anything else
+  # after the module block, and a range that ends at EOF swallows them: the
+  # earlier `sed -n '/^modules/,$p'` read `opts = "--total"` as a module named
+  # `opts` and failed looking for src/opts.idr. Directives are lower-case and
+  # contain `=`; module names are capitalised and dotted, so the two are
+  # unambiguous.
+  modules="$(awk '
+    /^modules[[:space:]]*=/ { inmod = 1; sub(/^modules[[:space:]]*=[[:space:]]*/, "") }
+    inmod && /^[[:space:]]*[a-z][A-Za-z0-9_]*[[:space:]]*=/ { inmod = 0 }
+    inmod { print }
+  ' "$ROOT/$IPKG" \
+    | tr ',' '\n' \
     | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//' | grep -E '^[A-Za-z]' || true)"
   [ -n "$modules" ] || fail "could not read the module list from $IPKG"
+  # If the parse ever goes wrong again, say so in terms of the parse rather
+  # than as a missing source file three lines later.
+  for m in $modules; do
+    printf '%s' "$m" | grep -qE "^[A-Z][A-Za-z0-9_.']*$" \
+      || fail "parsed \`$m\` from the module list of $IPKG, which is not a module name -- the ipkg parse is wrong, not the source tree"
+  done
   nmod=0; missing=""
   for m in $modules; do
     src="$ROOT/src/$(printf '%s' "$m" | tr '.' '/').idr"

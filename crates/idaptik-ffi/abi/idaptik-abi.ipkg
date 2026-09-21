@@ -10,4 +10,7 @@ modules = Idaptik.Abi.CABI,
            Idaptik.Abi.Handles,
            Idaptik.Abi.Json,
            Idaptik.Abi.Run,
-           Idaptik.Abi.Exports
+           Idaptik.Abi.Exports,
+           Idaptik.Abi.Protocol
+
+opts = "--total"

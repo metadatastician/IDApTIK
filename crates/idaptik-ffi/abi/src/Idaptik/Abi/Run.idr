@@ -9,6 +9,7 @@
 module Idaptik.Abi.Run
 
 import Decidable.Equality
+import Data.Nat
 
 import Idaptik.Abi.CABI
 
@@ -158,3 +159,87 @@ snapshotRoundTrip : (s : RunState) -> restore (snapshotOf s) = Just s
 snapshotRoundTrip s with (decEq (formatTag RuntimeV3) (formatTag RuntimeV3))
   snapshotRoundTrip s | Yes _  = Refl
   snapshotRoundTrip s | No contra = absurd (contra Refl)
+
+-- --------------------------------------------------------------------------
+-- Obligation 4: deterministic tick, and snapshot invariants.
+--
+-- A word on what is NOT proved here. "Two runs from the same inputs give
+-- the same output" is `Refl` in this model: `run` is a pure function, so
+-- the equation holds by the definition of a function and states nothing
+-- about IDApTIK. Shipping it would be a lemma that cannot fail. The
+-- substance of ADR-0004's determinism is that the frame clock is driven by
+-- the frame count ALONE — no command, seed or difficulty can skip,
+-- duplicate or stall a frame — and that is `runAdvancesByFrameCount`,
+-- which is a genuine induction with a genuine mutant.
+-- --------------------------------------------------------------------------
+
+||| The state half of a run. `run` returns state and events together; the
+||| frame-clock theorems concern only the state, and separating them lets
+||| the induction reduce.
+public export
+runState : RunState -> List (List Command) -> RunState
+runState s []          = s
+runState s (cs :: rest) = runState (fst (step s cs)) rest
+
+||| CHECKED: `runState` really is the state `run` computes. Without this
+||| the frame-clock theorems below would be about a function the ABI never
+||| calls — true, and about nothing.
+export
+runFstIsRunState : (s : RunState) -> (css : List (List Command)) ->
+                   fst (run s css) = runState s css
+runFstIsRunState s []           = Refl
+runFstIsRunState s (cs :: rest) with (run (fst (step s cs)) rest) proof eq
+  runFstIsRunState s (cs :: rest) | (s2, e2) =
+    trans (cong fst (sym eq)) (runFstIsRunState (fst (step s cs)) rest)
+
+||| CHECKED: the frame counter after a run is the starting counter plus the
+||| number of frames — whatever the commands were. No command can skip,
+||| duplicate or stall a frame.
+public export
+runAdvancesByFrameCount : (s : RunState) -> (css : List (List Command)) ->
+                          tick (runState s css) = tick s + length css
+runAdvancesByFrameCount s []          = sym (plusZeroRightNeutral (tick s))
+runAdvancesByFrameCount s (cs :: rest) =
+  trans (runAdvancesByFrameCount (fst (step s cs)) rest)
+        (plusSuccRightSucc (tick s) (length rest))
+
+||| CHECKED: the frame clock is a function of the frame count alone. Two
+||| runs that agree on the starting tick and the NUMBER of frames agree on
+||| the final tick, however their seeds, difficulties and commands differ.
+public export
+frameClockIgnoresInputs : (s1, s2 : RunState) ->
+                          (css1, css2 : List (List Command)) ->
+                          tick s1 = tick s2 ->
+                          length css1 = length css2 ->
+                          tick (runState s1 css1) = tick (runState s2 css2)
+frameClockIgnoresInputs s1 s2 css1 css2 sameTick sameLen =
+  trans (runAdvancesByFrameCount s1 css1)
+        (trans (cong2 plus sameTick sameLen)
+               (sym (runAdvancesByFrameCount s2 css2)))
+
+||| CHECKED: `restore` rejects any snapshot that is not this format. The
+||| round-trip theorem says a good snapshot survives; this says a foreign
+||| one is refused rather than silently reinterpreted — the half that makes
+||| the format tag load-bearing.
+public export
+restoreRejectsForeignFormat : (tag : String) -> (s : RunState) ->
+                              Not (tag = formatTag RuntimeV3) ->
+                              restore (MkRuntimeSnapshot tag s) = Nothing
+restoreRejectsForeignFormat tag s contra with (decEq tag (formatTag RuntimeV3))
+  restoreRejectsForeignFormat tag s contra | Yes prf = absurd (contra prf)
+  restoreRejectsForeignFormat tag s contra | No  _   = Refl
+
+||| POSITIVE CONTROL: the rejection theorem is not vacuous — a wrong tag
+||| really is refused.
+public export
+restoreRejectsV2 : restore (MkRuntimeSnapshot "idaptik-ghost-lobby-runtime-v2"
+                                              (newRun 7 Standard)) = Nothing
+restoreRejectsV2 = Refl
+
+||| CHECKED: the frame-clock theorem, restated about `run` — the function
+||| `idap_ghost_lobby_tick_json` actually drives.
+public export
+runAdvancesByFrameCountOnRun : (s : RunState) -> (css : List (List Command)) ->
+                               tick (fst (run s css)) = tick s + length css
+runAdvancesByFrameCountOnRun s css =
+  trans (cong tick (runFstIsRunState s css)) (runAdvancesByFrameCount s css)
