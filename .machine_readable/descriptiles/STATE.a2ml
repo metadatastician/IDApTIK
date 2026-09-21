@@ -15,8 +15,8 @@ description = "Asymmetric two-player infiltration game. One player infiltrates a
 subtitle = "Invisible Door: Action Point Trauma Inc. Kickers"
 truth-language = "rust"
 session-language = "elixir"
-ffi-language-policy = "zig"
-ffi-policy-status = "missing: the Zig adapter is not implemented; the exported C ABI is still consumed directly from Rust; tracked in issue #103"
+ffi-language = "zig"
+ffi-status = "present: crates/idaptik-ffi/zig-adapter — the Zig adapter consumes the exported C ABI, with a conformance suite checked against the Idris2 ABI model and a fuzz layer, gated by the abi-conformance workflow; the residual serde-wire work is tracked in issue #103"
 abi-model-language = "idris2"
 abi-model-status = "present: crates/idaptik-ffi/abi — a total, typechecked model of the C ABI (ownership, wire shapes, determinism, snapshot invariants) gated by scripts/abi_model_check.sh; the serde-wire conformance suite is still pending, tracked in issue #103"
 config-language = "nickel"
@@ -33,7 +33,7 @@ phase-goal = "Turn the proven Ghost Lobby/TUI/netplay slice into a coherent play
 [component-status]
 core = { status = "live", notes = "Deterministic event-sourced Ghost Lobby, building runtime, grounded network, actors, snapshots, package loading, and replay." }
 net = { status = "live", notes = "Two-seat delay lockstep, pacing, pause, peer loss, digest checks, snapshot resync, and interactive client." }
-ffi = { status = "partial", notes = "The Rust-exported C ABI drives the real Ghost Lobby simulation with JSON command/event and snapshot parity; the Idris2 ABI model now exists (crates/idaptik-ffi/abi, gated in CI); the Zig adapter and the serde-wire conformance suite are still missing; tracked in issue #103." }
+ffi = { status = "partial", notes = "The Rust-exported C ABI drives the real Ghost Lobby simulation with JSON command/event and snapshot parity; the Idris2 ABI model exists (crates/idaptik-ffi/abi, gated in CI); the Zig adapter now exists too (crates/idaptik-ffi/zig-adapter) with conformance and fuzz suites; the Idris2 proof obligations and the serde-wire conformance suite remain, tracked in issue #103." }
 tui = { status = "live", notes = "Playable reference frontend plus headless, replay, and export verification." }
 bevy-frontend = { status = "selected-partial", notes = "Working renderer, HUD, keymap, interpolation, and parity tests; full player-facing shell and visual validation remain." }
 burble-relay = { status = "external-live", notes = "The relay lives in sibling metadatastician/burble. IDApTIK pins a known-compatible revision in CI and gates role routing, de-duplication, determinism, peer loss, lockstep, and snapshot resync through its game lane." }
