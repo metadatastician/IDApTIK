@@ -3,8 +3,13 @@
 #
 # Gate the Idris2 model of the idaptik-ffi C ABI (issue #103):
 #
-#   1. escape scan  - no postulates, believe_me, assert_total, or partial
-#                     definitions in the model (comments excluded)
+#   1. escape scan  - scripts/idris_escape_scan.sh: no proof escape
+#                     (postulate, believe_me, assert_total, partial, ...)
+#                     outside comments, every packaged module under
+#                     %default total, and any escape kept must be waived
+#                     by a reviewed row in abi/ESCAPE-LEDGER.tsv. Runs
+#                     before the toolchain check, so it gates even where
+#                     no Idris2 compiler exists.
 #   2. typecheck    - idris2 --build under %default total: every property
 #                     the model states is machine-checked
 #   3. run          - the smoke session executes end-to-end under the Chez
@@ -41,6 +46,13 @@ dump_log() {
   printf 'abi-model: --- end %s output ---\n' "$1" >&2
 }
 
+# --- 1. escape scan --------------------------------------------------------
+# Deliberately first: it needs no compiler, so a proof escape is caught on
+# every run rather than only on runs where the Idris2 toolchain resolved.
+# The old inline grep silently scanned nothing when the toolchain was
+# missing, and matched `partialOrder` as if it were `partial`.
+bash "$REPO_DIR/scripts/idris_escape_scan.sh" || fail "proof-escape scan failed (see above)"
+
 # --- toolchain -------------------------------------------------------------
 IDRIS2="${IDRIS2:-}"
 if [ -z "$IDRIS2" ]; then
@@ -56,10 +68,6 @@ for scheme_dir in /tmp/idris-bootstrap/chez-native/bin; do
   [ -d "$scheme_dir" ] && PATH="$scheme_dir:$PATH"
 done
 export PATH
-
-# --- 1. escape scan --------------------------------------------------------
-escapes="$(grep -rvE '^[[:space:]]*(\|\|\||--)' "$ABI_DIR/src" | grep -oE 'postulate|believe_me|assert_total|assert_disjoint|partial' | sort -u || true)"
-[ -z "$escapes" ] || fail "escape hatches present in the model: $escapes"
 
 # --- 2. typecheck ----------------------------------------------------------
 if ! (cd "$ABI_DIR" && "$IDRIS2" --build idaptik-abi.ipkg) >"$BUILD_LOG" 2>&1; then
@@ -99,4 +107,4 @@ idris_tag="$(grep -oE 'formatTag RuntimeV3 = "[^"]+"' "$ABI_DIR/src/Idaptik/Abi/
 [ "$rust_tag" = "$idris_tag" ] \
   || fail "snapshot format drift: rust=$rust_tag idris=$idris_tag"
 
-echo "abi-model: ok (typechecked, smoke ran, header + format parity)"
+echo "abi-model: ok (escapes scanned, typechecked, smoke ran, header + format parity)"

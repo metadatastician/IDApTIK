@@ -60,10 +60,42 @@ gate, so the model cannot drift from the C surface in either direction.
 just abi-model-check        # or: bash scripts/abi_model_check.sh
 ```
 
-Escape scan (no `postulate` / `believe_me` / `assert_total` / partial
-definitions — comments excluded), typecheck, runtime smoke, header
-correspondence, and snapshot-format parity. A missing toolchain is a
-failure, never a skip.
+Escape scan, typecheck, runtime smoke, header correspondence, and
+snapshot-format parity. A missing toolchain is a failure, never a skip.
+
+### The escape scan (`scripts/idris_escape_scan.sh`)
+
+Runs first and needs no compiler, so it gates every pull request rather
+than only the ones where the Idris2 bootstrap job runs. It also runs
+standalone in the `fixtures-and-must` CI job. Two checks:
+
+1. **No proof escape outside comments** — `postulate`, `believe_me`,
+   `really_believe_me`, `assert_total`, `assert_smaller`, `assert_linear`,
+   `unsafePerformIO`, `idris_crash`, `partial`, `covering`, `%unsafe`.
+   Matched on word boundaries, so `partialOrder` is not a hit; `{- -}`,
+   `|||` and `--` comments are stripped first, and string literals are
+   deliberately *not* stripped — a false positive is one line to fix, a
+   false negative is a hole nobody sees.
+2. **Every packaged module carries `%default total`** — the module list
+   comes from `idaptik-abi.ipkg`, not a glob, so the check tracks what is
+   actually built. This escape's form is an *absence*: deleting the pragma
+   disarms every proof in a module with no compiler error and leaves no
+   token for a text scan to find, so it needs its own check.
+
+Keeping an escape requires a marker on the line (`-- ESCAPE-WAIVER: <id>`)
+*and* a reviewed row in [`ESCAPE-LEDGER.tsv`](./ESCAPE-LEDGER.tsv) naming
+the term, the file and the reason. Waivers key on the id, never a line
+number, so inserting a line cannot transfer a waiver to different code;
+one id excuses exactly one line; and a row matching no escape fails the
+gate, because an orphan row is a standing permission the next escape to
+land there would inherit.
+
+The scan prints its denominator on success — `6 .idr files, 401 lines of
+code scanned, 0 waived escapes` — and refuses to pass over an empty tree,
+so a gate that has stopped looking at anything says so instead of `ok`.
+`--self-test` builds a fixture tree and runs 12 controls, 10 of them
+mutants the gate must kill; CI runs it on every push, so the gate is
+checked for its ability to fail rather than only observed to pass.
 
 ## Toolchain (bootstrap recipe)
 
