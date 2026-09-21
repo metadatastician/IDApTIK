@@ -89,10 +89,19 @@ make -C support/c        # a fresh clone must build this first: without it,
 make bootstrap SCHEME="$PREFIX/chez-native/bin/scheme"   # install-refc may
 # still fail on a missing gmp.h — harmless for the Chez codegen; the compiler
 # and libraries are built by then
+export IDRIS2_PREFIX="$PREFIX/idris-install"   # where the libraries below land
 for lib in prelude base linear network; do
   (cd libs/$lib && ../../build/exec/idris2 --install $lib.ipkg)
 done
-export IDRIS2_PACKAGE_PATH="$PREFIX/.../idris2-0.8.0"   # installed package root
+# `make bootstrap` installs the C support library only into the bootstrap's own
+# prefix, never into $IDRIS2_PREFIX. `idris2 --build` copies it from
+# <prefix>/idris2-0.8.0/lib into the generated <exe>_app/ dir, so without these
+# two lines a build SUCCEEDS and the binary then dies at load time with
+# `Exception: (while loading libidris2_support.so)`.
+mkdir -p "$IDRIS2_PREFIX/idris2-0.8.0/lib"
+install -m 755 support/c/libidris2_support.so "$IDRIS2_PREFIX/idris2-0.8.0/lib/"
+install -m 644 support/c/libidris2_support.a  "$IDRIS2_PREFIX/idris2-0.8.0/lib/"
+export IDRIS2_PACKAGE_PATH="$IDRIS2_PREFIX/idris2-0.8.0"   # installed package root
 ```
 
 `scripts/abi_model_check.sh` finds the toolchain via `$IDRIS2`, then
