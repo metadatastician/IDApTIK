@@ -68,7 +68,7 @@ jobs:
           git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
           git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach --force FETCH_HEAD
-      - name: Bootstrap Chez + Idris2 (recipe: crates/idaptik-ffi/abi/README.md)
+      - name: "Bootstrap Chez + Idris2 (recipe: crates/idaptik-ffi/abi/README.md)"
         run: |
           mkdir -p /tmp/idris-bootstrap && cd /tmp/idris-bootstrap
           git clone --depth 1 --branch v10.4.1 --recurse-submodules --shallow-submodules \
