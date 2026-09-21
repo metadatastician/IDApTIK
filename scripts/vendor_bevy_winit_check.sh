@@ -152,6 +152,29 @@ check_parity() {
   [ -d "$published" ] || die "tarball did not contain $CRATE_NAME-$version/"
 
   # 1. Source, licences, and README are byte-identical.
+  #
+  # `cargo package` GENERATES three files into every tarball. They are correctly
+  # absent from a vendored source tree, so their absence is not drift -- before
+  # this was handled the gate failed on every real crates.io artefact while
+  # passing its whole fixture suite (issue #123):
+  #   .cargo_vcs_info.json  the upstream commit the tarball was cut from
+  #   Cargo.lock            the crate's own lock, meaningless to a vendored dep
+  #   Cargo.toml.orig       cargo's copy of the pre-normalisation manifest
+  #
+  # Removed at the crate ROOT rather than passed to `diff --exclude`, because
+  # --exclude matches a BASENAME AT ANY DEPTH: `--exclude=Cargo.lock` would also
+  # blind the check to a real `src/Cargo.lock`. Measured -- that exact mutant
+  # survived the --exclude form and is killed by this one. cargo only ever emits
+  # these three at the root, so removing them there is exact.
+  #
+  # $published is our own `mktemp -d` unpack (see $work above), never the
+  # vendored tree, and nothing below reads these files -- only Cargo.toml, which
+  # is deliberately kept and compared properly by section 2.
+  rm -f -- \
+    "$published/.cargo_vcs_info.json" \
+    "$published/Cargo.lock" \
+    "$published/Cargo.toml.orig"
+
   local drift
   drift="$(diff -rq "$published" "$VENDOR_DIR" --exclude=Cargo.toml 2>&1 || true)"
   [ -z "$drift" ] || die "vendored tree drifted from the published crate:
