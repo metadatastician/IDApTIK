@@ -29,6 +29,18 @@ HEADER="$REPO_DIR/crates/idaptik-ffi/include/idaptik.h"
 
 fail() { printf 'abi-model: FAIL %s\n' "$1" >&2; exit 1; }
 
+# Build steps are silenced so a passing gate prints one line. But a step
+# whose failure message says "see output above" while its output went to
+# /dev/null is a diagnosis dead end -- the compiler error is the one thing
+# a reader needs. Keep the output, and print it only when the step fails.
+BUILD_LOG="$(mktemp)"
+trap 'rm -f "$BUILD_LOG"' EXIT
+dump_log() {
+  printf 'abi-model: --- %s output ---\n' "$1" >&2
+  cat "$BUILD_LOG" >&2
+  printf 'abi-model: --- end %s output ---\n' "$1" >&2
+}
+
 # --- toolchain -------------------------------------------------------------
 IDRIS2="${IDRIS2:-}"
 if [ -z "$IDRIS2" ]; then
@@ -50,14 +62,20 @@ escapes="$(grep -rvE '^[[:space:]]*(\|\|\||--)' "$ABI_DIR/src" | grep -oE 'postu
 [ -z "$escapes" ] || fail "escape hatches present in the model: $escapes"
 
 # --- 2. typecheck ----------------------------------------------------------
-(cd "$ABI_DIR" && "$IDRIS2" --build idaptik-abi.ipkg) >/dev/null \
-  || fail "typecheck failed (the model is total and checked; see output above)"
+if ! (cd "$ABI_DIR" && "$IDRIS2" --build idaptik-abi.ipkg) >"$BUILD_LOG" 2>&1; then
+  dump_log typecheck
+  fail "typecheck failed (the model is total and checked; compiler output above)"
+fi
 
 # --- 3. runtime smoke ------------------------------------------------------
-(cd "$ABI_DIR" && "$IDRIS2" --install idaptik-abi.ipkg) >/dev/null \
-  || fail "package install failed"
-(cd "$SMOKE_DIR" && rm -rf build && "$IDRIS2" --build smoke.ipkg) >/dev/null \
-  || fail "smoke build failed"
+if ! (cd "$ABI_DIR" && "$IDRIS2" --install idaptik-abi.ipkg) >"$BUILD_LOG" 2>&1; then
+  dump_log "package install"
+  fail "package install failed"
+fi
+if ! (cd "$SMOKE_DIR" && rm -rf build && "$IDRIS2" --build smoke.ipkg) >"$BUILD_LOG" 2>&1; then
+  dump_log "smoke build"
+  fail "smoke build failed"
+fi
 smoke_out="$("$SMOKE_DIR/build/exec/abi-smoke" 2>&1)" \
   || fail "smoke execution failed: $smoke_out"
 printf '%s\n' "$smoke_out" | grep -q '^session: tick + snapshot + free complete$' \
