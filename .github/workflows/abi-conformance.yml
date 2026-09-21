@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -77,22 +77,67 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Re-derive pinned digests and diff against docs/abi/ABI-AUTHORITY.md
         run: |
           set -euo pipefail
           base="https://raw.githubusercontent.com/hyperpolymath/hypatia"
+          rev=bcb8bb3730c2520117e565d80d5638ff384c1222
+          old=2bbd3b2
+          fail=0
+          # NB: fetch to a FILE, never to a shell variable. Command
+          # substitution strips trailing newlines, which silently changes
+          # every digest — caught here by a positive control.
           check() { # ref path expected_sha
-            got="$(curl -fsSL "$base/$1/$2" | sha256sum | cut -d' ' -f1)"
+            tmp="$(mktemp)"
+            if ! curl -fsSL "$base/$1/$2" -o "$tmp"; then
+              echo "FETCH FAILED: $2 @$1 — pin unverifiable, treat as drift"; fail=1; rm -f "$tmp"; return
+            fi
+            got="$(sha256sum < "$tmp" | cut -d' ' -f1)"
+            rm -f "$tmp"
             if [ "$got" != "$3" ]; then
-              echo "DRIFT: $2 @$1 — expected $3, got $got"; exit 1
+              echo "DRIFT: $2 @$1 — expected $3, got $got"; fail=1; return
             fi
             echo "OK: $2 @$1"
           }
-          # Historical pin of record (docs table row 1).
-          check 2bbd3b2 ffi/connectors.json 16878b5b50145d860c9717bb035a001f5841aad20eb682308279e9063a44c15e
-          # Current canonical revision (docs table row 2); bump BOTH together.
-          check bcb8bb3730c2520117e565d80d5638ff384c1222 ffi/zig/src/unified-api-adapter.zig f9a0b6fa9158ac7055d2d68f39a126800d8724a5c171bb2d35994e60dc3b5676
-          check bcb8bb3730c2520117e565d80d5638ff384c1222 ffi/connectors.json 16878b5b50145d860c9717bb035a001f5841aad20eb682308279e9063a44c15e
+
+          # --- NEGATIVE CONTROL -------------------------------------------
+          # A gate that cannot fail is worse than no gate. Prove the fetch
+          # path actually refuses a path that does not exist, before trusting
+          # any OK below.
+          if curl -fsSL "$base/$rev/ffi/__no_such_file__.json" >/dev/null 2>&1; then
+            echo "CONTROL FAILED: a nonexistent path returned data; every OK below is meaningless"
+            exit 1
+          fi
+          echo "control: nonexistent path correctly refused"
+
+          # --- NORMATIVE LAYER: the Idris2 ABI ----------------------------
+          # Owner ruling 2026-09-21: the ABI is written in Idris2 and IS the
+          # specification; the Zig FFI below conforms to it.
+          check "$rev" src/Hypatia/ABI/Types.idr      a5f794b11cfbb38b9c38ba861af71d7cbd3e9b97c29a14973b212642d2f0d84e
+          check "$rev" src/Hypatia/ABI/FFI.idr        e7fb117bfe137e76232ddb220db82a389808a63d3eda29e3d47057052366c669
+          check "$rev" src/Hypatia/ABI/REST.idr       3d3bfe554afcfca22d5fa064621d9f6fb94e16a9b0a2a56b434ef5c66543813f
+          check "$rev" src/Hypatia/ABI/GraphQL.idr    a5122cfe2039fd1b06ab1e81fadb9d11b23418edd0b8bc25179d5546200914c5
+          check "$rev" src/Hypatia/ABI/GRPC.idr       c04165ae3426b7bde34d64d21277bbf5d0e0f66fdfa08ac71c9968df6888e5b4
+          check "$rev" src/Hypatia/ABI/RuleEngine.idr a191ada02ed9534cd66eb2b3c8de45e354682358e8f9cec4b676b68788adc3bd
+
+          # --- IMPLEMENTATION LAYER: the Zig FFI + wire manifest ----------
+          check "$rev" ffi/zig/src/unified-api-adapter.zig f9a0b6fa9158ac7055d2d68f39a126800d8724a5c171bb2d35994e60dc3b5676
+          check "$rev" ffi/connectors.json                 33ee987eeb20283676e663bb6eacb5534ecb0da4bec344891aca08e7933be842
+
+          # --- HISTORICAL PIN OF RECORD (pre-rename, for audits) ----------
+          # NB: connectors.json DID change across the rename (the advisory
+          # _note string only); ids, names and ordering did not. Both digests
+          # are pinned deliberately — they are not expected to match.
+          check "$old" ffi/connectors.json                 16878b5b50145d860c9717bb035a001f5841aad20eb682308279e9063a44c15e
+          check "$old" ffi/zig/src/hexadeca.zig            9e43876ae926567f6e0180a9da83a64bcb07222fde5347ef059a1bb0ecb56f22
+          check "$old" src/Hypatia/ABI/Types.idr           b04478e836754334c474e4f09317e88344b95c884cac4fc591bdb50157faf187
+          check "$old" clients/rust/hypatia-client/src/connector.rs 6c12e56e4c35954ee5eaab81a72c9f460b71e966364eeb0a9ee5e675702538c8
+
+          if [ "$fail" -ne 0 ]; then
+            echo "authority-pin: one or more pins drifted; update docs/abi/ABI-AUTHORITY.md and this workflow together"
+            exit 1
+          fi
+          echo "authority-pin: all pins verified against $rev"
