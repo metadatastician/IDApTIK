@@ -108,15 +108,33 @@ are the reason to be on the BEAM in the first place. The estate scanner is
 `cadastra/tools/estate-migration-toolkit/scripts/find-nif-to-snif.sh`.
 
 The Zig adapter implements IDApTIK's C boundary (8 exports) and its conformance
-fixtures pin against the digests above. CI re-derives the digests from the
-pinned revisions and rejects drift — see `.github/workflows/abi-conformance.yml`
+fixtures pin against the digests above. See `.github/workflows/abi-conformance.yml`
 and `crates/idaptik-ffi/zig-adapter/test/conformance_test.zig`.
 
-## Known limitation — drift is detected, not prevented
+## What the digest gate does and does not verify
+
+Be precise about this, because the obvious reading is wrong.
+
+**It verifies pin integrity.** Every `check` fetches at a *fixed* hypatia
+revision, so it proves three things: the digests recorded in this document are
+true of the bytes at that revision; the pinned commits still resolve (a history
+rewrite or a force-push that orphaned them fails the gate rather than passing
+silently); and this document and the workflow pin the *same* twelve digests.
+That last comparison is a real diff of the two files, with an emptiness guard —
+two empty sets compare equal, which is how a check like this usually goes
+vacuous — and a perturbation control proving the comparison can fail at all.
+
+**It does not track hypatia `main`.** Bytes at a fixed commit are immutable, so
+no amount of upstream movement can make this gate go red. If hypatia's ABI
+advances, the pins here keep verifying happily against the old revision. Moving
+the pins forward is a deliberate human act, and reviewing what changed between
+the old and new revisions is the point at which divergence is actually noticed.
+
+## Known limitation — divergence is detected, not prevented
 
 The 16-connector enum currently agrees across Idris2, Zig and Rust **by hand**;
-no code is generated from the normative ABI. The gate described above therefore
-*detects* divergence after it is committed, rather than making it impossible.
-Generating the Zig and Rust enums from the Idris2 ABI is the intended end state
-and is tracked as a separate issue; until it lands, this document plus the
-digest gate are the control.
+no code is generated from the normative ABI. The surface check and conformance
+vectors therefore *detect* divergence after it is committed, rather than making
+it impossible. Generating the Zig and Rust enums from the Idris2 ABI is the
+intended end state and is tracked as a separate issue; until it lands, this
+document, the surface check and the digest gate are the control.

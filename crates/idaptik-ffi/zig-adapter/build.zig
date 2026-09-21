@@ -5,8 +5,12 @@
 //   zig build test         — adapter unit tests (no library needed)
 //   zig build conformance  — conformance harness against the Rust cdylib
 //                            (build it first: cargo build -p idaptik-ffi;
-//                            point IDAPTIK_FFI_LIB at the .so if it is not
-//                            in the default search path)
+//                            -Dlibdir=<dir> if the .so is not at the
+//                            default ../../../target/debug)
+//   zig build fuzz         — adversarial sweep over the same boundary
+//
+// -Dlibdir is the ONLY library knob. There is no IDAPTIK_FFI_LIB: nothing
+// in this file or the harness reads an environment variable.
 
 const std = @import("std");
 

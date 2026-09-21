@@ -60,11 +60,13 @@ jobs:
         working-directory: crates/idaptik-ffi/zig-adapter
         run: zig build test
 
+      # -Dlibdir is the ONLY knob the build script reads. An earlier
+      # revision exported IDAPTIK_FFI_LIB here; no code reads it, so the
+      # job was relying on the relative default while appearing to be
+      # configured. Pass the real option, absolutely, and say so.
       - name: Conformance — vectors must pass, planted failures must be caught
         working-directory: crates/idaptik-ffi/zig-adapter
-        env:
-          IDAPTIK_FFI_LIB: ${{ github.workspace }}/target/debug/libidaptik_ffi.so
-        run: zig build conformance
+        run: zig build conformance -Dlibdir="$GITHUB_WORKSPACE/target/debug"
 
       - name: Fuzz — adversarial sweep + double-free trap probe
         working-directory: crates/idaptik-ffi/zig-adapter
@@ -112,6 +114,31 @@ jobs:
             exit 1
           fi
           echo "control: nonexistent path correctly refused"
+
+          # --- DOC ↔ WORKFLOW AGREEMENT ----------------------------------
+          # This step's NAME promises a diff against the document. An earlier
+          # revision only re-derived the hardcoded digests below and never
+          # opened the file, so the two could drift apart unnoticed and the
+          # name asserted something the script did not do.
+          doc="docs/abi/ABI-AUTHORITY.md"
+          me=".github/workflows/abi-conformance.yml"
+          doc_set="$(grep -oE '[0-9a-f]{64}' "$doc" | sort -u)"
+          wf_set="$(grep -E '^[[:space:]]*check "' "$me" | grep -oE '[0-9a-f]{64}' | sort -u)"
+          # Two EMPTY sets compare equal. A grep that silently matches nothing
+          # is the commonest way a gate like this goes vacuous, so refuse it.
+          [ -n "$doc_set" ] || { echo "CONTROL FAILED: no digests found in $doc"; exit 1; }
+          [ -n "$wf_set" ]  || { echo "CONTROL FAILED: no digests found in $me"; exit 1; }
+          if diff <(printf '%s\n' "$doc_set") <(printf '%s\n' "$doc_set" | sed '1d') >/dev/null 2>&1; then
+            echo "CONTROL FAILED: a perturbed digest set compared equal; this diff is vacuous"
+            exit 1
+          fi
+          echo "control: perturbed digest set correctly compared unequal"
+          if diff <(printf '%s\n' "$doc_set") <(printf '%s\n' "$wf_set"); then
+            echo "doc↔workflow: identical digest sets ($(printf '%s\n' "$doc_set" | wc -l) digests)"
+          else
+            echo "DOC DRIFT: $doc and $me pin different digest sets"
+            fail=1
+          fi
 
           # --- NORMATIVE LAYER: the Idris2 ABI ----------------------------
           # Owner ruling 2026-09-21: the ABI is written in Idris2 and IS the
