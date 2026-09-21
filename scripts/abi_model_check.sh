@@ -18,6 +18,11 @@
 #                     the idap_* exports of include/idaptik.h
 #   5. format diff  - the model's snapshot format tag equals the Rust
 #                     SNAPSHOT_FORMAT constant, so the two cannot drift
+#   6. proof mutants- scripts/abi_proof_mutants.sh: each of a set of
+#                     deliberately falsified lemmas must be rejected by the
+#                     typechecker, naming the lemma it rejected. A proof
+#                     suite only ever observed to say "ok" is not known to be
+#                     able to say anything else (issue #117)
 #
 # Toolchain resolution: $IDRIS2, then the known bootstrap locations (the
 # sandbox workspace keeps one under /home/user/idris-toolchain; CI builds its
@@ -69,11 +74,35 @@ for scheme_dir in /tmp/idris-bootstrap/chez-native/bin; do
 done
 export PATH
 
+# The package builds under `opts = "--total"`, and 0.8.x is the version the
+# model is written against. A 0.7.x compiler on PATH fails deep inside the
+# proofs with errors that read like defects in the model; say so up front.
+idris_version="$("$IDRIS2" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+case "$idris_version" in
+  0.8.*) : ;;
+  "")    fail "could not read a version from $IDRIS2" ;;
+  *)     fail "idris2 $idris_version at $IDRIS2 is not 0.8.x (set \$IDRIS2 to a 0.8.x build; see abi/README.md)" ;;
+esac
+
 # --- 2. typecheck ----------------------------------------------------------
+# MEASURED, not hygiene: `opts = "--total"` is applied when a module is
+# COMPILED, and a .ttc built without it is reused unchecked. Staged against
+# this package with a non-terminating function planted in Json.idr:
+#
+#   build clean, no --total   -> PASSED
+#   add --total, keep build/  -> PASSED   <- the mutant survives
+#   add --total, rm -rf build -> FAILED   <- the mutant dies
+#
+# So deleting the artefacts is what makes the totality requirement real. A
+# gate that skipped it would report "typechecked and total" over a tree that
+# had never been checked for totality at all.
+rm -rf "$ABI_DIR/build"
 if ! (cd "$ABI_DIR" && "$IDRIS2" --build idaptik-abi.ipkg) >"$BUILD_LOG" 2>&1; then
   dump_log typecheck
   fail "typecheck failed (the model is total and checked; compiler output above)"
 fi
+grep -qE '^opts[[:space:]]*=[[:space:]]*"[^"]*--total' "$ABI_DIR/idaptik-abi.ipkg" \
+  || fail "idaptik-abi.ipkg no longer passes --total; the clean rebuild above proved nothing"
 
 # --- 3. runtime smoke ------------------------------------------------------
 if ! (cd "$ABI_DIR" && "$IDRIS2" --install idaptik-abi.ipkg) >"$BUILD_LOG" 2>&1; then
@@ -90,6 +119,15 @@ printf '%s\n' "$smoke_out" | grep -q '^session: tick + snapshot + free complete$
   || fail "smoke session did not complete: $smoke_out"
 printf '%s\n' "$smoke_out" | grep -q '^smoke: interior NUL rejected$' \
   || fail "interior-NUL rejection missing: $smoke_out"
+# `natChars` exists because `show : Nat -> String` does not reduce, so no
+# proof can be stated over it. That `natChars` agrees with `show` byte for
+# byte is therefore a measurement, not a theorem -- and the negative control
+# is checked FIRST, because agreement reported by a comparator that cannot
+# disagree would mean nothing.
+printf '%s\n' "$smoke_out" | grep -q '^smoke: natChars comparator rejects a wrong renderer$' \
+  || fail "natChars comparator did not reject a deliberately wrong renderer: $smoke_out"
+printf '%s\n' "$smoke_out" | grep -qE '^smoke: natChars = show over [0-9]+ values$' \
+  || fail "natChars/show agreement not reported: $smoke_out"
 
 # --- 4. header correspondence ---------------------------------------------
 header_fns="$(grep -oE '\bidap_[a-z_]+\b' "$HEADER" | sort -u)"
@@ -107,4 +145,17 @@ idris_tag="$(grep -oE 'formatTag RuntimeV3 = "[^"]+"' "$ABI_DIR/src/Idaptik/Abi/
 [ "$rust_tag" = "$idris_tag" ] \
   || fail "snapshot format drift: rust=$rust_tag idris=$idris_tag"
 
-echo "abi-model: ok (escapes scanned, typechecked, smoke ran, header + format parity)"
+# --- 6. proof mutants ------------------------------------------------------
+# Steps 1-5 establish that the model compiles and agrees with the C surface.
+# None of them establishes that the PROOFS have teeth: a theorem about an
+# uninhabited type, or one the elaborator discharges for a reason unrelated to
+# what it claims, compiles just as happily. Each mutant falsifies one lemma and
+# must be rejected BY NAME.
+# Invoked directly, not as `bash <script>`: `bash script` ignores the file
+# mode, so a script committed 100644 passes every local run and dies at exit
+# 126 in CI. Running it directly makes the executable bit load-bearing.
+if ! IDRIS2="$IDRIS2" "$REPO_DIR/scripts/abi_proof_mutants.sh"; then
+  fail "proof mutants: a deliberately false lemma was accepted (see above)"
+fi
+
+echo "abi-model: ok (escapes scanned, typechecked, smoke ran, mutants killed, header + format parity)"

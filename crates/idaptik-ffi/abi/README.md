@@ -36,6 +36,62 @@ the properties below are equations the typechecker verified, not claims:
 `Idaptik.Abi.Exports.exportedFunctions` is diffed against the header by the
 gate, so the model cannot drift from the C surface in either direction.
 
+### The four proof obligations of [#117](https://github.com/metadatastician/IDApTIK/issues/117)
+
+`Idaptik.Abi.Protocol` states the C calling protocol as one indexed session
+type, `Session : HandleState -> Nat -> HandleState -> Nat -> Type`: the
+handle's state and the number of owned strings outstanding, before and after.
+A `Complete` session is `Session Live 0 Freed 0`. Ownership and string
+pairing are then the same theorem about one object, rather than two theories
+that could disagree.
+
+- **O1 — ownership and lifetime.** `noResurrection` checks that no operation
+  takes a freed handle back to live. `completeFreesExactlyOnce` checks that a
+  complete session frees exactly once, by induction through
+  `liveToFreedFreesOnce` and `noFreeAfterFreed`, so it holds on every path
+  rather than for one example. A double free has no typing derivation at all.
+- **O2 — string/`idap_string_free` pairing.** `sessionBalance` checks
+  `n₁ + emitCount s = freeStrCount s + n₂` at *every* prefix;
+  `completeBalancesStrings` specialises it, so a complete session frees
+  exactly as many strings as it was handed. Freeing a string is deliberately
+  polymorphic in handle state, because C permits `idap_string_free` after
+  `idap_ghost_lobby_free`.
+- **O3 — wire shape and NUL-freedom.** `renderTickCloses` and
+  `renderSnapshotCloses` check the closing delimiter, `renderSnapshotIsObject`
+  the opening one, and `snapshotOfIsNulFree` that a rendered snapshot holds no
+  interior NUL — the property that makes it safe to hand to C as a `char *` —
+  stated over the exact expression `Exports` passes to `ownSnapshot`.
+- **O4 — deterministic tick and snapshot.** `runAdvancesByFrameCountOnRun`
+  checks that the frame clock advances by the number of frames whatever they
+  contain, stated about `run` itself via `runFstIsRunState` rather than about
+  a model function written alongside it.  `restoreRejectsForeignFormat`
+  checks that restore refuses any tag but the current one, with
+  `restoreRejectsV2` as a worked instance.
+
+`entryPointIsExported` ties the protocol to the C surface: every operation the
+session type permits denotes a function in `exportedFunctions`, which the gate
+diffs against `include/idaptik.h`. Header to model by the gate, model to
+protocol by the proof.
+
+Each obligation carries **witnesses and positive controls**, because a theorem
+about an uninhabited type is true and worthless. `typicalSession` and
+`lateStringFree` are inhabitants of `Complete`; `typicalFreesOnce`,
+`typicalBalances`, `typicalFreesTwoStrings`, `natCharsIsDecimal` and
+`restoreRejectsV2` pin known answers instead of restating the general lemma.
+
+## What is deliberately *not* claimed
+
+- **That `natChars` agrees with `show`.** The snapshot tick counter is
+  rendered by `Idaptik.Abi.Json.natChars`, not `show`, because
+  `show : Nat -> String` elaborates to `primNumShow` and does not reduce, so
+  no proof can be stated over it. That `natChars` emits the *same bytes* as
+  `show` is therefore not a theorem. The smoke harness measures it over 2005
+  values, checking a deliberately wrong renderer first to establish that the
+  comparator is able to disagree.
+- **That "two runs of the same inputs agree".** In this model that is `Refl`
+  — a lemma that cannot fail, and so evidence of nothing. The determinism
+  content lives in O4's frame clock, which can fail.
+
 ## Honest gaps (also tracked in #103)
 
 - The **Zig adapter** now exists (`../zig-adapter/`), gated by
@@ -60,8 +116,9 @@ gate, so the model cannot drift from the C surface in either direction.
 just abi-model-check        # or: bash scripts/abi_model_check.sh
 ```
 
-Escape scan, typecheck, runtime smoke, header correspondence, and
-snapshot-format parity. A missing toolchain is a failure, never a skip.
+Escape scan, typecheck, runtime smoke, header correspondence,
+snapshot-format parity, and proof mutants. A missing toolchain is a failure,
+never a skip, and so is a toolchain that is not 0.8.x.
 
 ### The escape scan (`scripts/idris_escape_scan.sh`)
 
@@ -90,19 +147,65 @@ one id excuses exactly one line; and a row matching no escape fails the
 gate, because an orphan row is a standing permission the next escape to
 land there would inherit.
 
-The scan prints its denominator on success — `6 .idr files, 401 lines of
+The scan prints its denominator on success — `7 .idr files, 719 lines of
 code scanned, 0 waived escapes` — and refuses to pass over an empty tree,
 so a gate that has stopped looking at anything says so instead of `ok`.
 `--self-test` builds a fixture tree and runs 12 controls, 10 of them
 mutants the gate must kill; CI runs it on every push, so the gate is
 checked for its ability to fail rather than only observed to pass.
 
+### The typecheck deletes `build/` first
+
+That is load-bearing, not hygiene. The package carries `opts = "--total"`,
+but the flag is applied when a module is *compiled*, and a `.ttc` built
+without it is reused unchecked. Staged against this package with a
+non-terminating function planted in `Json.idr`:
+
+| build | artefacts | result |
+|---|---|---|
+| no `--total` | clean | passes |
+| `--total` | **`build/` kept** | **passes — the mutant survives** |
+| `--total` | `build/` deleted | fails — the mutant dies |
+
+A gate that reused artefacts would report "typechecked and total" over a tree
+that had never been checked for totality at all.
+
+### The proof mutants (`scripts/abi_proof_mutants.sh`)
+
+Compiling under `--total` and agreeing with the header says nothing about
+whether the *proofs* have teeth. So each mutant falsifies one lemma, and the
+build must fail **and name the lemma it rejected**. A non-zero exit code
+alone cannot tell a dead mutant from a typo or a toolchain fault, and a mutant
+killed by an unrelated error is a false pass that looks exactly like a real
+one.
+
+Seven mutants cover all four obligations and the header tie-in: a wrong free
+count, a double free, a wrong string count, an entry point renamed to a
+different exported function, a wrong decimal rendering, a wrong opening
+delimiter, and an off-by-one frame clock. An unmutated copy is built first as
+a positive control — without it, a tree that failed to build for an unrelated
+reason would report every mutant as killed. A mutation that matches nothing
+fails loudly rather than reading as a survivor, because a renamed lemma
+otherwise stops being tested in silence. Every mutation is applied to a copy;
+the working tree is never modified.
+
 ## Toolchain (bootstrap recipe)
 
-The model targets Idris 2 (0.8.x) with the Chez backend. There is no
-packaged build for the sandbox environment this repository's gates run in,
-so the gate and CI use this recipe (native Chez 10.4.1, no curses/X11 —
-no system library dependencies beyond libc):
+The model targets Idris 2 **0.8.x** with the Chez backend, and the gate
+refuses any other version: a 0.7.x compiler fails deep inside the proofs with
+errors that read like defects in the model rather than like a version
+mismatch.
+
+If you already have a 0.8.x build, point the gate at it and skip the recipe
+entirely:
+
+```sh
+IDRIS2=/path/to/idris2 bash scripts/abi_model_check.sh
+```
+
+There is no distribution package for Idris 2 on the runner image this
+repository's CI uses, so CI builds one with the recipe below (native Chez
+10.4.1, no curses/X11 — no system library dependencies beyond libc):
 
 ```sh
 git clone --depth 1 --branch v10.4.1 --recurse-submodules \
@@ -137,7 +240,8 @@ export IDRIS2_PACKAGE_PATH="$IDRIS2_PREFIX/idris2-0.8.0"   # installed package r
 ```
 
 `scripts/abi_model_check.sh` finds the toolchain via `$IDRIS2`, then
-`/tmp/idris-bootstrap/bin/idris2`, then `PATH`.
+`/tmp/idris-bootstrap/bin/idris2`, then `PATH`, and rejects anything that does
+not report 0.8.x.
 
 ## Licence
 
