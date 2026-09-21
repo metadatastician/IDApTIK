@@ -1,0 +1,156 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Safety classification of every first-party Rust file, for issue #121.
+#
+# The question each row answers is not "is this file important?" but
+# "what breaks, and how quietly, if this file is wrong?"  Creusot is
+# expensive, so it is pointed at the tier where a wrong answer is both
+# severe AND silent -- tier S.  Everything else is named here with a
+# reason, so the scope is a decision on the record rather than a gap.
+#
+# Tiers:
+#   S  determinism kernel -- a wrong answer silently breaks the
+#      byte-for-byte reproducibility ADR-0004 promises.  Tests can miss
+#      it because the run still completes and still looks plausible.
+#      THIS IS THE CREUSOT SCOPE.
+#   L  simulation logic -- gameplay truth.  A wrong answer is a bug, but
+#      a loud one: the acceptance suites in tests/ observe it directly.
+#   B  boundary -- C ABI and network wire.  Memory and protocol safety.
+#      Covered by the Idris2 ABI model (#117) and the conformance
+#      harness, not by Creusot; listed so the coverage claim is honest.
+#   D  data and definitions -- serde content, constants, id newtypes,
+#      registries.  Largely declarative; validated by round-trip tests.
+#   P  presentation -- TUI and Bevy.  Derives nothing; renders tiers
+#      above it.  A wrong answer is visible on screen.
+#   T  tests, examples and binaries -- these observe the system, they do
+#      not define it.  Verifying a test would be circular.
+#
+# Vendored code is NOT in this file and is excluded by path, explicitly,
+# in scripts/creusot_check.sh -- see the VENDOR_EXCLUDED list there.
+#
+# The gate requires this file to be a BIJECTION with the first-party
+# .rs files on disk: every file appears exactly once, every row names a
+# file that exists.  A new .rs file therefore cannot enter the tree
+# without someone classifying it.
+#
+# tier	path	reason
+S	crates/idaptik-core/src/scenario/rng.rs	Mulberry32 PRNG; every stochastic decision in a run descends from it
+S	crates/idaptik-core/src/scenario/mathf.rs	fixed float helpers; ADR-0004 byte-exactness rests on these
+S	crates/idaptik-core/src/scenario/snapshot.rs	RuntimeSnapshot round-trip; a lossy field is invisible until replay
+S	crates/idaptik-core/src/scenario/state.rs	the replayed state itself
+S	crates/idaptik-core/src/scenario/sim/mod.rs	the tick function; ordering here is the determinism contract
+S	crates/idaptik-core/src/scenario/sim/systems.rs	per-tick systems; run order is load-bearing
+S	crates/idaptik-core/src/scenario/command.rs	typed command stream: the replay input
+S	crates/idaptik-core/src/scenario/event.rs	typed event stream: the replay output
+S	crates/idaptik-core/src/trace.rs	the trace clock the run races; off-by-one changes outcomes
+L	crates/idaptik-core/src/interp.rs	pose/door interpolation; parity-tested against the Bevy frontend
+L	crates/idaptik-core/src/scenario/common.rs	shared helpers over the scenario types
+L	crates/idaptik-core/src/scenario/outcome.rs	debrief and grading
+L	crates/idaptik-core/src/scenario/vsm.rs	viable-system model layer
+L	crates/idaptik-core/src/scenario/agents.rs	agent scheduling
+L	crates/idaptik-core/src/scenario/actor/mod.rs	composed actor behaviour
+L	crates/idaptik-core/src/scenario/actor/belief.rs	actor belief state
+L	crates/idaptik-core/src/scenario/floor_graph.rs	floor navigation graph
+L	crates/idaptik-core/src/scenario/building/mod.rs	building simulation
+L	crates/idaptik-core/src/scenario/building/sim.rs	building tick
+L	crates/idaptik-core/src/scenario/building/graph.rs	building adjacency
+L	crates/idaptik-core/src/scenario/building/network.rs	building network overlay
+L	crates/idaptik-core/src/companion/sim.rs	Moletaire companion simulation
+L	crates/idaptik-core/src/companion/hunger.rs	companion hunger model
+L	crates/idaptik-core/src/companion/music.rs	companion music model
+L	crates/idaptik-core/src/companion/equipment.rs	companion equipment
+L	crates/idaptik-core/src/companion/coprocessors.rs	companion coprocessor model
+L	crates/idaptik-core/src/companion/mod.rs	companion re-exports and glue
+L	crates/idaptik-core/src/netsim/access.rs	access evaluation
+L	crates/idaptik-core/src/netsim/addressing.rs	address allocation
+L	crates/idaptik-core/src/netsim/dns.rs	name resolution
+L	crates/idaptik-core/src/netsim/effect.rs	netsim effects
+L	crates/idaptik-core/src/netsim/graph.rs	netsim graph
+L	crates/idaptik-core/src/netsim/mod.rs	netsim re-exports
+L	crates/idaptik-core/src/netsim/reach.rs	reachability
+L	crates/idaptik-core/src/netsim/route.rs	routing
+L	crates/idaptik-core/src/netsim/session.rs	netsim session state
+L	crates/idaptik-core/src/netsim/topology.rs	topology construction
+L	crates/idaptik-core/src/network.rs	the demo network model
+L	crates/idaptik-core/src/package.rs	package load/run orchestration
+D	crates/idaptik-core/src/lib.rs	crate root: re-exports and the demo network fixture
+D	crates/idaptik-core/src/device.rs	device newtypes and enums
+D	crates/idaptik-core/src/scenario/mod.rs	scenario re-exports
+D	crates/idaptik-core/src/scenario/ids.rs	id newtypes
+D	crates/idaptik-core/src/scenario/constants.rs	tuning constants
+D	crates/idaptik-core/src/scenario/tuning.rs	tuning tables
+D	crates/idaptik-core/src/scenario/definition.rs	serde ScenarioDefinition
+D	crates/idaptik-core/src/scenario/ghost_lobby.rs	Ghost Lobby content
+D	crates/idaptik-core/src/scenario/building/exchange_house.rs	Exchange House content
+D	crates/idaptik-core/src/companion/definition.rs	serde CompanionDefinition
+B	crates/idaptik-ffi/src/lib.rs	the C ABI; modelled in Idris2 (#117), conformance-tested in Zig
+B	crates/idaptik-net/src/envelope.rs	wire envelope encoding
+B	crates/idaptik-net/src/error.rs	wire error taxonomy
+B	crates/idaptik-net/src/lib.rs	net crate root
+B	crates/idaptik-net/src/live.rs	live session transport
+B	crates/idaptik-net/src/lockstep.rs	two-seat lockstep; gated by the session-loopback CI job
+B	crates/idaptik-net/src/phoenix.rs	Phoenix channel framing
+B	crates/idaptik-net/src/seat.rs	seat assignment
+B	crates/idaptik-net/src/session.rs	session lifecycle
+B	crates/idaptik-net/src/transport.rs	transport trait
+B	crates/idaptik-net/src/ws.rs	WebSocket adapter
+B	crates/idaptik-net/src/interactive.rs	interactive client driver
+P	crates/idaptik-tui/src/app.rs	TUI application state
+P	crates/idaptik-tui/src/config.rs	TUI config
+P	crates/idaptik-tui/src/export.rs	TUI export
+P	crates/idaptik-tui/src/headless.rs	headless TUI driver
+P	crates/idaptik-tui/src/input.rs	TUI input decoding
+P	crates/idaptik-tui/src/keymap.rs	TUI keymap
+P	crates/idaptik-tui/src/lib.rs	TUI crate root
+P	crates/idaptik-tui/src/net/app.rs	TUI net view state
+P	crates/idaptik-tui/src/net/mod.rs	TUI net re-exports
+P	crates/idaptik-tui/src/net/render.rs	TUI net rendering
+P	crates/idaptik-tui/src/render.rs	TUI rendering
+P	crates/idaptik-tui/src/replay.rs	TUI replay driver
+P	crates/idaptik-tui/src/script.rs	TUI scripted input
+P	crates/idaptik-bevy/src/driver.rs	Bevy driver
+P	crates/idaptik-bevy/src/hud.rs	Bevy HUD
+P	crates/idaptik-bevy/src/keymap.rs	Bevy keymap
+P	crates/idaptik-bevy/src/lib.rs	Bevy crate root
+P	crates/idaptik-bevy/src/net_view.rs	Bevy network view
+P	crates/idaptik-bevy/src/netplay/connection.rs	Bevy netplay connection
+P	crates/idaptik-bevy/src/netplay/input.rs	Bevy netplay input
+P	crates/idaptik-bevy/src/netplay/mod.rs	Bevy netplay re-exports
+P	crates/idaptik-bevy/src/netplay/plugin.rs	Bevy netplay plugin
+P	crates/idaptik-bevy/src/netplay/ui/mod.rs	Bevy netplay UI re-exports
+P	crates/idaptik-bevy/src/netplay/ui/role_select.rs	Bevy role-select UI
+P	crates/idaptik-bevy/src/scene.rs	Bevy scene
+P	crates/idaptik-bevy/src/sprites.rs	Bevy sprites
+T	crates/idaptik-bevy/src/main.rs	binary entry point
+T	crates/idaptik-tui/src/main.rs	binary entry point
+T	crates/idaptik-net/src/bin/loopback_seat.rs	binary entry point
+T	crates/idaptik-net/src/bin/netplay.rs	binary entry point
+T	crates/idaptik-core/examples/package-runner.rs	example binary
+T	crates/idaptik-core/tests/acceptance_endings.rs	test
+T	crates/idaptik-core/tests/acceptance_misdirect_pickpocket.rs	test
+T	crates/idaptik-core/tests/actor_registry.rs	test
+T	crates/idaptik-core/tests/agent_fusion.rs	test
+T	crates/idaptik-core/tests/billy_doors.rs	test
+T	crates/idaptik-core/tests/building_runtime.rs	test
+T	crates/idaptik-core/tests/common/mod.rs	test support
+T	crates/idaptik-core/tests/golden_reset.rs	test
+T	crates/idaptik-core/tests/grounded_slice.rs	test
+T	crates/idaptik-core/tests/interp.rs	test
+T	crates/idaptik-core/tests/json_roundtrip.rs	test
+T	crates/idaptik-core/tests/mechanics_b.rs	test
+T	crates/idaptik-core/tests/moletaire.rs	test
+T	crates/idaptik-core/tests/no_panic_fuzz.rs	test
+T	crates/idaptik-core/tests/phase_asymmetry.rs	test
+T	crates/idaptik-core/tests/replay_determinism.rs	test
+T	crates/idaptik-core/tests/rng_vectors.rs	test
+T	crates/idaptik-core/tests/scoring_grades.rs	test
+T	crates/idaptik-core/tests/session_relay_fixture.rs	test
+T	crates/idaptik-core/tests/snapshot_equivalence.rs	test
+T	crates/idaptik-core/tests/supervised_coverage.rs	test
+T	crates/idaptik-core/tests/validate_ghost_lobby.rs	test
+T	crates/idaptik-bevy/tests/frontend_render_smoke.rs	test
+T	crates/idaptik-bevy/tests/interp_parity.rs	test
+T	crates/idaptik-bevy/tests/net_view_smoke.rs	test
+T	crates/idaptik-bevy/tests/parity.rs	test
+T	crates/idaptik-tui/tests/headless_smoke.rs	test
+T	crates/idaptik-tui/tests/net_smoke.rs	test

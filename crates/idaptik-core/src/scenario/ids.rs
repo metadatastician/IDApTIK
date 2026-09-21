@@ -10,6 +10,7 @@ use std::collections::HashMap;
 macro_rules! id_newtype {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
+        #[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
         #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
         #[serde(transparent)]
         pub struct $name(pub String);

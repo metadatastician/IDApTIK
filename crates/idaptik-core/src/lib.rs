@@ -13,6 +13,18 @@
 //! `(definition, config, seed, command stream)`.
 #![forbid(unsafe_code)]
 
+// Creusot 0.13 refuses to verify a crate that has not loaded `creusot_std`
+// (issue #121), so load it -- but with `extern crate`, never
+// `use creusot_std::prelude::*`. That glob shadows std's derive macros on
+// purpose (creusot-std-proc exports its own `Clone`, `Default` and
+// `PartialEq`), which makes every ordinary `#[derive(Clone)]` in this crate
+// ambiguous (E0659). Creusot's own test corpus imports selectively for the
+// same reason. `cfg(creusot)` is set only by creusot-rustc, so the stable
+// 1.95 build this workspace deliberately pins is untouched -- measured, not
+// assumed: see scripts/creusot_check.sh.
+#[cfg(creusot)]
+extern crate creusot_std;
+
 pub mod companion;
 pub mod device;
 pub mod interp;

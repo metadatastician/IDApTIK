@@ -15,6 +15,12 @@ use serde::{Deserialize, Serialize};
 
 /// Upgrade level for a coprocessor. Declaration order is the upgrade order, so
 /// the derived `Ord` gives the archive's `level >= Enhanced` comparison.
+// Creusot needs a logical model of that order: an ordering comparison on a
+// derived-`Ord` type requires `DeepModel`, and without one creusot-rustc 0.13
+// ICEs in `normalize_erasing_regions` instead of reporting the missing bound
+// (isolated: the same cause surfaces as a plain E0277 in a minimal crate).
+// This is a specification, not proof debt -- it asserts nothing unproven.
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default, Hash,
 )]
@@ -131,6 +137,7 @@ impl CoprocessorType {
 }
 
 /// Vibration analyser reading quality (archive `vibrationReading`).
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub enum VibrationReading {
     /// No data — coprocessor not installed.

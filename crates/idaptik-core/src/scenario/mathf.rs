@@ -16,6 +16,24 @@
 /// The fixed simulation timestep: 60 Hz.
 pub const TICK_DT: f64 = 1.0 / 60.0;
 
+
+/// Whether `v` lies in the closed range `[lo, hi]` — exactly
+/// `(lo..=hi).contains(&v)`, including its NaN behaviour (NaN is in no range).
+///
+/// This wrapper exists for **Creusot** and nothing else. `RangeInclusive<f64>`'s
+/// `contains` is the one construct in this crate that ICEs the Creusot 0.13
+/// driver: its spec calls `<f64 as DeepModel>::deep_model()`, `creusot-std`
+/// implements `DeepModel` for no float type, and the projection then fails to
+/// normalise inside rustc (`normalize_erasing_regions.rs:201`). Marking these
+/// three lines `#[trusted]` confines the damage here instead of losing every
+/// enclosing validator to the same abort. Recorded in
+/// `crates/CREUSOT-PROOF-DEBT.tsv`.
+#[inline]
+#[cfg_attr(creusot, creusot_std::macros::trusted)]
+pub fn in_closed_range(v: f64, lo: f64, hi: f64) -> bool {
+    (lo..=hi).contains(&v)
+}
+
 /// Clamp `v` into `[lo, hi]`, matching JS `Math.min(Math.max(v, lo), hi)`.
 #[inline]
 pub fn clamp(v: f64, lo: f64, hi: f64) -> f64 {

@@ -59,6 +59,7 @@ pub const USB_OBJECT: &str = "usb";
 pub const ACTORS_JSON: &str = include_str!("actors.json");
 
 /// Object classes from the training-ground prototype's `valueSignal` economy.
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ObjectClass {
     Objective,
@@ -152,6 +153,7 @@ impl InterestProfile {
 
 /// Every scalar stat a modifier can address. One variant per [`ActorStats`]
 /// field, so a modifier is data, not code.
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum StatId {
     EnterSpeed,
@@ -606,7 +608,7 @@ impl ActorRegistry {
                     .iter()
                     .map(move |(obj, p)| (a.id.clone(), obj.clone(), p.value_signal))
             })
-            .find(|(_, _, vs)| !(0.0..=1.0).contains(vs));
+            .find(|(_, _, vs)| !crate::scenario::mathf::in_closed_range(*vs, 0.0, 1.0));
         check(
             &mut checks,
             "interests",

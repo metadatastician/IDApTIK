@@ -325,7 +325,7 @@ impl CompanionDefinition {
             }
         }
 
-        if !(0.0..=1.0).contains(&t.item_eat_chance) {
+        if !crate::scenario::mathf::in_closed_range(t.item_eat_chance, 0.0, 1.0) {
             errs.push(E::EatChanceOutOfRange {
                 value: t.item_eat_chance,
             });

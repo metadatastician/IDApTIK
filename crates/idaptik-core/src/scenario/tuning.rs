@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Selects a difficulty preset. Ordered so it is a stable `BTreeMap` key.
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum DifficultyId {
     Story,
@@ -46,6 +47,7 @@ impl FromStr for DifficultyId {
 }
 
 /// The four uplink actions. Ordered so it is a stable `BTreeMap` key.
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ActionKind {
     Camera,

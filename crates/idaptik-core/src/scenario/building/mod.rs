@@ -70,6 +70,7 @@ const SCENARIO_DOOR_TRAVEL_TIME: f64 = 1.0;
 
 /// A reference to one room on one floor. Room ids only need to be unique
 /// within their floor; the pair is globally unique.
+#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct RoomRef {
     pub floor: FloorId,
