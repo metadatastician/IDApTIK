@@ -38,13 +38,17 @@ gate, so the model cannot drift from the C surface in either direction.
 
 ## Honest gaps (also tracked in #103)
 
-- The **Zig adapter** does not exist yet; the C ABI is still implemented
-  directly in Rust (`idaptik-ffi`). Zig remains a policy pin in `mise.toml`.
+- The **Zig adapter** now exists (`../zig-adapter/`), gated by
+  `.github/workflows/abi-conformance.yml` (surface lockstep against
+  `exportedFunctions` and the header, fixture conformance against the Rust
+  cdylib incl. a planted failing fixture, authority-digest drift rejection).
+  The C ABI itself is still implemented directly in Rust (`idaptik-ffi`).
 - The tick parser accepts a **simplified commands wire** (`;`-separated
   `Jump` / `SetButton:<button>:<down|up>`), not the serde JSON the session
   layer and TUI share. Bridging the two — plus the full event vocabulary —
-  is the conformance-test work, blocked until the Zig/Hexadeca toolchain can
-  be exercised here.
+  is now exercised by the conformance harness (`../zig-adapter/`): the serde
+  JSON wire is the wire the fixtures drive through the ABI, and the simplified
+  model wire remains a documented idealisation of it.
 - Two idealisations, documented at their declaration sites: a C `const`
   borrow cannot be expressed linearly, so observation functions thread the
   handle through and hand it back; and the demo network's device count is

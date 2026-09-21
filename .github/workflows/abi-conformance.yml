@@ -1,0 +1,170 @@
+# Conformance + drift gates for the IDApTIK C boundary (issue #103).
+#
+# Proves, on every push/PR that can move the boundary:
+#   1. header ↔ Idris2 model ↔ Zig adapter surface lockstep (3-way diff);
+#   2. the Zig adapter agrees with the Rust truth through the fixture
+#      vectors — including that the PLANTED FAILING fixture is caught;
+#   3. the pinned ABI authority digests (hyperpolymath/hypatia) are
+#      unchanged; a moved pin fails here, not silently downstream.
+
+name: ABI Conformance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/idaptik-ffi/**'
+      - 'fixtures/abi/**'
+      - 'scripts/zig_adapter_surface_check.sh'
+      - 'docs/abi/ABI-AUTHORITY.md'
+      - '.github/workflows/abi-conformance.yml'
+  pull_request:
+    paths:
+      - 'crates/idaptik-ffi/**'
+      - 'fixtures/abi/**'
+      - 'scripts/zig_adapter_surface_check.sh'
+      - 'docs/abi/ABI-AUTHORITY.md'
+      - '.github/workflows/abi-conformance.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  surface-and-conformance:
+    name: Surface lockstep + Zig↔Rust conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust and Zig
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq rustc cargo
+          curl -sL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -o /tmp/zig.tar.xz
+          sudo tar -xJf /tmp/zig.tar.xz -C /usr/local
+          echo "/usr/local/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Surface lockstep (header ↔ Idris2 ↔ Zig)
+        run: bash scripts/zig_adapter_surface_check.sh
+
+      - name: Build the Rust truth (cdylib)
+        run: cargo build -p idaptik-ffi
+
+      - name: Adapter unit tests
+        working-directory: crates/idaptik-ffi/zig-adapter
+        run: zig build test
+
+      # -Dlibdir is the ONLY knob the build script reads. An earlier
+      # revision exported IDAPTIK_FFI_LIB here; no code reads it, so the
+      # job was relying on the relative default while appearing to be
+      # configured. Pass the real option, absolutely, and say so.
+      - name: Conformance — vectors must pass, planted failures must be caught
+        working-directory: crates/idaptik-ffi/zig-adapter
+        run: zig build conformance -Dlibdir="$GITHUB_WORKSPACE/target/debug"
+
+      - name: Fuzz — adversarial sweep + double-free trap probe
+        working-directory: crates/idaptik-ffi/zig-adapter
+        run: |
+          zig build fuzz
+          bash ../../../scripts/fuzz_double_free_probe.sh
+
+  authority-pin:
+    name: ABI authority digests unchanged
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Re-derive pinned digests and diff against docs/abi/ABI-AUTHORITY.md
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/hyperpolymath/hypatia"
+          rev=bcb8bb3730c2520117e565d80d5638ff384c1222
+          old=2bbd3b2
+          fail=0
+          # NB: fetch to a FILE, never to a shell variable. Command
+          # substitution strips trailing newlines, which silently changes
+          # every digest — caught here by a positive control.
+          check() { # ref path expected_sha
+            tmp="$(mktemp)"
+            if ! curl -fsSL "$base/$1/$2" -o "$tmp"; then
+              echo "FETCH FAILED: $2 @$1 — pin unverifiable, treat as drift"; fail=1; rm -f "$tmp"; return
+            fi
+            got="$(sha256sum < "$tmp" | cut -d' ' -f1)"
+            rm -f "$tmp"
+            if [ "$got" != "$3" ]; then
+              echo "DRIFT: $2 @$1 — expected $3, got $got"; fail=1; return
+            fi
+            echo "OK: $2 @$1"
+          }
+
+          # --- NEGATIVE CONTROL -------------------------------------------
+          # A gate that cannot fail is worse than no gate. Prove the fetch
+          # path actually refuses a path that does not exist, before trusting
+          # any OK below.
+          if curl -fsSL "$base/$rev/ffi/__no_such_file__.json" >/dev/null 2>&1; then
+            echo "CONTROL FAILED: a nonexistent path returned data; every OK below is meaningless"
+            exit 1
+          fi
+          echo "control: nonexistent path correctly refused"
+
+          # --- DOC ↔ WORKFLOW AGREEMENT ----------------------------------
+          # This step's NAME promises a diff against the document. An earlier
+          # revision only re-derived the hardcoded digests below and never
+          # opened the file, so the two could drift apart unnoticed and the
+          # name asserted something the script did not do.
+          doc="docs/abi/ABI-AUTHORITY.md"
+          me=".github/workflows/abi-conformance.yml"
+          doc_set="$(grep -oE '[0-9a-f]{64}' "$doc" | sort -u)"
+          wf_set="$(grep -E '^[[:space:]]*check "' "$me" | grep -oE '[0-9a-f]{64}' | sort -u)"
+          # Two EMPTY sets compare equal. A grep that silently matches nothing
+          # is the commonest way a gate like this goes vacuous, so refuse it.
+          [ -n "$doc_set" ] || { echo "CONTROL FAILED: no digests found in $doc"; exit 1; }
+          [ -n "$wf_set" ]  || { echo "CONTROL FAILED: no digests found in $me"; exit 1; }
+          if diff <(printf '%s\n' "$doc_set") <(printf '%s\n' "$doc_set" | sed '1d') >/dev/null 2>&1; then
+            echo "CONTROL FAILED: a perturbed digest set compared equal; this diff is vacuous"
+            exit 1
+          fi
+          echo "control: perturbed digest set correctly compared unequal"
+          if diff <(printf '%s\n' "$doc_set") <(printf '%s\n' "$wf_set"); then
+            echo "doc↔workflow: identical digest sets ($(printf '%s\n' "$doc_set" | wc -l) digests)"
+          else
+            echo "DOC DRIFT: $doc and $me pin different digest sets"
+            fail=1
+          fi
+
+          # --- NORMATIVE LAYER: the Idris2 ABI ----------------------------
+          # Owner ruling 2026-09-21: the ABI is written in Idris2 and IS the
+          # specification; the Zig FFI below conforms to it.
+          check "$rev" src/Hypatia/ABI/Types.idr      a5f794b11cfbb38b9c38ba861af71d7cbd3e9b97c29a14973b212642d2f0d84e
+          check "$rev" src/Hypatia/ABI/FFI.idr        e7fb117bfe137e76232ddb220db82a389808a63d3eda29e3d47057052366c669
+          check "$rev" src/Hypatia/ABI/REST.idr       3d3bfe554afcfca22d5fa064621d9f6fb94e16a9b0a2a56b434ef5c66543813f
+          check "$rev" src/Hypatia/ABI/GraphQL.idr    a5122cfe2039fd1b06ab1e81fadb9d11b23418edd0b8bc25179d5546200914c5
+          check "$rev" src/Hypatia/ABI/GRPC.idr       c04165ae3426b7bde34d64d21277bbf5d0e0f66fdfa08ac71c9968df6888e5b4
+          check "$rev" src/Hypatia/ABI/RuleEngine.idr a191ada02ed9534cd66eb2b3c8de45e354682358e8f9cec4b676b68788adc3bd
+
+          # --- IMPLEMENTATION LAYER: the Zig FFI + wire manifest ----------
+          check "$rev" ffi/zig/src/unified-api-adapter.zig f9a0b6fa9158ac7055d2d68f39a126800d8724a5c171bb2d35994e60dc3b5676
+          check "$rev" ffi/connectors.json                 33ee987eeb20283676e663bb6eacb5534ecb0da4bec344891aca08e7933be842
+
+          # --- HISTORICAL PIN OF RECORD (pre-rename, for audits) ----------
+          # NB: connectors.json DID change across the rename (the advisory
+          # _note string only); ids, names and ordering did not. Both digests
+          # are pinned deliberately — they are not expected to match.
+          check "$old" ffi/connectors.json                 16878b5b50145d860c9717bb035a001f5841aad20eb682308279e9063a44c15e
+          check "$old" ffi/zig/src/hexadeca.zig            9e43876ae926567f6e0180a9da83a64bcb07222fde5347ef059a1bb0ecb56f22
+          check "$old" src/Hypatia/ABI/Types.idr           b04478e836754334c474e4f09317e88344b95c884cac4fc591bdb50157faf187
+          check "$old" clients/rust/hypatia-client/src/connector.rs 6c12e56e4c35954ee5eaab81a72c9f460b71e966364eeb0a9ee5e675702538c8
+
+          if [ "$fail" -ne 0 ]; then
+            echo "authority-pin: one or more pins drifted; update docs/abi/ABI-AUTHORITY.md and this workflow together"
+            exit 1
+          fi
+          echo "authority-pin: all pins verified against $rev"
