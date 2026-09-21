@@ -76,7 +76,7 @@ provenance-bearing.
 Gameplay truth remains in deterministic Rust/Crusoe. Any future BEAM-hosted
 native computation uses SNIFs through a WebAssembly sandbox, never a raw NIF.
 Any FFI surface follows the estate chain: Idris2 owns the ABI contract, Zig
-implements the unified hexadeca-compatible FFI, and generated C headers expose
+implements the unified-api-adapter-compatible FFI, and generated C headers expose
 it to other consumers. These rules do not imply that those future adapters
 already exist.
 

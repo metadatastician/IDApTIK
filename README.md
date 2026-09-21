@@ -56,10 +56,10 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
   selected graphical frontend over it
   ([ADR-0008](docs/adr/0008-select-bevy-and-retire-fyrox.md)).
 - **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
-- **FFI / ABI policy:** **Zig unified hexadeca APIs/FFIs** for the adapter and **Idris2** for ABI
+- **FFI / ABI policy:** **Zig unified-api-adapter APIs/FFIs** for the adapter and **Idris2** for ABI
   contracts. The C ABI is still exported directly from Rust/Crusoe, but the Idris2 ABI
   model now exists (`crates/idaptik-ffi/abi`, gated by `just abi-model-check`); the Zig
-  adapter and the Hexadeca/serde-wire conformance work remain open in
+  adapter and the UnifiedApiAdapter/serde-wire conformance work remain open in
   [#103](https://github.com/metadatastician/IDApTIK/issues/103)
   ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
 - **Config:** **Nickel** (typed configuration).

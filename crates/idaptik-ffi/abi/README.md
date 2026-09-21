@@ -43,7 +43,7 @@ gate, so the model cannot drift from the C surface in either direction.
 - The tick parser accepts a **simplified commands wire** (`;`-separated
   `Jump` / `SetButton:<button>:<down|up>`), not the serde JSON the session
   layer and TUI share. Bridging the two — plus the full event vocabulary —
-  is the conformance-test work, blocked until the Zig/Hexadeca toolchain can
+  is the conformance-test work, blocked until the Zig/UnifiedApiAdapter toolchain can
   be exercised here.
 - Two idealisations, documented at their declaration sites: a C `const`
   borrow cannot be expressed linearly, so observation functions thread the
