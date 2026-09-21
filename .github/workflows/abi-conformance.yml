@@ -1,0 +1,92 @@
+# Conformance + drift gates for the IDApTIK C boundary (issue #103).
+#
+# Proves, on every push/PR that can move the boundary:
+#   1. header ↔ Idris2 model ↔ Zig adapter surface lockstep (3-way diff);
+#   2. the Zig adapter agrees with the Rust truth through the fixture
+#      vectors — including that the PLANTED FAILING fixture is caught;
+#   3. the pinned ABI authority digests (hyperpolymath/hypatia) are
+#      unchanged; a moved pin fails here, not silently downstream.
+
+name: ABI Conformance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crates/idaptik-ffi/**'
+      - 'fixtures/abi/**'
+      - 'scripts/zig_adapter_surface_check.sh'
+      - 'docs/abi/ABI-AUTHORITY.md'
+      - '.github/workflows/abi-conformance.yml'
+  pull_request:
+    paths:
+      - 'crates/idaptik-ffi/**'
+      - 'fixtures/abi/**'
+      - 'scripts/zig_adapter_surface_check.sh'
+      - 'docs/abi/ABI-AUTHORITY.md'
+      - '.github/workflows/abi-conformance.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  surface-and-conformance:
+    name: Surface lockstep + Zig↔Rust conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust and Zig
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq rustc cargo
+          curl -sL https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz -o /tmp/zig.tar.xz
+          sudo tar -xJf /tmp/zig.tar.xz -C /usr/local
+          echo "/usr/local/zig-x86_64-linux-0.16.0" >> "$GITHUB_PATH"
+
+      - name: Surface lockstep (header ↔ Idris2 ↔ Zig)
+        run: bash scripts/zig_adapter_surface_check.sh
+
+      - name: Build the Rust truth (cdylib)
+        run: cargo build -p idaptik-ffi
+
+      - name: Adapter unit tests
+        working-directory: crates/idaptik-ffi/zig-adapter
+        run: zig build test
+
+      - name: Conformance — vectors must pass, planted failures must be caught
+        working-directory: crates/idaptik-ffi/zig-adapter
+        env:
+          IDAPTIK_FFI_LIB: ${{ github.workspace }}/target/debug/libidaptik_ffi.so
+        run: zig build conformance
+
+  authority-pin:
+    name: ABI authority digests unchanged
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Re-derive pinned digests and diff against docs/abi/ABI-AUTHORITY.md
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/hyperpolymath/hypatia"
+          check() { # ref path expected_sha
+            got="$(curl -fsSL "$base/$1/$2" | sha256sum | cut -d' ' -f1)"
+            if [ "$got" != "$3" ]; then
+              echo "DRIFT: $2 @$1 — expected $3, got $got"; exit 1
+            fi
+            echo "OK: $2 @$1"
+          }
+          # Historical pin of record (docs table row 1).
+          check 2bbd3b2 ffi/connectors.json 16878b5b50145d860c9717bb035a001f5841aad20eb682308279e9063a44c15e
+          # Current canonical revision (docs table row 2); bump BOTH together.
+          check bcb8bb3730c2520117e565d80d5638ff384c1222 ffi/zig/src/unified-api-adapter.zig f9a0b6fa9158ac7055d2d68f39a126800d8724a5c171bb2d35994e60dc3b5676
+          check bcb8bb3730c2520117e565d80d5638ff384c1222 ffi/connectors.json 16878b5b50145d860c9717bb035a001f5841aad20eb682308279e9063a44c15e

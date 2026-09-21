@@ -1,0 +1,123 @@
+{
+  "_comment": "Conformance vectors for the IDApTIK C boundary. Behaviour expectations come from the Rust truth (crates/idaptik-ffi/src/lib.rs and its tests); structural expectations come from the Idris2 model (crates/idaptik-ffi/abi). Run by crates/idaptik-ffi/zig-adapter (zig build test) and .github/workflows/abi-conformance.yml.",
+  "authority": {
+    "repo": "hyperpolymath/hypatia",
+    "pinned_revision": "2bbd3b2",
+    "current_revision": "bcb8bb3730c2520117e565d80d5638ff384c1222",
+    "connectors": 16,
+    "note": "See docs/abi/ABI-AUTHORITY.md; connector ids/wire are byte-identical estate-wide."
+  },
+  "model_divergences": [
+    {
+      "where": "demo_network_device_count",
+      "idris_model": 4,
+      "rust_truth": 6,
+      "disposition": "The conformance fixtures follow the Rust truth (the executable behaviour). The Idris model's MkNetworkModel 4 is an idealisation that must be reconciled by the model owners; recorded here so the divergence is visible instead of silently smoothed over."
+    }
+  ],
+  "cases": [
+    {
+      "id": "demo_network_device_count",
+      "kind": "network_device_count",
+      "expect": { "device_count": 6 }
+    },
+    {
+      "id": "null_network_device_count_is_zero_and_free_null_noop",
+      "kind": "network_device_count_null",
+      "expect": { "device_count": 0 }
+    },
+    {
+      "id": "ghost_lobby_new_rejects_unknown_difficulty",
+      "kind": "ghost_lobby_new",
+      "seed": 1337,
+      "difficulty": "nightmare",
+      "expect": { "handle": "null" }
+    },
+    {
+      "id": "ghost_lobby_new_accepts_difficulty_case_insensitive",
+      "kind": "ghost_lobby_new",
+      "seed": 1337,
+      "difficulty": "STANDARD",
+      "expect": { "handle": "live" }
+    },
+    {
+      "id": "first_tick_returns_queued_startup_events",
+      "kind": "tick",
+      "seed": 1337,
+      "difficulty": "standard",
+      "commands": "[]",
+      "expect": {
+        "shape": "events_array",
+        "contains_in_order": ["RunStarted", "SeedAnnounced"]
+      }
+    },
+    {
+      "id": "tick_null_commands_is_error_object_handle_stays_live",
+      "kind": "tick_null",
+      "seed": 1337,
+      "difficulty": "standard",
+      "expect": {
+        "shape": "error_object",
+        "error_contains": "commands_json is null"
+      }
+    },
+    {
+      "id": "tick_malformed_commands_is_error_object",
+      "kind": "tick",
+      "seed": 1337,
+      "difficulty": "standard",
+      "commands": "not-json",
+      "expect": {
+        "shape": "error_object",
+        "error_contains": "not a JSON array"
+      }
+    },
+    {
+      "id": "tick_command_wire_setbutton_and_jump",
+      "kind": "tick",
+      "seed": 4242,
+      "difficulty": "operator",
+      "commands": "[{\"cmd\":\"SetButton\",\"button\":\"Right\",\"down\":true},{\"cmd\":\"Jump\"}]",
+      "expect": { "shape": "events_array" }
+    },
+    {
+      "id": "determinism_same_seed_byte_identical_wires",
+      "kind": "determinism",
+      "seed": 1337,
+      "difficulty": "operator",
+      "ticks": 12,
+      "commands_by_tick": [
+        "[]",
+        "[{\"cmd\":\"SetButton\",\"button\":\"Right\",\"down\":true}]",
+        "[]",
+        "[{\"cmd\":\"Jump\"}]",
+        "[]",
+        "[]",
+        "[{\"cmd\":\"SetButton\",\"button\":\"Right\",\"down\":false}]",
+        "[]",
+        "[{\"cmd\":\"Interact\"}]",
+        "[]",
+        "[]",
+        "[]"
+      ],
+      "expect": { "identical_runs": true }
+    },
+    {
+      "id": "snapshot_is_json_object",
+      "kind": "snapshot",
+      "seed": 7,
+      "difficulty": "story",
+      "expect": { "shape": "json_object" }
+    },
+    {
+      "id": "string_free_null_is_noop",
+      "kind": "string_free_null",
+      "expect": { "no_crash": true }
+    },
+    {
+      "id": "owned_wire_double_free_is_trapped_by_the_adapter",
+      "kind": "owned_wire_double_free",
+      "expect": { "traps": true }
+    }
+  ]
+}

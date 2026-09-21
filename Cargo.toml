@@ -3,7 +3,8 @@
 # Layout follows ADR-0003: gameplay truth lives in an engine-agnostic `core`
 # crate; `bevy` is the selected rendering frontend over it; `ffi` is the C-ABI
 # surface, modelled in Idris2 under ffi/abi/ (gated by just abi-model-check);
-# the Zig adapter over it is still open, see issue #103 (ADR-0001, ADR-0008).
+# the Zig adapter over it lives in crates/idaptik-ffi/zig-adapter/ (gated by
+# .github/workflows/abi-conformance.yml), see issue #103 (ADR-0001, ADR-0008).
 [workspace]
 resolver = "2"
 members = [

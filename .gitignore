@@ -35,3 +35,4 @@ erl_crash.dump
 # Idris2 build outputs (crates/idaptik-ffi/abi and its smoke)
 crates/idaptik-ffi/abi/build/
 crates/idaptik-ffi/abi/smoke/build/
+.zig-cache/

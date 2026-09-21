@@ -1,0 +1,28 @@
+{
+  "_comment": "PLANTED FAILING FIXTURE (issue #103 definition of done): deliberately wrong expectations. The conformance harness MUST report this case as failing; CI fails if the harness ever reports it as passing, which would mean the harness has gone blind to drift.",
+  "authority": {
+    "repo": "hyperpolymath/hypatia",
+    "pinned_revision": "2bbd3b2",
+    "connectors": 16
+  },
+  "cases": [
+    {
+      "id": "PLANTED_WRONG_demo_network_device_count",
+      "kind": "network_device_count",
+      "expect": { "device_count": 5 },
+      "planted": "Rust truth is 6; 5 is wrong on purpose. If this case ever passes, the harness is broken."
+    },
+    {
+      "id": "PLANTED_WRONG_first_tick_lacks_startup_events",
+      "kind": "tick",
+      "seed": 1337,
+      "difficulty": "standard",
+      "commands": "[]",
+      "expect": {
+        "shape": "events_array",
+        "must_not_contain": ["RunStarted"]
+      },
+      "planted": "The first tick always surfaces the queued RunStarted event; expecting it absent is wrong on purpose."
+    }
+  ]
+}
