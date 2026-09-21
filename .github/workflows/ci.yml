@@ -51,6 +51,17 @@ jobs:
           bash tests/vendor_winit_check_test.sh
       - name: Mustfile physical-state probes
         run: bash scripts/must_check.sh
+      # The proof-escape scan needs no Idris2 toolchain, so it lives here
+      # rather than in abi-model: a `believe_me` is then caught on every
+      # pull request, not only on the ones where the 20-25 minute compiler
+      # bootstrap runs. Invoked as ./scripts/... on purpose -- `bash script`
+      # ignores the file mode, so a script committed 100644 passes every
+      # local run and dies at exit 126 in CI. Running it directly makes the
+      # executable bit load-bearing and a mode regression fails here.
+      - name: Proof-escape gate self-test (the gate must be able to fail)
+        run: ./scripts/idris_escape_scan.sh --self-test
+      - name: Proof-escape scan (Idris2 ABI model)
+        run: ./scripts/idris_escape_scan.sh
 
 # Idris2 ABI model gate (issue #103): bootstrap Idris 2 0.8.0 with a source
 # built Chez (no system deps beyond libc), then run the model gate.

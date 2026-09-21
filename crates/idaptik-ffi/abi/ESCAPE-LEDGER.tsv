@@ -1,0 +1,20 @@
+# Proof-escape waiver ledger for the Idris2 ABI model.
+#
+# Every escape construct in this package is a hole in the proof: `postulate`
+# asserts without proving, `believe_me` casts between unrelated types,
+# `assert_total` silences the totality checker, `partial`/`covering` lower
+# the guarantee a definition carries. The gate (scripts/idris_escape_scan.sh)
+# rejects all of them. This file is the only way to keep one, and a row here
+# is a reviewed, permanent, public admission that a proof is missing.
+#
+# To waive, do BOTH:
+#   1. mark the line in the .idr source:  -- ESCAPE-WAIVER: <id>
+#   2. add a row below, tab-separated:    <id>	<term>	<file>	<reason>
+#
+# <file> is relative to this directory. <id> is matched, not the line number,
+# so inserting a line above an escape cannot silently transfer its waiver to
+# different code. One id excuses exactly one line; the gate fails if a row
+# matches no escape (a stale permission the next escape would inherit), if it
+# names the wrong term or file, or if the same id is claimed twice.
+#
+# id	term	file	reason
