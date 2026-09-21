@@ -32,6 +32,33 @@ paths = [
   # A lockfile has no legitimate reason to contain a credential.
   '''(^|/)Cargo\.lock$''',
   '''(^|/)mix\.lock$''',
+
+  # The SCANNER'S OWN STAGED ARTEFACT -- not an exemption for a file that
+  # "is fine", which the DESIGN RULE above forbids, but the one file the
+  # scanner writes into its own scan target.
+  #
+  # The standards secret-scanner reusable copies
+  # `config/gitleaks/estate-baseline.toml` to `.gitleaks-estate.toml` in the
+  # workspace root UNCONDITIONALLY, before the step that decides whether this
+  # repo references it. So the baseline is present in the scanned tree even
+  # when the workflow's own log says "nothing staged". That baseline documents
+  # worked examples of credential SHAPES (RFC 8032 vectors, masked-token
+  # forms); they are credential-shaped by construction, so `generic-api-key`
+  # fires on them and the gate goes red for reasons no commit here caused.
+  # The estate baseline carries this same self-exclusion; it was dropped when
+  # this file's `paths` list was trimmed to the lockfiles this repo has.
+  #
+  # Measured on the CI-pinned gitleaks 8.18.4 (sha256 ba6dbb65...d628e7d):
+  # without this entry a clean tree yields 3 `generic-api-key` findings on
+  # `.gitleaks-estate.toml` and rc=1; with it, `no leaks found` and rc=0.
+  #
+  # Anchored `^...$` -- ROOT ONLY, deliberately tighter than the estate
+  # baseline's `(^|/)` form. A path regex matches a BASENAME AT ANY DEPTH
+  # unless anchored, so `(^|/)` would also blind the scanner to a real
+  # `src/.gitleaks-estate.toml`. Measured: a PAT planted in exactly that path
+  # is still caught under this anchor. The reusable only ever writes the file
+  # at the root, so root-only is exact. (Same basename trap as issue #123.)
+  '''^\.gitleaks-estate\.toml$''',
 ]
 
 regexes = [
