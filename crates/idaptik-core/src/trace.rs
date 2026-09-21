@@ -5,7 +5,8 @@
 //! transport-agnostic; the frontend and the Elixir session layer decide how
 //! often to tick it.
 
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// A live trace clock. It fills as the hacker works; when it reaches its
 /// threshold the intrusion is traced.

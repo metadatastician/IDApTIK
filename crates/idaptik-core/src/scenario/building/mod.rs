@@ -53,7 +53,8 @@ pub mod sim;
 
 use crate::scenario::definition::{ScenarioDefinition, ValidationError};
 use crate::scenario::ids::{CircuitId, FloorId, PortalId, RoomId, ZoneId};
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 use std::collections::BTreeSet;
 use std::net::Ipv4Addr;
 
@@ -70,7 +71,6 @@ const SCENARIO_DOOR_TRAVEL_TIME: f64 = 1.0;
 
 /// A reference to one room on one floor. Room ids only need to be unique
 /// within their floor; the pair is globally unique.
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct RoomRef {
     pub floor: FloorId,

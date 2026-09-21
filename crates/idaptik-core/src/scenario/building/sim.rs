@@ -23,7 +23,8 @@ use crate::scenario::building::{
     BuildingDefinition, BuildingValidationError, BuildingValidationReport, PortalKind, RoomRef,
 };
 use crate::scenario::ids::{CircuitId, PortalId};
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// The runtime-snapshot export format tag.

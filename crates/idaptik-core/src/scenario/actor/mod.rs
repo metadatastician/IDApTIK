@@ -39,7 +39,8 @@
 pub mod belief;
 
 use crate::scenario::constants as c;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// The actor-pack payload format this build reads and writes.
@@ -59,7 +60,6 @@ pub const USB_OBJECT: &str = "usb";
 pub const ACTORS_JSON: &str = include_str!("actors.json");
 
 /// Object classes from the training-ground prototype's `valueSignal` economy.
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ObjectClass {
     Objective,
@@ -153,7 +153,6 @@ impl InterestProfile {
 
 /// Every scalar stat a modifier can address. One variant per [`ActorStats`]
 /// field, so a modifier is data, not code.
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum StatId {
     EnterSpeed,

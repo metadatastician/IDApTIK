@@ -1,11 +1,11 @@
 //! Devices the hacker discovers, compromises, and pivots through.
 
 use crate::network::Zone;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 use std::net::Ipv4Addr;
 
 /// Stable identifier for a [`Device`] within a [`crate::Network`].
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct DeviceId(pub u32);
 
@@ -47,7 +47,6 @@ pub enum DeviceKind {
 
 /// How hard a device is to compromise. Ordered from easiest to hardest, so
 /// comparisons like `security >= SecurityLevel::Medium` are meaningful.
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SecurityLevel {
     Open,

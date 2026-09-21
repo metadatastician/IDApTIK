@@ -17,7 +17,8 @@ use crate::scenario::floor_graph::{
 };
 use crate::scenario::sim::GhostLobbySim;
 use crate::scenario::state::RuntimeState;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// The two symmetric peers on the floor graph. Nothing here distinguishes their
 /// powers; only their vantages differ.

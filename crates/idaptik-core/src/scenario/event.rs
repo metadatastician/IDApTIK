@@ -16,7 +16,8 @@ use crate::scenario::common::{
 };
 use crate::scenario::ids::{DoorId, RoomId};
 use crate::scenario::tuning::{ActionKind, DifficultyId};
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// A typed simulation event.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -2,7 +2,8 @@
 //! propagates a loss of power to every node that draws from it, directly or
 //! transitively.
 use crate::netsim::graph::{Actuation, GroundedGraph};
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 use std::collections::HashSet;
 
 /// A physical change in the shared world. The string is the affected node id.

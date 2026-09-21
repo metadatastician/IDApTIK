@@ -11,16 +11,19 @@
 //! (voice mimicry and vault weak points only at Overclocked, fragile carry at
 //! Enhanced or better) live here on the bay, exactly as in the archive.
 
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// Upgrade level for a coprocessor. Declaration order is the upgrade order, so
 /// the derived `Ord` gives the archive's `level >= Enhanced` comparison.
-// Creusot needs a logical model of that order: an ordering comparison on a
-// derived-`Ord` type requires `DeepModel`, and without one creusot-rustc 0.13
-// ICEs in `normalize_erasing_regions` instead of reporting the missing bound
-// (isolated: the same cause surfaces as a plain E0277 in a minimal crate).
-// This is a specification, not proof debt -- it asserts nothing unproven.
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
+// Creusot needs a *logical* model of that order before it will admit a `<` on
+// this type. `derive(DeepModel)` is not it: the derive emits the deep-model
+// type with no impls at all, so the ordering site then fails with
+// `LevelDeepModel: OrdLogic is not satisfied`. The model is written by hand
+// below, mapping each variant to its `value()`, which is the same order the
+// derived `Ord` uses (no explicit discriminants, so declaration order rules).
+// That is a specification, not proof debt -- a `logic` function is a
+// definition and asserts nothing unproven.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default, Hash,
 )]
@@ -34,6 +37,26 @@ pub enum Level {
     Enhanced,
     /// Overclocked (MK-III). Maximum capability. May introduce quirks.
     Overclocked,
+}
+
+/// Logical model of [`Level`] for Creusot: the upgrade ladder as an integer,
+/// identical to [`Level::value`]. Ordering comparisons on `Level` are verified
+/// against this, so `level >= Level::Enhanced` means `deep_model >= 2` in the
+/// proof. Kept adjacent to `value()` deliberately: if one changes the other
+/// must, and `level_model_matches_value` in this module's tests is the guard.
+#[cfg(creusot)]
+impl creusot_std::model::DeepModel for Level {
+    type DeepModelTy = creusot_std::logic::Int;
+
+    #[creusot_std::macros::logic(open)]
+    fn deep_model(self) -> creusot_std::logic::Int {
+        match self {
+            Level::Stock => 0int,
+            Level::Basic => 1int,
+            Level::Enhanced => 2int,
+            Level::Overclocked => 3int,
+        }
+    }
 }
 
 impl Level {
@@ -137,7 +160,6 @@ impl CoprocessorType {
 }
 
 /// Vibration analyser reading quality (archive `vibrationReading`).
-#[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub enum VibrationReading {
     /// No data — coprocessor not installed.
@@ -148,6 +170,27 @@ pub enum VibrationReading {
     DirectionAndIntent,
     /// Full reading: direction, intent, weight class and pace.
     FullProfile,
+}
+
+/// Logical model of [`VibrationReading`] for Creusot: the reading-quality
+/// ladder as an integer, in declaration order. Unlike [`Level`] this enum has
+/// no `value()` to mirror, so the ladder *is* the derived `Ord` and nothing
+/// else -- which is exactly what a comparison such as `reading > NoData` means
+/// in a proof. `vibration_reading_model_matches_order` in this module's tests
+/// is what keeps the two from drifting.
+#[cfg(creusot)]
+impl creusot_std::model::DeepModel for VibrationReading {
+    type DeepModelTy = creusot_std::logic::Int;
+
+    #[creusot_std::macros::logic(open)]
+    fn deep_model(self) -> creusot_std::logic::Int {
+        match self {
+            VibrationReading::NoData => 0int,
+            VibrationReading::DirectionOnly => 1int,
+            VibrationReading::DirectionAndIntent => 2int,
+            VibrationReading::FullProfile => 3int,
+        }
+    }
 }
 
 /// Moletaire's coprocessor bay — one slot per type, five total, all starting
@@ -220,5 +263,51 @@ impl CoprocessorBay {
     /// here — this port follows the ReScript.)
     pub fn can_carry_fragile(&self) -> bool {
         self.stabilisation_core >= Level::Enhanced
+    }
+}
+
+#[cfg(test)]
+mod creusot_model_tests {
+    use super::{Level, VibrationReading};
+
+    /// The Creusot deep model of [`Level`] is written by hand as
+    /// `Stock => 0 .. Overclocked => 3`. Nothing in a normal build type-checks
+    /// it, so this test is what stops the model and the code drifting apart:
+    /// it pins `value()` to the same ladder and pins the derived `Ord` to it
+    /// too, which is the property the proof actually relies on.
+    #[test]
+    fn level_model_matches_value() {
+        let ladder = [
+            Level::Stock,
+            Level::Basic,
+            Level::Enhanced,
+            Level::Overclocked,
+        ];
+        for (i, lvl) in ladder.iter().enumerate() {
+            assert_eq!(lvl.value(), i, "deep_model maps {lvl:?} to {i}");
+        }
+        for w in ladder.windows(2) {
+            assert!(w[0] < w[1], "derived Ord must agree with the deep model");
+        }
+    }
+
+    /// [`VibrationReading`]'s deep model is the declaration-order ladder
+    /// `NoData => 0 .. FullProfile => 3`. There is no `value()` to check it
+    /// against, so this test pins the only thing the proof relies on: that the
+    /// derived `Ord` really is that ladder. Reordering the variants would
+    /// silently change what `reading > NoData` proves; this fails first.
+    #[test]
+    fn vibration_reading_model_matches_order() {
+        let ladder = [
+            VibrationReading::NoData,
+            VibrationReading::DirectionOnly,
+            VibrationReading::DirectionAndIntent,
+            VibrationReading::FullProfile,
+        ];
+        for w in ladder.windows(2) {
+            assert!(w[0] < w[1], "derived Ord must agree with the deep model");
+        }
+        assert_eq!(ladder.iter().min(), Some(&VibrationReading::NoData));
+        assert_eq!(ladder.iter().max(), Some(&VibrationReading::FullProfile));
     }
 }

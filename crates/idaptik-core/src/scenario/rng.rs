@@ -10,7 +10,8 @@
 use crate::scenario::definition::ScenarioDefinition;
 use crate::scenario::mathf::lerp;
 use crate::scenario::tuning::DifficultyId;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// `mulberry32` PRNG. The `state` is serialized so a snapshot resumes the exact
 /// sequence.

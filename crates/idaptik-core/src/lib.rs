@@ -24,6 +24,23 @@
 // assumed: see scripts/creusot_check.sh.
 #[cfg(creusot)]
 extern crate creusot_std;
+// Creusot 0.13 cannot translate serde's derived `Deserialize`, and the failure
+// is crate-wide rather than per-file: one such derive anywhere stops the whole
+// crate being verified, which would have put both of issue #121's proof targets
+// (`Trace::advance` and `Mulberry32::next_u32`) out of reach. The cure is a
+// like-named derive that emits a `#[trusted]` stub impl, swapped in here and
+// only here, so the 28 modules below differ by an import rather than by 196
+// split derive lists. `Serialize` is untouched -- it translates cleanly, which
+// is also why every `#[serde(...)]` helper attribute still works unchanged.
+//
+// The trade is recorded in `crates/CREUSOT-PROOF-DEBT.tsv`: under `cfg(creusot)`
+// a deserialized value is unconstrained rather than unverified-but-assumed, so
+// proofs downstream assume less, never more. See `creusot-serde-shim`'s crate
+// docs for the measurements behind it.
+#[cfg(not(creusot))]
+pub(crate) use serde::Deserialize;
+#[cfg(creusot)]
+pub(crate) use creusot_serde_shim::Deserialize;
 
 pub mod companion;
 pub mod device;

@@ -18,6 +18,10 @@ libm = { workspace = true }
 # known" errors on the generated `*DeepModelTy` associated types. Creusot's own
 # test crate depends on it the same way (creusot/tests/Cargo.toml:16).
 creusot-std = "0.13.0"
+# The Creusot-only `Deserialize` derive (issue #121). A proc-macro crate, so it
+# is a compile-time dependency only and never links into a shipped binary; its
+# derive is reached solely through the `cfg(creusot)` re-export in lib.rs.
+creusot-serde-shim.workspace = true
 
 [dev-dependencies]
 proptest = "1"

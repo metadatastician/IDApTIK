@@ -11,7 +11,8 @@ use crate::scenario::ids::{CameraId, DoorId, HideSpotId, ObjectiveId, RoomId};
 use crate::scenario::tuning::{
     ActionKind, ActionSpec, DifficultyId, DifficultyPreset, ScoringDef, TuningConstants,
 };
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// Small tolerance for float boundary comparisons (contiguity, door edges).

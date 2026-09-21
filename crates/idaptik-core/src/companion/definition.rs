@@ -13,7 +13,8 @@ use crate::companion::coprocessors::{Level, VibrationReading};
 use crate::companion::equipment::{ALL_EQUIPMENT, Equipment};
 use crate::companion::hunger::{self, HungerConfig};
 use crate::companion::music;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// The companion definition format tag.
 pub const COMPANION_FORMAT: &str = "idaptik-moletaire/1";

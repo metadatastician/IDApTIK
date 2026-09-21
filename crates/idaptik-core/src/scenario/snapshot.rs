@@ -10,7 +10,8 @@ use crate::scenario::event::Event;
 use crate::scenario::outcome::Debrief;
 use crate::scenario::rng::Mulberry32;
 use crate::scenario::state::RuntimeState;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// The runtime-snapshot export format tag. v3: `RuntimeState` gained the
 /// required `supervision` field (and `RunConfig` the `supervised` flag), so a

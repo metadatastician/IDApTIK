@@ -109,6 +109,13 @@ impl Serialize for Equipment {
 }
 
 impl<'de> Deserialize<'de> for Equipment {
+    // Hand-written rather than derived, so the crate-root `Deserialize` swap
+    // (see lib.rs) does not reach it -- this impl names the *trait*, not the
+    // derive. It needs the same treatment for the same reason: the body calls
+    // into serde's error machinery, which Creusot 0.13 cannot translate. One
+    // attribute here keeps the proof debt a single class rather than a special
+    // case, and keeps this impl consistent with every derived one in the crate.
+    #[cfg_attr(creusot, creusot_std::macros::trusted)]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let s = String::deserialize(deserializer)?;
         Equipment::from_code(&s)

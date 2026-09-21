@@ -46,7 +46,8 @@ use crate::companion::definition::{
 use crate::companion::equipment::Equipment;
 use crate::companion::hunger::{self, EdibleObject};
 use crate::scenario::rng::Mulberry32;
-use serde::{Deserialize, Serialize};
+use crate::Deserialize;
+use serde::Serialize;
 
 /// The 11-state mole state machine (archive `moleState`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

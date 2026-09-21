@@ -2439,6 +2439,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "creusot-serde-shim"
+version = "0.1.0"
+dependencies = [
+ "quote",
+ "syn 2.0.118",
+]
+
+[[package]]
 name = "creusot-std"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3564,6 +3572,7 @@ dependencies = [
 name = "idaptik-core"
 version = "0.1.0"
 dependencies = [
+ "creusot-serde-shim",
  "creusot-std",
  "libm",
  "proptest",
