@@ -191,6 +191,70 @@ printf 'graph fixtures:\n'
 expect_fail "missing cargo fails graph" "cargo is required" \
   env PATH="$FIXTURE/minimal-bin" "$CHECKER" graph
 
+# The graph assertions are pure functions of the `cargo metadata` document, so
+# they are exercised by feeding crafted ones. Mutating Cargo.toml instead is
+# useless: it invalidates Cargo.lock, `--locked` fails FIRST, and the gate then
+# fires for the wrong reason while saying nothing about these checks.
+#
+# `make_metadata <winit-features-json> [bevy_winit-id] [winit-id]` builds a
+# minimal document. The ids are deliberately in cargo's CURRENT PackageIdSpec
+# spelling, which is what broke the graph check in the first place.
+make_metadata() {
+  local winit_features="$1"
+  local bw_id="${2:-path+file:///w/vendor/bevy_winit#0.19.1}"
+  local w_id="${3:-registry+https://github.com/rust-lang/crates.io-index#winit@0.31.0}"
+  cat <<JSON
+{ "packages": [
+    {"name":"bevy_winit","id":"$bw_id"},
+    {"name":"winit","id":"$w_id"}],
+  "resolve": { "nodes": [
+    {"id":"$bw_id","features":["wayland","wayland-csd-adwaita-notitle"]},
+    {"id":"$w_id","features":$winit_features}]}}
+JSON
+}
+
+# Clean: the title-free feature alone is the correct state and must be quiet.
+# Guards a regression that is invisible to any "does the gate fail?" test --
+# the previous form used `grep -qw wayland-csd-adwaita` against a space-joined
+# feature string, and `-w` treats `-` as a word boundary, so it MATCHED inside
+# `wayland-csd-adwaita-notitle`. That check fired in every state including the
+# correct one: a constant-true assertion that could never pass. It went
+# unnoticed because the bevy_winit node lookup above died first on every
+# modern toolchain, leaving this arm unreachable.
+make_metadata '["wayland","wayland-csd-adwaita-notitle"]' > "$FIXTURE/meta-clean.json"
+expect_pass "title-free CSD alone is accepted" \
+  env IDAPTIK_BEVY_WINIT_METADATA="$FIXTURE/meta-clean.json" "$CHECKER" graph
+
+# Firing: the titled CSD feature is the regression the gate exists to catch.
+make_metadata '["wayland","wayland-csd-adwaita"]' > "$FIXTURE/meta-titled.json"
+expect_fail "titled wayland-csd-adwaita is rejected" "font-parser-free CSD selection has regressed" \
+  env IDAPTIK_BEVY_WINIT_METADATA="$FIXTURE/meta-titled.json" "$CHECKER" graph
+
+# Firing: titled alongside title-free is still the font-parser path.
+make_metadata '["wayland","wayland-csd-adwaita","wayland-csd-adwaita-notitle"]' > "$FIXTURE/meta-both.json"
+expect_fail "titled CSD alongside title-free is still rejected" "font-parser-free CSD selection has regressed" \
+  env IDAPTIK_BEVY_WINIT_METADATA="$FIXTURE/meta-both.json" "$CHECKER" graph
+
+# Firing: neither CSD feature selected means native Wayland CSD is not wired.
+make_metadata '["wayland"]' > "$FIXTURE/meta-none.json"
+expect_fail "absent CSD feature is rejected" "native Wayland CSD is not wired" \
+  env IDAPTIK_BEVY_WINIT_METADATA="$FIXTURE/meta-none.json" "$CHECKER" graph
+
+# Firing: a bevy_winit that resolves to NO node is the broken-patch case the
+# gate reports. Written with a package whose id matches no resolve node.
+make_metadata '["wayland","wayland-csd-adwaita-notitle"]' > "$FIXTURE/meta-nonode.json"
+sed -i 's|"resolve": { "nodes": \[|"resolve": { "nodes": [{"id":"unrelated#0.0.0","features":[]},|' "$FIXTURE/meta-nonode.json"
+sed -i '0,/{"name":"bevy_winit","id":"[^"]*"}/s||{"name":"bevy_winit","id":"path+file:///w/absent#0.19.1"}|' "$FIXTURE/meta-nonode.json"
+expect_fail "a bevy_winit with no resolved node is rejected" "expected exactly one resolved bevy_winit node" \
+  env IDAPTIK_BEVY_WINIT_METADATA="$FIXTURE/meta-nonode.json" "$CHECKER" graph
+
+# Firing: the font-parser crates returning to the graph is the original #105
+# regression and must still be caught.
+make_metadata '["wayland","wayland-csd-adwaita-notitle"]' > "$FIXTURE/meta-font.json"
+sed -i 's|{"name":"winit",|{"name":"ttf-parser","id":"registry+x#ttf-parser@0.1.0"},{"name":"winit",|' "$FIXTURE/meta-font.json"
+expect_fail "font-parser crates back in the graph are rejected" "font-parser crates are back in the resolved graph" \
+  env IDAPTIK_BEVY_WINIT_METADATA="$FIXTURE/meta-font.json" "$CHECKER" graph
+
 if [ "$failures" -ne 0 ]; then
   printf 'vendor-winit check fixtures: %d FAILURES\n' "$failures" >&2
   exit 1

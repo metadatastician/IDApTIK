@@ -20,8 +20,9 @@
 #            so the patch cannot silently outlive its welcome.
 #
 # Offline fixtures: set IDAPTIK_BEVY_WINIT_CRATE to a local .crate tarball
-# (parity) and/or IDAPTIK_BEVY_WINIT_INDEX to a local sparse-index JSONL
-# file (watch). Both default to the live sources.
+# (parity), IDAPTIK_BEVY_WINIT_INDEX to a local sparse-index JSONL file
+# (watch), and/or IDAPTIK_BEVY_WINIT_METADATA to a local `cargo metadata`
+# JSON document (graph). All default to the live sources.
 
 set -euo pipefail
 
@@ -208,8 +209,17 @@ check_graph() {
   need jq "inspecting cargo metadata"
 
   local metadata
-  metadata="$(cargo metadata --format-version 1 --locked 2>/dev/null)" ||
-    die "cargo metadata failed; is the workspace resolvable?"
+  if [ -n "${IDAPTIK_BEVY_WINIT_METADATA:-}" ]; then
+    # Fixture injection, mirroring IDAPTIK_BEVY_WINIT_CRATE/_INDEX above. The
+    # graph assertions are pure functions of this document, so feeding a
+    # crafted one is the only way to exercise them: mutating Cargo.toml
+    # instead invalidates Cargo.lock and `--locked` then fails FIRST, so the
+    # gate fires for the wrong reason and proves nothing about these checks.
+    metadata="$(cat "$IDAPTIK_BEVY_WINIT_METADATA")"
+  else
+    metadata="$(cargo metadata --format-version 1 --locked 2>/dev/null)" ||
+      die "cargo metadata failed; is the workspace resolvable?"
+  fi
 
   # 1. The font-parser path must not return to the resolved graph.
   local offenders
@@ -220,13 +230,27 @@ check_graph() {
 
   # 2. Exactly one bevy_winit (the patched path dependency) is resolved, with
   #    the title-free CSD feature active.
+  #
+  # Resolve the node by looking its id up in `.packages[]` BY NAME, never by
+  # matching the id's text. cargo's package-id format changed: ids are opaque
+  # PackageIdSpec URLs now (`path+file:///.../vendor/bevy_winit#0.19.1`, and
+  # `...#name@version` when the directory name differs from the crate name),
+  # not the legacy `bevy_winit 0.19.1 (path+file://...)`. The old
+  # `startswith("bevy_winit ")` therefore matched NOTHING on any modern
+  # toolchain: it reported 0 nodes and blamed the [patch.crates-io] wiring,
+  # which was never broken. Measured on the pinned cargo 1.95.0.
+  #
+  # `.packages[].name` is a real field with a stable meaning, so this survives
+  # any further change to how ids are spelled.
   local node_count bevy_winit_features
-  node_count="$(jq '[.resolve.nodes[] | select(.id | startswith("bevy_winit "))] | length' <<<"$metadata")"
+  node_count="$(jq '[.packages[] | select(.name == "bevy_winit") | .id] as $ids
+    | [.resolve.nodes[] | select(.id | IN($ids[]))] | length' <<<"$metadata")"
   [ "$node_count" -eq 1 ] ||
     die "expected exactly one resolved bevy_winit node, found $node_count; \
 is the [patch.crates-io] wiring broken?"
-  bevy_winit_features="$(jq -r '.resolve.nodes[]
-    | select(.id | startswith("bevy_winit "))
+  bevy_winit_features="$(jq -r '[.packages[] | select(.name == "bevy_winit") | .id] as $ids
+    | .resolve.nodes[]
+    | select(.id | IN($ids[]))
     | .features[]' <<<"$metadata")"
   grep -qx 'wayland-csd-adwaita-notitle' <<<"$bevy_winit_features" ||
     die "bevy_winit resolves without the 'wayland-csd-adwaita-notitle' feature active; \
@@ -234,14 +258,24 @@ the workspace bevy_winit dependency must select it"
 
   # 3. The titled-CSD feature (the one that pulls the font parser) is OFF.
   local winit_node_features
-  winit_node_features="$(jq -r '[.resolve.nodes[]
-    | select(.id | startswith("winit "))
-    | .features[]] | join(" ")' <<<"$metadata")"
-  if grep -qw 'wayland-csd-adwaita' <<<"$winit_node_features"; then
+  #
+  # One feature PER LINE, matched with `grep -qx`, never `grep -qw` on a
+  # space-joined string. `-w` treats `-` as a word boundary, so
+  # `grep -qw wayland-csd-adwaita` MATCHES inside `wayland-csd-adwaita-notitle`
+  # -- i.e. the titled-CSD check fired precisely when the title-FREE feature
+  # was correctly active. Measured. That never surfaced because check 2 above
+  # died first on every modern toolchain, so this arm was unreachable.
+  # `-qx` anchors the whole line, which is the exact token test intended, and
+  # matches how the bevy_winit feature is checked above.
+  winit_node_features="$(jq -r '[.packages[] | select(.name == "winit") | .id] as $ids
+    | .resolve.nodes[]
+    | select(.id | IN($ids[]))
+    | .features[]' <<<"$metadata")"
+  if grep -qx 'wayland-csd-adwaita' <<<"$winit_node_features"; then
     die "winit resolves with the titled 'wayland-csd-adwaita' feature active; \
 the font-parser-free CSD selection has regressed"
   fi
-  grep -qw 'wayland-csd-adwaita-notitle' <<<"$winit_node_features" ||
+  grep -qx 'wayland-csd-adwaita-notitle' <<<"$winit_node_features" ||
     die "winit resolves without 'wayland-csd-adwaita-notitle'; native Wayland CSD is not wired"
 
   say "graph: font-parser crates absent; title-free Wayland CSD feature is active."
