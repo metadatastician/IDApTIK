@@ -169,5 +169,5 @@ Recorded so they are not silently assumed. Full statements in
 2. `enaction-engine/docs/architecture/CAC-KERNEL.adoc` — the kernel contract.
 3. ADR-0009, ADR-0010, ADR-0011 here — dependency direction, why the kernel
    stays put, and why the work is documented in the open.
-4. `docs/ROUNDTRIP-STATUS.adoc` in UMS — what the round trip does and does not
-   prove.
+4. `idaptik-ums/docs/ROUNDTRIP-STATUS.adoc` — what the round trip does and
+   does not prove.

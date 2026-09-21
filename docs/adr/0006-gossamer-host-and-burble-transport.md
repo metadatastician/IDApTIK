@@ -24,7 +24,8 @@ Everything under it is now real:
 - **The frontend** (`crates/idaptik-bevy`) is a real Ghost Lobby renderer: a
   render-free `SimDriverPlugin` (`src/driver.rs`) steps `GhostLobbySim` at a
   fixed 60 Hz from a queued `Command` stream — the same wire API the TUI and
-  the relay speak — and `tests/parity.rs` already drives it headless.
+  the relay speak — and `crates/idaptik-bevy/tests/parity.rs` already drives
+  it headless.
 - **Determinism** (ADR-0004) makes relay-only lockstep sound: two sims fed the
   same seed and ordered `Command` stream are the same world.
 
