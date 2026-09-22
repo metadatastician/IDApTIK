@@ -39,8 +39,7 @@
 pub mod belief;
 
 use crate::scenario::constants as c;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// The actor-pack payload format this build reads and writes.
@@ -607,7 +606,7 @@ impl ActorRegistry {
                     .iter()
                     .map(move |(obj, p)| (a.id.clone(), obj.clone(), p.value_signal))
             })
-            .find(|(_, _, vs)| !crate::scenario::mathf::in_closed_range(*vs, 0.0, 1.0));
+            .find(|(_, _, vs)| !(0.0..=1.0).contains(vs));
         check(
             &mut checks,
             "interests",

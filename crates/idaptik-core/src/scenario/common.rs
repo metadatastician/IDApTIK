@@ -4,8 +4,7 @@
 //! exhaustively — a totality property the SPARK-equivalent core relies on. All
 //! derive serde so they round-trip through the JSON export surfaces.
 
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Mission phase. Monotonic: `Quiet -> Crisis -> Result`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

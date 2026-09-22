@@ -3,8 +3,7 @@
 //! "what can I see from this foothold").
 
 use crate::device::{Device, DeviceId};
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 //## Network segmentation categories

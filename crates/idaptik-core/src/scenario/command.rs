@@ -8,8 +8,7 @@
 
 use crate::scenario::common::{ExtractMethod, FailReason};
 use crate::scenario::tuning::{ActionKind, DifficultyId};
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// A held movement button. The discriminant is the bitset flag.
 #[repr(u8)]

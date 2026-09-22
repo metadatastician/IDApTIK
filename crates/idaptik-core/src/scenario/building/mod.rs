@@ -53,8 +53,7 @@ pub mod sim;
 
 use crate::scenario::definition::{ScenarioDefinition, ValidationError};
 use crate::scenario::ids::{CircuitId, FloorId, PortalId, RoomId, ZoneId};
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::net::Ipv4Addr;
 

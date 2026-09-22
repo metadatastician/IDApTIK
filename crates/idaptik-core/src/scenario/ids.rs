@@ -4,8 +4,7 @@
 //! never hashes strings.
 
 use crate::scenario::definition::ScenarioDefinition;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 macro_rules! id_newtype {

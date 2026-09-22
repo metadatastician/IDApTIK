@@ -51,13 +51,8 @@ pub const CAMERA_HOST_BASE: usize = 30;
 /// [`CAMERA_HOST_BASE`]: validation and derivation must not drift apart.
 pub const DOOR_HOST_BASE: usize = 10;
 
-/// The largest usable host octet in a dotted /24-style subnet prefix. Public
-/// for the same reason as [`CAMERA_HOST_BASE`]: it is the ceiling
-/// [`MAX_CAMERAS`] and [`MAX_DOORS_PER_ROOM`] are derived from, so it is
-/// already part of their public meaning. Creusot refuses to make a public
-/// constant transparent in terms of a private one, which is that latent
-/// inconsistency stated out loud.
-pub const MAX_HOST_OCTET: usize = 254;
+/// The largest usable host octet in a dotted /24-style subnet prefix.
+const MAX_HOST_OCTET: usize = 254;
 
 /// The most cameras a definition can carry before camera addressing would
 /// overflow the security subnet's host octet.

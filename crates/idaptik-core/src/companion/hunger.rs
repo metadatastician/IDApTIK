@@ -11,8 +11,7 @@
 //! nearby, wanders aimlessly otherwise, and above 0.9 will even eat the
 //! mission objective.
 
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
 // Thresholds — the canonical constants (mirrored into the definition data).

@@ -3,8 +3,7 @@
 //! session are built over this.
 use crate::device::{DeviceKind, SecurityLevel};
 use crate::network::{Range, Zone};
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// A physical effect hacking a node performs in the shared world.

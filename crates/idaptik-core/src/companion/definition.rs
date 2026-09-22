@@ -13,8 +13,7 @@ use crate::companion::coprocessors::{Level, VibrationReading};
 use crate::companion::equipment::{ALL_EQUIPMENT, Equipment};
 use crate::companion::hunger::{self, HungerConfig};
 use crate::companion::music;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The companion definition format tag.
 pub const COMPANION_FORMAT: &str = "idaptik-moletaire/1";
@@ -326,7 +325,7 @@ impl CompanionDefinition {
             }
         }
 
-        if !crate::scenario::mathf::in_closed_range(t.item_eat_chance, 0.0, 1.0) {
+        if !(0.0..=1.0).contains(&t.item_eat_chance) {
             errs.push(E::EatChanceOutOfRange {
                 value: t.item_eat_chance,
             });

@@ -7,8 +7,7 @@
 //! start inside the look-ahead window and advances the scheduler cursor.
 //! No audio I/O, no wall clock: the caller supplies `current_time`.
 
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Loop tempo in beats per minute.
 pub const BPM: f64 = 114.0;

@@ -8,8 +8,7 @@ use crate::netsim::effect::{Effect, apply_actuation};
 use crate::netsim::graph::{GroundedGraph, VantageDef};
 use crate::netsim::reach::{reachable_count_from, reachable_from};
 use crate::trace::Trace;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// Why a session operation failed. Serde-carrying, because a refused pivot is

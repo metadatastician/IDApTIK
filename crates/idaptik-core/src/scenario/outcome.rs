@@ -8,8 +8,7 @@
 use crate::scenario::common::{Grade, Outcome, Tone};
 use crate::scenario::state::Stats;
 use crate::scenario::tuning::GradeBands;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The after-action export format tag.
 pub const DEBRIEF_FORMAT: &str = "idaptik-ghost-lobby-after-action-v1";

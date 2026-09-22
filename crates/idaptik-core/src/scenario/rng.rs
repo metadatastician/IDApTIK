@@ -10,36 +10,12 @@
 use crate::scenario::definition::ScenarioDefinition;
 use crate::scenario::mathf::lerp;
 use crate::scenario::tuning::DifficultyId;
-use crate::Deserialize;
-use serde::Serialize;
 
-/// `mulberry32` PRNG. The `state` is serialized so a snapshot resumes the exact
-/// sequence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Mulberry32 {
-    pub state: u32,
-}
-
-impl Mulberry32 {
-    /// Seed the generator.
-    pub fn new(seed: u32) -> Self {
-        Self { state: seed }
-    }
-
-    /// Next 32-bit output.
-    pub fn next_u32(&mut self) -> u32 {
-        self.state = self.state.wrapping_add(0x6D2B_79F5);
-        let mut t = self.state;
-        t = (t ^ (t >> 15)).wrapping_mul(t | 1);
-        t ^= t.wrapping_add((t ^ (t >> 7)).wrapping_mul(t | 61));
-        t ^ (t >> 14)
-    }
-
-    /// Next float in `[0, 1)` — `u32 / 2^32`, exactly as the prototype.
-    pub fn next_f64(&mut self) -> f64 {
-        f64::from(self.next_u32()) / 4_294_967_296.0
-    }
-}
+/// The `mulberry32` stream itself lives in [`idaptik_kernel`], where it is
+/// machine-checked (issue #121); re-exported here so `scenario::rng::Mulberry32`
+/// keeps the path every caller already uses. The reset roll below stays in this
+/// crate because it is float-valued, and floats are what the kernel excludes.
+pub use idaptik_kernel::Mulberry32;
 
 /// The values rolled once at reset from the seed and difficulty.
 #[derive(Debug, Clone, PartialEq)]
@@ -106,27 +82,3 @@ pub fn roll_init(
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn seed_123456_u32_vector() {
-        let mut r = Mulberry32::new(123456);
-        assert_eq!(
-            [r.next_u32(), r.next_u32(), r.next_u32(), r.next_u32()],
-            [1642107918, 3424218114, 4280064779, 687244953]
-        );
-    }
-
-    #[test]
-    fn edge_seeds_do_not_panic() {
-        for seed in [0u32, 1, u32::MAX] {
-            let mut r = Mulberry32::new(seed);
-            for _ in 0..1000 {
-                let v = r.next_f64();
-                assert!((0.0..1.0).contains(&v));
-            }
-        }
-    }
-}

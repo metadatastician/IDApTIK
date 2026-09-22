@@ -11,8 +11,7 @@ use crate::scenario::ids::{CameraId, DoorId, HideSpotId, ObjectiveId, RoomId};
 use crate::scenario::tuning::{
     ActionKind, ActionSpec, DifficultyId, DifficultyPreset, ScoringDef, TuningConstants,
 };
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Small tolerance for float boundary comparisons (contiguity, door edges).
@@ -486,7 +485,7 @@ impl ScenarioDefinition {
         let bad_support = self
             .rooms
             .iter()
-            .find(|r| !crate::scenario::mathf::in_closed_range(r.support, 0.05, 1.0))
+            .find(|r| !(0.05..=1.0).contains(&r.support))
             .map(|r| r.id.clone());
         check(
             checks,

@@ -20,8 +20,7 @@ use crate::scenario::rng::InitRoll;
 use crate::scenario::sim::GhostLobbySim;
 use crate::scenario::tuning::{ActionKind, DifficultyPreset};
 use crate::scenario::vsm::SupervisionState;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// The infiltrator's physical and interaction state.

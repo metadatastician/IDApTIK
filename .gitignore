@@ -38,3 +38,6 @@ crates/idaptik-ffi/abi/smoke/build/
 .zig-cache/
 .probe
 .double-free-probe
+
+# why3find local prover cache (per-machine; proof sessions live in verif/)
+.why3find/

@@ -8,7 +8,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/creusot-serde-shim",
+    "crates/idaptik-kernel",
     "crates/idaptik-core",
     "crates/idaptik-ffi",
     "crates/idaptik-tui",
@@ -24,7 +24,7 @@ authors = ["IDApTIK contributors"]
 repository = "https://github.com/metadatastician/IDApTIK"
 
 [workspace.dependencies]
-creusot-serde-shim = { path = "crates/creusot-serde-shim", version = "0.1.0" }
+idaptik-kernel = { path = "crates/idaptik-kernel", version = "0.1.0" }
 idaptik-core = { path = "crates/idaptik-core", version = "0.1.0" }
 idaptik-tui = { path = "crates/idaptik-tui", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }

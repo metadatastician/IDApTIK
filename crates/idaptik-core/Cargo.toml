@@ -8,25 +8,10 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+idaptik-kernel.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 libm = { workspace = true }
-# Default features deliberately: `std` is one of them, and `impl DeepModel for
-# String` is `#[cfg(feature = "std")]` (creusot-std/src/std/string.rs:34). With
-# `default-features = false` every id newtype over `String` fails to derive
-# `DeepModel`, which surfaces as nine E0277s plus a cascade of "size cannot be
-# known" errors on the generated `*DeepModelTy` associated types. Creusot's own
-# test crate depends on it the same way (creusot/tests/Cargo.toml:16).
-creusot-std = "0.13.0"
-# The Creusot-only `Deserialize` derive (issue #121). A proc-macro crate, so it
-# is a compile-time dependency only and never links into a shipped binary; its
-# derive is reached solely through the `cfg(creusot)` re-export in lib.rs.
-creusot-serde-shim.workspace = true
 
 [dev-dependencies]
 proptest = "1"
-
-# `cfg(creusot)` is set only by creusot-rustc (issue #121). Register it so the
-# stable build does not raise `unexpected_cfgs` on the guarded prelude import.
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(creusot)'] }

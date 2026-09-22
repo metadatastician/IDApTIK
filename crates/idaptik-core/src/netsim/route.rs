@@ -2,8 +2,7 @@
 //! wall-clock, no RNG (spec A.5).
 use crate::netsim::access::can_reach;
 use crate::netsim::graph::GroundedGraph;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// One traceroute hop.

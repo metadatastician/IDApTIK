@@ -5,8 +5,7 @@
 //! before it is connected to gameplay events.
 
 use super::Event;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Functional VSM roles. These are roles, not required processes.

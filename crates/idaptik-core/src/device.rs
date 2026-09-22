@@ -1,8 +1,7 @@
 //! Devices the hacker discovers, compromises, and pivots through.
 
 use crate::network::Zone;
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::net::Ipv4Addr;
 
 /// Stable identifier for a [`Device`] within a [`crate::Network`].

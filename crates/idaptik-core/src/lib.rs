@@ -13,35 +13,6 @@
 //! `(definition, config, seed, command stream)`.
 #![forbid(unsafe_code)]
 
-// Creusot 0.13 refuses to verify a crate that has not loaded `creusot_std`
-// (issue #121), so load it -- but with `extern crate`, never
-// `use creusot_std::prelude::*`. That glob shadows std's derive macros on
-// purpose (creusot-std-proc exports its own `Clone`, `Default` and
-// `PartialEq`), which makes every ordinary `#[derive(Clone)]` in this crate
-// ambiguous (E0659). Creusot's own test corpus imports selectively for the
-// same reason. `cfg(creusot)` is set only by creusot-rustc, so the stable
-// 1.95 build this workspace deliberately pins is untouched -- measured, not
-// assumed: see scripts/creusot_check.sh.
-#[cfg(creusot)]
-extern crate creusot_std;
-// Creusot 0.13 cannot translate serde's derived `Deserialize`, and the failure
-// is crate-wide rather than per-file: one such derive anywhere stops the whole
-// crate being verified, which would have put both of issue #121's proof targets
-// (`Trace::advance` and `Mulberry32::next_u32`) out of reach. The cure is a
-// like-named derive that emits a `#[trusted]` stub impl, swapped in here and
-// only here, so the 28 modules below differ by an import rather than by 196
-// split derive lists. `Serialize` is untouched -- it translates cleanly, which
-// is also why every `#[serde(...)]` helper attribute still works unchanged.
-//
-// The trade is recorded in `crates/CREUSOT-PROOF-DEBT.tsv`: under `cfg(creusot)`
-// a deserialized value is unconstrained rather than unverified-but-assumed, so
-// proofs downstream assume less, never more. See `creusot-serde-shim`'s crate
-// docs for the measurements behind it.
-#[cfg(not(creusot))]
-pub(crate) use serde::Deserialize;
-#[cfg(creusot)]
-pub(crate) use creusot_serde_shim::Deserialize;
-
 pub mod companion;
 pub mod device;
 pub mod interp;
@@ -49,7 +20,10 @@ pub mod netsim;
 pub mod network;
 pub mod package;
 pub mod scenario;
-pub mod trace;
+/// The trace clock and alert enum live in [`idaptik_kernel`], where they are
+/// machine-checked (issue #121). Re-exported as a module so `crate::trace::Trace`
+/// keeps the path every caller already uses.
+pub use idaptik_kernel::trace;
 
 pub use companion::{
     CompanionDefinition, MOLETAIRE_JSON, MoleCommand, MoleEvent, MoleParams, MoletaireSim,

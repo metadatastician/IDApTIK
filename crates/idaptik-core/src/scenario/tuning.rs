@@ -4,8 +4,7 @@
 //! projected from [`crate::scenario::constants`] by
 //! [`crate::scenario::ghost_lobby::ghost_lobby`].
 
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Selects a difficulty preset. Ordered so it is a stable `BTreeMap` key.

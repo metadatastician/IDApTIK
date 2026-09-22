@@ -8,8 +8,7 @@ use crate::scenario::{
     Buttons, Command, Event, GhostLobbySim, RunConfig, RuntimeSnapshot, SNAPSHOT_FORMAT,
     ScenarioDefinition, ValidationError, fold,
 };
-use crate::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
