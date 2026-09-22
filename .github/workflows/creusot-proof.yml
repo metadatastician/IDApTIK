@@ -1,0 +1,167 @@
+# Machine-checked proof of the IDApTIK determinism kernel (issue #121).
+#
+# Two jobs, deliberately separated by cost:
+#
+#   ledgers  cheap, no toolchain. Enforces both Creusot ledgers against the
+#            source tree and runs their controls. This is the job that catches
+#            the everyday regression -- a new #[trusted] with no row, an
+#            unclassified file -- and it reports in seconds.
+#   proof    builds Creusot from a pinned source ref and discharges the kernel's
+#            proof obligations, then PLANTS A MUTANT and requires it to go red.
+#
+# NO `paths:` FILTER, on purpose. A required check that never runs because the
+# path filter did not match does not report "skipped" -- it reports nothing, and
+# the pull request waits forever for a context that will never arrive. The
+# estate has been bitten by this. Both jobs run on every pull request.
+#
+# NO MATRIX, also on purpose. GitHub appends the matrix combination to a job's
+# posted check name whenever `name:` does not interpolate the matrix, so a
+# ruleset matching on display name stops matching. A plain job posts the name
+# written here, verbatim.
+
+name: Creusot Proof
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned identically to developer/tools, which is where this was measured.
+  # A tag would be a moving target under sha_pinning_required; the commit is not.
+  CREUSOT_REF: 318615be3b8bbc60d1f6d52469ba5c0bdebed4f1
+  CREUSOT_VERSION: v0.13.0
+
+jobs:
+  ledgers:
+    name: Creusot ledgers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The controls run FIRST. If the gate cannot distinguish a clean tree from
+      # a mutated one, its verdict on the real tree means nothing, and we want
+      # that failure to be the one reported.
+      - name: Gate controls (a gate that cannot fail is worse than no gate)
+        run: ./scripts/creusot_ledger_check.sh --self-test
+
+      - name: Classification and proof-debt ledgers vs disk
+        run: ./scripts/creusot_ledger_check.sh all
+
+  proof:
+    name: Creusot proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Creusot needs its own nightly with rustc-dev; this is the toolchain the
+      # pinned Creusot ref declares, not a choice made here.
+      - name: Install Creusot's rustc
+        run: |
+          rustup toolchain install nightly-2026-06-22 \
+            --component rustfmt --component rustc-dev --component llvm-tools
+          rustup default nightly-2026-06-22
+
+      # The why3/prover bootstrap is the expensive part (opam switch + four
+      # provers). Keyed on the Creusot ref, so a pin bump rebuilds and nothing
+      # else does.
+      - name: Cache the Creusot toolchain
+        id: creusot-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/creusot
+            ~/.config/creusot
+            ~/.cargo/bin/cargo-creusot
+            ~/.cargo/bin/creusot-rustc
+          key: creusot-${{ runner.os }}-${{ env.CREUSOT_REF }}
+
+      - name: Build and provision Creusot
+        if: steps.creusot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq opam pkg-config libgmp-dev autoconf
+          git clone https://github.com/creusot-rs/creusot.git "$RUNNER_TEMP/creusot"
+          git -C "$RUNNER_TEMP/creusot" checkout --detach "$CREUSOT_REF"
+          # Refuse to proceed on anything but the pinned ref: a silent fallback
+          # to a different Creusot would make every result below unattributable.
+          got="$(git -C "$RUNNER_TEMP/creusot" rev-parse HEAD)"
+          [ "$got" = "$CREUSOT_REF" ] || { echo "::error::creusot ref is $got, expected $CREUSOT_REF"; exit 1; }
+          cd "$RUNNER_TEMP/creusot"
+          ./INSTALL
+
+      - name: Record the toolchain actually in use
+        run: |
+          echo "creusot ref pinned: $CREUSOT_REF ($CREUSOT_VERSION)"
+          rustc --version
+          why3 --version || true
+
+      - name: Translate the kernel
+        run: |
+          set -euo pipefail
+          cargo creusot -p idaptik-kernel --only coma --span-mode relative 2>&1 | tee coma.log
+          if grep -qE '^error' coma.log; then
+            echo "::error::translation reported errors"; exit 1
+          fi
+
+      # The denominator is the point. "ok" with no count is how a vacuous gate
+      # reads, so the proved-file count is extracted and required to be > 0.
+      - name: Prove, and print the denominator
+        run: |
+          set -euo pipefail
+          cargo creusot --only prove 2>&1 | tee prove.log
+          n="$(sed -n 's/.*Proved (\([0-9]\+\) files).*/\1/p' prove.log | tail -1)"
+          if [ -z "$n" ]; then
+            echo "::error::no 'Proved (N files)' line -- the prover did not report a verdict"; exit 1
+          fi
+          if [ "$n" -eq 0 ]; then
+            echo "::error::proved 0 files: a zero denominator is not a pass"; exit 1
+          fi
+          echo "PROVED $n files"
+
+      # Criterion (d): the gate must be able to say NO. The mutant deletes the
+      # .max(1) in Trace::advance -- the exact bug that function's own doc
+      # comment warns about, where a hacker pivots through enough hops to
+      # integer-divide the trace rate to zero and stall it forever.
+      - name: Control -- planted mutant must fail the proof
+        run: |
+          set -euo pipefail
+          cp crates/idaptik-kernel/src/trace.rs /tmp/trace.orig
+          sed -i 's|(base / hops\.max(1))\.max(1)|base / hops.max(1)|' crates/idaptik-kernel/src/trace.rs
+          if ! git diff --quiet crates/idaptik-kernel/src/trace.rs; then :; else
+            echo "::error::mutant did not apply -- the control is vacuous"; exit 1
+          fi
+          touch crates/idaptik-kernel/src/lib.rs
+          cargo creusot -p idaptik-kernel --only coma --span-mode relative >/dev/null 2>&1 || true
+          if cargo creusot --only prove > mutant.log 2>&1; then
+            echo "::error::THE GATE HAS NO TEETH -- the anti-stall mutant still proved"
+            cat mutant.log; cp /tmp/trace.orig crates/idaptik-kernel/src/trace.rs; exit 1
+          fi
+          echo "mutant correctly rejected by the prover"
+          cp /tmp/trace.orig crates/idaptik-kernel/src/trace.rs
+
+      - name: Positive control -- clean tree proves again after revert
+        run: |
+          set -euo pipefail
+          git diff --quiet crates/idaptik-kernel/src/trace.rs || { echo "::error::tree not restored"; exit 1; }
+          touch crates/idaptik-kernel/src/lib.rs
+          cargo creusot -p idaptik-kernel --only coma --span-mode relative >/dev/null
+          cargo creusot --only prove 2>&1 | tee restored.log
+          grep -q 'Proved (' restored.log || { echo "::error::clean tree no longer proves"; exit 1; }
+
+      - name: The kernel's own tests
+        run: cargo test -p idaptik-kernel --lib
