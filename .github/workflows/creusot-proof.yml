@@ -93,16 +93,37 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq opam pkg-config libgmp-dev autoconf
-          # MEASURED: without this, creusot-install dies on
+          sudo apt-get install -y -qq opam pkg-config libgmp-dev zlib1g-dev autoconf
+
+          # MEASURED (run 35671485327): apt ships the opam binary but creates no
+          # opam root, and creusot-install's first act is `opam switch create`,
+          # which needs one:
           #   [ERROR] Opam has not been initialised, please run `opam init`
-          #   Error: Failed: "opam" "switch" "create" "-y" ".../creusot"
-          # apt ships the opam binary but no opam root. --bare creates the root
-          # and the default repository WITHOUT a default switch, which is right
-          # because creusot-install creates its own local switch. Sandboxing is
-          # disabled because the runner is ephemeral and bubblewrap is not part
-          # of the default image -- it would only add a failure mode.
+          # --bare makes the root and the default repository WITHOUT a default
+          # switch, which is right because creusot-install brings its own.
+          # Sandboxing off: bubblewrap is not in the default runner image and
+          # the runner is ephemeral, so it could only add a failure mode.
           opam init --bare --yes --disable-sandboxing --no-setup
+
+          # MEASURED (run 35671959918): with the root initialised, the switch
+          # then failed because creusot-deps pulls **why3-ide**, whose GTK
+          # depexts (libcairo2-dev, libgtk-3-dev, libgtksourceview-3.0-dev)
+          # triggered opam's depext prompt, which answered `n` non-interactively
+          # and aborted the switch.
+          #
+          # The cure is upstream's own, not a workaround. creusot-deps.opam
+          # declares the IDE conditionally:
+          #     "why3-ide" {= "git-54c92f96" & !?in-creusot-ci}
+          # so setting that variable drops the GUI and the entire GTK stack with
+          # it. why3, why3find and the four provers -- everything a headless
+          # proof actually uses -- are unaffected. This is how Creusot's own CI
+          # builds, and it is the ONE difference from the developer/tools
+          # install, which has the IDE because a human might want it.
+          opam var in-creusot-ci=true --global
+          # Belt and braces: should any other package carry a system dependency,
+          # install it rather than prompt into a non-interactive `n`.
+          opam option depext-run-installs=true --global
+
           git clone https://github.com/creusot-rs/creusot.git "$RUNNER_TEMP/creusot"
           git -C "$RUNNER_TEMP/creusot" checkout --detach "$CREUSOT_REF"
           # Refuse to proceed on anything but the pinned ref: a silent fallback
@@ -185,3 +206,27 @@ jobs:
 
       - name: The kernel's own tests
         run: cargo test -p idaptik-kernel --lib
+
+      # Criterion (c) asks for the evidence to be retained as a build artefact.
+      # `verif/` is committed as well -- that is the durable half, reviewable in
+      # the pull request instead of expiring with the run -- but the RUN's own
+      # output is not in git, and the denominator lives there. Both halves, and
+      # `if: always()` so a red proof uploads the log that explains it.
+      - name: Retain the proof evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: creusot-proof-evidence
+          path: |
+            coma.log
+            prove.log
+            mutant.log
+            restored.log
+            verif/
+          # `warn`, not `error`: with `if: always()` a bootstrap failure reaches
+          # this step before any log exists, and a second red there would only
+          # obscure the first. The guarantee that evidence EXISTS on a green run
+          # comes from the prove step, which greps its own denominator out of
+          # prove.log and fails without it -- not from this uploader.
+          if-no-files-found: warn
+          retention-days: 30
