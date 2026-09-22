@@ -16,10 +16,15 @@
 #   trusted      an empty contract via #[cfg_attr(creusot, ..::trusted)].
 #                Assumes nothing about the body, so it stays sound, but the
 #                body is unverified.
-#   cfg-out      a derive compiled out under cfg(creusot), placing it outside
-#                the proof boundary.  Keyed by DERIVE NAME, one row per name,
-#                because the escape is a property of the derive and not of the
-#                type it sits on.
+#   cfg-out      an item compiled out under cfg(creusot), placing it outside
+#                the proof boundary.  Two forms: a derive dropped from a
+#                cfg_attr(not(creusot), derive(..)) list, or a whole
+#                hand-written #[cfg(not(creusot))] impl Trait for Type.
+#                Keyed by DERIVE-OR-TRAIT NAME, one row per name, because the
+#                escape is a property of the trait and not of the type it sits
+#                on -- so swapping a derive for an equivalent hand-written
+#                impl keeps the row it already had instead of quietly changing
+#                shape and walking out of the gate's view.
 #   no-contract  a function with no functional postcondition.  Creusot still
 #                discharges it for panic- and overflow-freedom; what is absent
 #                is a statement of what it computes.
@@ -29,5 +34,5 @@ PD-01	crates/idaptik-kernel/src/trace.rs	fraction	trusted	Returns f32. Creusot 0
 PD-02	crates/idaptik-kernel/src/rng.rs	next_f64	trusted	Returns f64 (u32 / 2^32). Same absent float model as PD-01. The contract is empty, so it assumes nothing; the integer step it wraps, next_u32, IS proved.	Same as PD-01. Byte-exactness of the division is guarded by the golden replay tests and the libm pin (ADR-0004), not by Creusot.	Same as PD-01.
 PD-03	crates/idaptik-kernel	Serialize	cfg-out	A derived Serialize translates but does not prove. Serialization is outside the proof boundary either way: the determinism claim is about the values, not their wire form.	Goal Coma.vc_serialize_Cfg: FAIL (24/28), measured on an isolation crate.	serde derives carry contracts, or the impl is hand-written with one. Neither is worth it for a boundary the kernel does not depend on.
 PD-04	crates/idaptik-kernel	Deserialize	cfg-out	Paired with PD-03; the same derive family and the same boundary. Kept as its own row because the gate keys on derive names, so a row per name is what makes the bijection exact.	Same translate-but-not-prove class as PD-03.	Same as PD-03.
-PD-05	crates/idaptik-kernel	Hash	cfg-out	A derived Hash does not prove. Hashing is not part of any determinism invariant -- Alert is compared by value, and its PartialEq IS hand-written and proved.	Goal Coma.vc_hash_Alert: FAIL, measured.	Same as PD-03.
+PD-05	crates/idaptik-kernel	Hash	cfg-out	Hand-written and compiled out entirely under cfg(creusot).  It does not prove: Hasher is an external trait with no contract, and Creusot warns that calling a contractless external function "will yield an impossible precondition", so a green result here would be vacuous rather than meaningful.  Hashing is not part of any determinism invariant either -- Alert is compared by value, and its PartialEq IS hand-written and proved.  Hand-written rather than derived because clippy::derived_hash_with_manual_eq rejects a derived Hash beside a hand-written eq; it hashes the discriminant, so it agrees with that eq by construction.	Goal Coma.vc_hash_Alert: FAIL, measured on the derived form before the swap.	Same as PD-03.
 PD-06	crates/idaptik-kernel/src/rng.rs	next_u32	no-contract	A PRNG step has no useful functional postcondition -- being hard to characterise is its purpose. The proof is NOT vacuous: every operation is wrapping or masking, and discharging the function proves it panic- and overflow-free for all 2^32 states.	An earlier draft specced result@ == state@ + 1, which is FALSE at u32::MAX -- a false contract is a mutant that passes for the wrong reason. Recorded so it is not reintroduced. The bit-exact output vector is pinned by the unit test seed_123456_u32_vector.	Never, deliberately. This row exists to make the absence a decision on the record rather than an oversight.

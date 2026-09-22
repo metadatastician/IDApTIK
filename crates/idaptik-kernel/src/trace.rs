@@ -124,14 +124,20 @@ impl Trace {
 /// Noisy actions that raise alerts on a defended network. Passive logging and
 /// active response both key off these.
 ///
-/// `Hash` joins the serde derives outside the proof boundary for the same
-/// reason and by the same ruling: it translates but cannot be proved, because
-/// `Hasher` is an external trait with no contract — and Creusot warns that
-/// calling a contractless external function "will yield an impossible
-/// precondition", so a green result there would be vacuous rather than
-/// meaningful. Measured: `vc_hash_Alert` was the single failing goal of 23.
+/// The serde derives sit outside the proof boundary: they translate but cannot
+/// be proved. `Hash` is outside it too, by the same ruling — `Hasher` is an
+/// external trait with no contract, and Creusot warns that calling a
+/// contractless external function "will yield an impossible precondition", so a
+/// green result there would be vacuous rather than meaningful. Measured:
+/// `vc_hash_Alert` was the single failing goal of 23.
+///
+/// `Hash` takes the form of a hand-written `#[cfg(not(creusot))] impl` below
+/// rather than a derive, because `clippy::derived_hash_with_manual_eq` will not
+/// have a derived `Hash` beside the hand-written `eq` this type needs. The
+/// ledger keys `cfg-out` on the trait name, not the mechanism, so the swap
+/// keeps the row it already had.
 #[derive(Debug, Clone, Copy, Eq)]
-#[cfg_attr(not(creusot), derive(Serialize, Deserialize, Hash))]
+#[cfg_attr(not(creusot), derive(Serialize, Deserialize))]
 #[cfg_attr(creusot, derive(creusot_std::model::DeepModel))]
 pub enum Alert {
     FailedLogin,
@@ -155,6 +161,33 @@ impl PartialEq for Alert {
                 | (Alert::FirewallTrip, Alert::FirewallTrip)
                 | (Alert::PowerCut, Alert::PowerCut)
         )
+    }
+}
+
+/// Hand-written for the same reason `PartialEq` is, and to keep the two
+/// provably in step.
+///
+/// `#[derive(Hash)]` alongside a hand-written `eq` is
+/// `clippy::derived_hash_with_manual_eq`, and the lint is right to ask: `Hash`
+/// and `Eq` must agree, or a `HashMap` silently loses entries. Here they do
+/// agree — `Alert` is field-less and the hand-written `eq` matches exactly the
+/// variant pairs a derive would — but *stating* the agreement is better than
+/// asserting it in a comment and silencing the lint with an `allow`. Each
+/// variant hashes to its own discriminant, so equal values hash equally and
+/// unequal ones are distinguished.
+///
+/// It stays outside the proof boundary with the serde derives, by the same
+/// ruling recorded above: `Hasher` is an external trait with no contract, so a
+/// green Creusot result here would be vacuous rather than meaningful.
+#[cfg(not(creusot))]
+impl core::hash::Hash for Alert {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        state.write_u8(match self {
+            Alert::FailedLogin => 0,
+            Alert::PortScan => 1,
+            Alert::FirewallTrip => 2,
+            Alert::PowerCut => 3,
+        });
     }
 }
 
@@ -247,5 +280,39 @@ mod tests {
         assert_eq!(a, b);
         assert_ne!(a, c, "threshold must participate");
         assert_ne!(a, d, "progress must participate");
+    }
+
+    #[test]
+    fn alert_hash_agrees_with_alert_eq() {
+        // The obligation `clippy::derived_hash_with_manual_eq` names. Silencing
+        // that lint with an `allow`, or answering it in a comment, leaves the
+        // agreement unchecked -- and a `Hash` that disagrees with `Eq` does not
+        // fail loudly, it makes a `HashMap` lose entries. So assert it over the
+        // whole cross product, in both directions: equal values must hash
+        // equally, and unequal values must not collide.
+        use core::hash::{Hash, Hasher};
+        use std::collections::hash_map::DefaultHasher;
+
+        fn digest(a: &Alert) -> u64 {
+            let mut h = DefaultHasher::new();
+            a.hash(&mut h);
+            h.finish()
+        }
+
+        let all = [
+            Alert::FailedLogin,
+            Alert::PortScan,
+            Alert::FirewallTrip,
+            Alert::PowerCut,
+        ];
+        for a in &all {
+            for b in &all {
+                assert_eq!(
+                    a == b,
+                    digest(a) == digest(b),
+                    "Hash and Eq disagree for {a:?} vs {b:?}"
+                );
+            }
+        }
     }
 }

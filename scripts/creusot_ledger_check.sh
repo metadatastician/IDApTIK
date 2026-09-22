@@ -71,6 +71,15 @@ disk_escapes() {
     awk -v rel="$rel" '
       /^#\[cfg\(test\)\]/ { exit }
 
+      # Inside an impl that cfg(creusot) compiles out -- see the impl rule
+      # below. Its methods are covered by the one cfg-out row emitted there,
+      # so they are consumed here rather than counted again as uncontracted
+      # runtime fns.
+      skip_depth > 0 {
+        skip_depth += gsub(/\{/, "{") - gsub(/\}/, "}")
+        next
+      }
+
       # A multi-line attribute. Creusot contracts routinely wrap across lines,
       # and a continuation line looks like nothing in particular -- so the block
       # is held open on bracket balance rather than on how the line begins.
@@ -81,6 +90,7 @@ disk_escapes() {
       # spanning three lines.
       in_attr > 0 {
         blk = blk "\n" $0
+        attrs = attrs "\n" $0
         in_attr += gsub(/\[/, "[") - gsub(/\]/, "]")
         next
       }
@@ -107,9 +117,46 @@ disk_escapes() {
       # A real attribute. Only these are balanced across lines.
       /^[ \t]*#\[/ {
         blk = blk "\n" $0
+        attrs = attrs "\n" $0
         depth = gsub(/\[/, "[") - gsub(/\]/, "]")
         if (depth > 0) in_attr = depth
         next
+      }
+
+      # An impl compiled out under cfg(creusot): the SAME escape as a derive
+      # compiled out the same way, in the form a hand-written impl takes.
+      # Keyed by trait name, so replacing
+      # `#[cfg_attr(not(creusot), derive(Hash))]` with an equivalent
+      # hand-written impl keeps the ledger row it already had rather than
+      # silently dropping out of the gate view -- which is exactly what
+      # happened when clippy derived_hash_with_manual_eq forced that swap.
+      #
+      # Matched against the attributes ONLY, never the accumulated doc prose:
+      # a doc comment that quotes an attribute must not be able to conjure an
+      # escape out of nothing.
+      /^[ \t]*impl[ \t<]/ {
+        if (attrs ~ /#\[cfg\(not\(creusot\)\)\]/) {
+          t = $0
+          sub(/^[ \t]*impl[ \t]*(<[^>]*>)?[ \t]*/, "", t)
+          sub(/[ \t]+for[ \t].*/, "", t)
+          sub(/[ \t]*\{.*/, "", t)
+          sub(/<.*/, "", t)
+          nt = split(t, tp, /::/); t = tp[nt]
+          gsub(/[ \t]/, "", t)
+          if (t == "") {
+            print "[creusot-ledger] PARSE FAILURE: cfg-out impl with no trait name at " rel ":" NR > "/dev/stderr"
+            exit 2
+          }
+          print "crates/idaptik-kernel\t" t "\tcfg-out"
+          # The impl body is not separately debt: the whole item sits outside
+          # the proof, and the one row above says so. Consume it on balance.
+          skip_depth = gsub(/\{/, "{") - gsub(/\}/, "}")
+          if (skip_depth < 1) {
+            print "[creusot-ledger] PARSE FAILURE: cfg-out impl body did not open at " rel ":" NR > "/dev/stderr"
+            exit 2
+          }
+        }
+        blk = ""; attrs = ""; next
       }
 
       /^[ \t]*(pub )?fn [A-Za-z_][A-Za-z0-9_]*/ {
@@ -120,10 +167,21 @@ disk_escapes() {
         else if (blk ~ /macros::logic/)   { }   # logic fns state the model; not runtime code
         else if (blk ~ /macros::(ensures|requires)/) { }
         else                              print rel "\t" name "\tno-contract"
-        blk = ""; next
+        blk = ""; attrs = ""; next
       }
 
-      { blk = "" }
+      { blk = ""; attrs = "" }
+
+      # A skip region that never closes would swallow every later fn in the
+      # file and turn this gate green by eating its own subject matter -- the
+      # vacuous shape this repository keeps re-learning. So the balance is
+      # asserted, not assumed.
+      END {
+        if (skip_depth > 0) {
+          print "[creusot-ledger] PARSE FAILURE: unterminated cfg-out impl in " rel > "/dev/stderr"
+          exit 2
+        }
+      }
     ' "$f"
   done | sort -u
 }
@@ -246,6 +304,31 @@ self_test() {
     probe "mutant: a contract stripped -> fn becomes unledgered debt" fail debt
   cp "$work/rng.bak" "$work/src/rng.rs"
 
+
+  # Mutants 6 and 7 guard the cfg-out IMPL rule. Clippy forced Alert::Hash from
+  # a cfg-out derive to a hand-written cfg-out impl, and before this rule
+  # existed the gate could not see the impl form at all -- the escape changed
+  # shape and would have walked out of the ledger unnoticed.
+  cp "$work/src/trace.rs" "$work/trace.bak"
+
+  # Mutant 6: the cfg attribute is stripped, so the impl is no longer outside
+  # the proof. The Hash row must orphan AND the method must surface as debt.
+  # Only the attribute directly above an impl is removed, so the serde `use`
+  # gating higher in the file is left alone and cannot mask the result.
+  awk '{a[NR]=$0} END{for(i=1;i<=NR;i++){ if (a[i]=="#[cfg(not(creusot))]" && a[i+1] ~ /^impl /) continue; print a[i]}}' \
+      "$work/trace.bak" > "$work/src/trace.rs"
+  IDAPTIK_KERNEL_SRC="$work/src" IDAPTIK_DEBT_TSV="$work/debt.tsv" \
+    probe "mutant: cfg attr stripped from the Hash impl -> row orphaned" fail debt
+
+  # Mutant 7: the sharp one. The impl body is consumed on brace balance, and a
+  # skip region that fails to close would swallow every later item and turn
+  # this gate green by eating its own subject matter. An uncontracted fn
+  # planted AFTER the impl must still be seen.
+  sed 's|^#\[cfg(test)\]|pub fn leaked_past_the_skip_region(x: u32) -> u32 { x }\n\n#[cfg(test)]|' \
+      "$work/trace.bak" > "$work/src/trace.rs"
+  IDAPTIK_KERNEL_SRC="$work/src" IDAPTIK_DEBT_TSV="$work/debt.tsv" \
+    probe "mutant: uncontracted fn after the cfg-out impl is still seen" fail debt
+  cp "$work/trace.bak" "$work/src/trace.rs"
   say "self-test: classification arm"
   mkdir -p "$work/scan/crates" "$work/scan/$VENDOR_EXCLUDE"
   printf 'fn a() {}\n' > "$work/scan/crates/one.rs"
