@@ -86,7 +86,6 @@ jobs:
             ~/.local/share/creusot
             ~/.config/creusot
             ~/.cargo/bin/cargo-creusot
-            ~/.cargo/bin/creusot-rustc
           key: creusot-${{ runner.os }}-${{ env.CREUSOT_REF }}
 
       - name: Build and provision Creusot
@@ -95,6 +94,15 @@ jobs:
           set -euo pipefail
           sudo apt-get update -qq
           sudo apt-get install -y -qq opam pkg-config libgmp-dev autoconf
+          # MEASURED: without this, creusot-install dies on
+          #   [ERROR] Opam has not been initialised, please run `opam init`
+          #   Error: Failed: "opam" "switch" "create" "-y" ".../creusot"
+          # apt ships the opam binary but no opam root. --bare creates the root
+          # and the default repository WITHOUT a default switch, which is right
+          # because creusot-install creates its own local switch. Sandboxing is
+          # disabled because the runner is ephemeral and bubblewrap is not part
+          # of the default image -- it would only add a failure mode.
+          opam init --bare --yes --disable-sandboxing --no-setup
           git clone https://github.com/creusot-rs/creusot.git "$RUNNER_TEMP/creusot"
           git -C "$RUNNER_TEMP/creusot" checkout --detach "$CREUSOT_REF"
           # Refuse to proceed on anything but the pinned ref: a silent fallback
@@ -104,11 +112,23 @@ jobs:
           cd "$RUNNER_TEMP/creusot"
           ./INSTALL
 
+      # Runs on a cache hit too, so the PATH is set either way. why3 and the
+      # four provers live in the switch creusot-install provisions; creusot-rustc
+      # lives under toolchains/<toolchain>/bin in the same tree.
       - name: Record the toolchain actually in use
         run: |
+          set -euo pipefail
+          echo "$HOME/.local/share/creusot/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/share/creusot/bin:$PATH"
           echo "creusot ref pinned: $CREUSOT_REF ($CREUSOT_VERSION)"
           rustc --version
-          why3 --version || true
+          # Deliberately NOT tolerated with `|| true`. If why3 is not runnable
+          # here then every proof verdict below is unattributable, and that is
+          # the failure worth reporting -- not a confusing one three steps on.
+          why3 --version
+          for p in alt-ergo cvc4 cvc5 z3; do
+            command -v "$p" >/dev/null || { echo "::error::prover $p is missing"; exit 1; }
+          done
 
       - name: Translate the kernel
         run: |
