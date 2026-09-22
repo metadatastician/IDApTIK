@@ -178,22 +178,53 @@ jobs:
       # .max(1) in Trace::advance -- the exact bug that function's own doc
       # comment warns about, where a hacker pivots through enough hops to
       # integer-divide the trace rate to zero and stall it forever.
-      - name: Control -- planted mutant must fail the proof
+      #
+      # A non-zero exit is NOT sufficient evidence that the gate has teeth.
+      # `cargo creusot --only prove` also exits non-zero when the mutant fails
+      # to COMPILE or TRANSLATE, and a control that cannot tell those apart
+      # passes for the wrong reason -- the precise failure this repository has
+      # already been bitten by. So the mutant must translate cleanly first,
+      # and then the prover must name the goal it could not discharge.
+      - name: Control -- planted mutant must fail the PROOF, not the build
         run: |
           set -euo pipefail
+          restore() { cp /tmp/trace.orig crates/idaptik-kernel/src/trace.rs; }
           cp crates/idaptik-kernel/src/trace.rs /tmp/trace.orig
           sed -i 's|(base / hops\.max(1))\.max(1)|base / hops.max(1)|' crates/idaptik-kernel/src/trace.rs
-          if ! git diff --quiet crates/idaptik-kernel/src/trace.rs; then :; else
+          if git diff --quiet crates/idaptik-kernel/src/trace.rs; then
             echo "::error::mutant did not apply -- the control is vacuous"; exit 1
           fi
           touch crates/idaptik-kernel/src/lib.rs
-          cargo creusot -p idaptik-kernel --only coma --span-mode relative >/dev/null 2>&1 || true
+
+          # Must still translate. Previously this was `|| true`, which would
+          # have let a translation failure masquerade as a proof failure.
+          if ! cargo creusot -p idaptik-kernel --only coma --span-mode relative > mutant-coma.log 2>&1; then
+            echo "::error::the mutant failed to TRANSLATE, so the control cannot distinguish a build failure from a proof failure"
+            tail -40 mutant-coma.log; restore; exit 1
+          fi
+
           if cargo creusot --only prove > mutant.log 2>&1; then
             echo "::error::THE GATE HAS NO TEETH -- the anti-stall mutant still proved"
-            cat mutant.log; cp /tmp/trace.orig crates/idaptik-kernel/src/trace.rs; exit 1
+            cat mutant.log; restore; exit 1
           fi
-          echo "mutant correctly rejected by the prover"
-          cp /tmp/trace.orig crates/idaptik-kernel/src/trace.rs
+
+          # It failed. Now prove it failed for the RIGHT reason. why3find lists
+          # a goal line only for a goal it could not discharge, so the presence
+          # of this one IS the proof obligation failing:
+          #     Goal Coma.vc_advance: X (5/6)
+          # Matched without the verdict glyph so a locale or encoding change
+          # cannot silently turn this assertion into a false negative.
+          if ! grep -q 'Goal Coma.vc_advance' mutant.log; then
+            echo "::error::mutant failed, but NOT on Coma.vc_advance -- this control proves nothing about the contract"
+            tail -40 mutant.log; restore; exit 1
+          fi
+          if ! grep -q 'unproved file' mutant.log; then
+            echo "::error::mutant failed without an unproved-file verdict -- not a proof failure"
+            tail -40 mutant.log; restore; exit 1
+          fi
+          grep 'Goal Coma.vc_advance' mutant.log
+          echo "mutant correctly rejected by the PROVER, on the advance contract"
+          restore
 
       - name: Positive control -- clean tree proves again after revert
         run: |
@@ -221,6 +252,7 @@ jobs:
             coma.log
             prove.log
             mutant.log
+            mutant-coma.log
             restored.log
             verif/
           # `warn`, not `error`: with `if: always()` a bootstrap failure reaches
