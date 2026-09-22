@@ -33,9 +33,9 @@
 //! `cfg(creusot)` twin of the shipped impl -- it *is* the shipped impl, so the
 //! proof is about the code that runs. The serde derives are the opposite: they
 //! are compiled out under `cfg(creusot)`, so serialization sits outside the
-//! proof boundary. One ledger row in `crates/CREUSOT-PROOF-DEBT.tsv` records
-//! that for the whole class; it was never proved under any of the options
-//! considered.
+//! proof boundary. Rows PD-03 to PD-05 in `crates/CREUSOT-PROOF-DEBT.tsv`
+//! record that class -- one per derive name, which is what makes the
+//! ledger gate an exact bijection with what is on disk.
 
 #![forbid(unsafe_code)]
 

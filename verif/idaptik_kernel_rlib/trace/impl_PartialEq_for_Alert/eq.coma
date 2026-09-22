@@ -1,0 +1,70 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 146 4 146 37 *)
+
+(* <trace::Alert as std::cmp::PartialEq> *)
+
+let%span smodel = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/model.rs" 37 8 37 28
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 145 53 145 102
+let%span strace'0 = "crates/idaptik-kernel/src/trace.rs" 135 27 135 56
+
+use creusot.prelude.Any
+
+type t_Alert = FailedLogin | PortScan | FirewallTrip | PowerCut
+
+type tup2_ref_Alert_ref_Alert = { f0: t_Alert; f1: t_Alert }
+
+type t_AlertDeepModel = FailedLogin'0 | PortScan'0 | FirewallTrip'0 | PowerCut'0
+
+function deep_model_Alert [#"crates/idaptik-kernel/src/trace.rs" 135 27 135 56] (self: t_Alert) : t_AlertDeepModel =
+  [%#strace'0] match self with
+    | FailedLogin -> FailedLogin'0
+    | PortScan -> PortScan'0
+    | FirewallTrip -> FirewallTrip'0
+    | PowerCut -> PowerCut'0
+    end
+
+function deep_model_ref_Alert [@inline:trivial] (self: t_Alert) : t_AlertDeepModel = [%#smodel] deep_model_Alert self
+
+meta "rewrite_def" function deep_model_ref_Alert
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let eq_Alert [#"crates/idaptik-kernel/src/trace.rs" 146 4 146 37] (self: t_Alert) (rhs: t_Alert) (return (x: bool)) =
+(! bb0
+  [ bb0 = s0
+    [ s0 = [ &_6 <- { f0 = self; f1 = rhs } ] s1
+    | s1 = any
+      [ br0 -> {_6.f0 = FailedLogin} (! bb2)
+      | br1 -> {_6.f0 = PortScan} (! bb3)
+      | br2 -> {_6.f0 = FirewallTrip} (! bb4)
+      | br3 -> {_6.f0 = PowerCut} (! bb5) ] ]
+  | bb5 = any
+    [ br0 -> {_6.f1 = FailedLogin} (! bb1)
+    | br1 -> {_6.f1 = PortScan} (! bb1)
+    | br2 -> {_6.f1 = FirewallTrip} (! bb1)
+    | br3 -> {_6.f1 = PowerCut} (! bb7) ]
+  | bb4 = any
+    [ br0 -> {_6.f1 = FailedLogin} (! bb1)
+    | br1 -> {_6.f1 = PortScan} (! bb1)
+    | br2 -> {_6.f1 = FirewallTrip} (! bb7)
+    | br3 -> {_6.f1 = PowerCut} (! bb1) ]
+  | bb3 = any
+    [ br0 -> {_6.f1 = FailedLogin} (! bb1)
+    | br1 -> {_6.f1 = PortScan} (! bb7)
+    | br2 -> {_6.f1 = FirewallTrip} (! bb1)
+    | br3 -> {_6.f1 = PowerCut} (! bb1) ]
+  | bb2 = any
+    [ br0 -> {_6.f1 = FailedLogin} (! bb7)
+    | br1 -> {_6.f1 = PortScan} (! bb1)
+    | br2 -> {_6.f1 = FirewallTrip} (! bb1)
+    | br3 -> {_6.f1 = PowerCut} (! bb1) ]
+  | bb1 = s0 [ s0 = [ &_ret <- false ] s1 | s1 = return {_ret} ]
+  | bb7 = s0 [ s0 = [ &_ret <- true ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: bool = Any.any_l ()
+  | & self: t_Alert = self
+  | & rhs: t_Alert = rhs
+  | & _6: tup2_ref_Alert_ref_Alert = Any.any_l () ])
+  [ return (result: bool) -> {[@stop_split] [@expl:eq ensures] [%#strace] result
+    = (deep_model_ref_Alert self = deep_model_ref_Alert rhs)}
+    (! return {result}) ]

@@ -1,0 +1,27 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 92 4 92 32 *)
+
+(* trace::Trace *)
+
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 91 53 91 98
+let%span sord = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/logic/ord.rs" 34 8 34 21
+
+use creusot.int.UInt32
+use creusot.prelude.Any
+use int.Int
+
+type t_Trace = { progress: UInt32.t; threshold: UInt32.t }
+
+predicate ge_log_Int [@inline:trivial] (self: int) (other: int) = [%#sord] other <= self
+
+meta "rewrite_def" predicate ge_log_Int
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let traced [#"crates/idaptik-kernel/src/trace.rs" 92 4 92 32] (self: t_Trace) (return (x: bool)) = (! bb0
+  [ bb0 = s0 [ s0 = [ &_ret <- UInt32.ge self.progress self.threshold ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: bool = Any.any_l () | & self: t_Trace = self ])
+  [ return (result: bool) -> {[@stop_split] [@expl:traced ensures] [%#strace] result
+    = ge_log_Int (UInt32.t'int self.progress) (UInt32.t'int self.threshold)}
+    (! return {result}) ]

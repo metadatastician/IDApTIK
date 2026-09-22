@@ -34,7 +34,7 @@
 # without someone classifying it.
 #
 # tier	path	reason
-S	crates/idaptik-core/src/scenario/rng.rs	Mulberry32 PRNG; every stochastic decision in a run descends from it
+S	crates/idaptik-core/src/scenario/rng.rs	roll_init and InitRoll plus the Mulberry32 re-export; the generator itself moved to idaptik-kernel, where it is proved
 S	crates/idaptik-core/src/scenario/mathf.rs	fixed float helpers; ADR-0004 byte-exactness rests on these
 S	crates/idaptik-core/src/scenario/snapshot.rs	RuntimeSnapshot round-trip; a lossy field is invisible until replay
 S	crates/idaptik-core/src/scenario/state.rs	the replayed state itself
@@ -42,7 +42,8 @@ S	crates/idaptik-core/src/scenario/sim/mod.rs	the tick function; ordering here i
 S	crates/idaptik-core/src/scenario/sim/systems.rs	per-tick systems; run order is load-bearing
 S	crates/idaptik-core/src/scenario/command.rs	typed command stream: the replay input
 S	crates/idaptik-core/src/scenario/event.rs	typed event stream: the replay output
-S	crates/idaptik-core/src/trace.rs	the trace clock the run races; off-by-one changes outcomes
+S	crates/idaptik-kernel/src/trace.rs	the trace clock the run races; off-by-one changes outcomes. PROVED: hand-written DeepModel and PartialEq, and advance() carries the anti-stall contract its own doc comment warns about
+S	crates/idaptik-kernel/src/rng.rs	Mulberry32 PRNG; every stochastic decision in a run descends from it. PROVED: next_u32 discharged panic- and overflow-free for all 2^32 states
 L	crates/idaptik-core/src/interp.rs	pose/door interpolation; parity-tested against the Bevy frontend
 L	crates/idaptik-core/src/scenario/common.rs	shared helpers over the scenario types
 L	crates/idaptik-core/src/scenario/outcome.rs	debrief and grading
@@ -74,6 +75,7 @@ L	crates/idaptik-core/src/netsim/topology.rs	topology construction
 L	crates/idaptik-core/src/network.rs	the demo network model
 L	crates/idaptik-core/src/package.rs	package load/run orchestration
 D	crates/idaptik-core/src/lib.rs	crate root: re-exports and the demo network fixture
+D	crates/idaptik-kernel/src/lib.rs	crate root: re-exports, and the record of the three conditions a crate must meet before Creusot can prove it
 D	crates/idaptik-core/src/device.rs	device newtypes and enums
 D	crates/idaptik-core/src/scenario/mod.rs	scenario re-exports
 D	crates/idaptik-core/src/scenario/ids.rs	id newtypes

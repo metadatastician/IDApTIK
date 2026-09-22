@@ -1,0 +1,16 @@
+(* #"crates/idaptik-kernel/src/rng.rs" 20 23 20 25 *)
+
+(* <rng::Mulberry32 as std::cmp::Eq> *)
+
+use creusot.prelude.Any
+use creusot.int.UInt32
+
+type t_Mulberry32 = { state: UInt32.t }
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let assert_fields_are_eq_Mulberry32 [#"crates/idaptik-kernel/src/rng.rs" 20 23 20 25] (self: t_Mulberry32)
+  (return (x: ())) = (! bb0
+  [ bb0 = return {_ret} ] [ & _ret: () = Any.any_l () ]) [ return (result: ()) -> (! return {result}) ]

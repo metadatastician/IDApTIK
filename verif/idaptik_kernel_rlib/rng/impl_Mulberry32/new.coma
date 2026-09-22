@@ -1,0 +1,30 @@
+(* #"crates/idaptik-kernel/src/rng.rs" 49 4 49 33 *)
+
+(* rng::Mulberry32 *)
+
+let%span srng = "crates/idaptik-kernel/src/rng.rs" 48 53 48 81
+let%span srng'0 = "crates/idaptik-kernel/src/rng.rs" 33 8 33 31
+let%span snum = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 27 28 27 33
+
+use creusot.int.UInt32
+use creusot.prelude.Any
+
+type t_Mulberry32 = { state: UInt32.t }
+
+function deep_model_u32 [@inline:trivial] (self: UInt32.t) : int = [%#snum] UInt32.t'int self
+
+meta "rewrite_def" function deep_model_u32
+
+function deep_model_Mulberry32 [#"crates/idaptik-kernel/src/rng.rs" 32 4 32 50] (self: t_Mulberry32) : int =
+  [%#srng'0] deep_model_u32 self.state
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let new [#"crates/idaptik-kernel/src/rng.rs" 49 4 49 33] (seed: UInt32.t) (return (x: t_Mulberry32)) = (! bb0
+  [ bb0 = s0 [ s0 = [ &_ret <- { state = seed } ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: t_Mulberry32 = Any.any_l () | & seed: UInt32.t = seed ])
+  [ return (result: t_Mulberry32) -> {[@stop_split] [@expl:new ensures] [%#srng] deep_model_Mulberry32 result
+    = UInt32.t'int seed}
+    (! return {result}) ]
