@@ -1,0 +1,72 @@
+(* #"crates/idaptik-kernel/src/rng.rs" 20 9 20 14 *)
+
+(* <rng::Mulberry32 as std::fmt::Debug> *)
+
+let%span srng = "crates/idaptik-kernel/src/rng.rs" 20 9 20 14
+let%span srng'0 = "crates/idaptik-kernel/src/rng.rs" 23 4 23 18
+let%span sfmt = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/fmt.rs" 10 20 10 24
+let%span sinvariant = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/invariant.rs" 93 20 93 44
+
+use creusot.int.UInt32
+use creusot.prelude.MutBorrow
+use creusot.prelude.Any
+
+type t_Mulberry32 = { state: UInt32.t }
+
+type dyn_Debug
+
+function dyn_Debug_of_ref_u32 (x: UInt32.t) : dyn_Debug
+
+type t_Formatter
+
+predicate inv_Formatter (_1: t_Formatter)
+
+type t_Result_unit_Error = Ok () | Err ()
+
+predicate invariant_refmut_Formatter [@inline:trivial] (self: MutBorrow.t t_Formatter) =
+  [%#sinvariant] inv_Formatter self.current /\ inv_Formatter self.final
+
+meta "rewrite_def" predicate invariant_refmut_Formatter
+
+predicate inv_refmut_Formatter [@inline:trivial] (_1: MutBorrow.t t_Formatter) = invariant_refmut_Formatter _1
+
+meta "rewrite_def" predicate inv_refmut_Formatter
+
+let debug_struct_field1_finish (self_: MutBorrow.t t_Formatter) (name: string) (name1: string) (value1: dyn_Debug)
+  (return (x: t_Result_unit_Error)) =
+{[@stop_split] [@expl:debug_struct_field1_finish 'self_' type invariant] [%#sfmt] inv_refmut_Formatter self_}
+  any [ return (result: t_Result_unit_Error) -> (! return {result}) ]
+
+predicate resolve_refmut_Formatter [@inline:trivial] (_1: MutBorrow.t t_Formatter) = _1.final = _1.current
+
+meta "rewrite_def" predicate resolve_refmut_Formatter
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let fmt_Mulberry32 [#"crates/idaptik-kernel/src/rng.rs" 20 9 20 14] (self: t_Mulberry32) (f: MutBorrow.t t_Formatter)
+  (return (x: t_Result_unit_Error)) = {[@stop_split] [@expl:fmt 'f' type invariant] [%#srng] inv_refmut_Formatter f}
+  (! bb0
+  [ bb0 = s0
+    [ s0 = [ &_5 <- [%#srng] "Mulberry32" ] s1
+    | s1 = [ &_7 <- [%#srng'0] "state" ] s2
+    | s2 = [ &_10 <- self.state ] s3
+    | s3 = [ &_8 <- dyn_Debug_of_ref_u32 _10 ] s4
+    | s4 = MutBorrow.borrow_final <t_Formatter> {f.current} {MutBorrow.get_id f}
+        (fun (_bor: MutBorrow.t t_Formatter) ->
+          [ &_3 <- _bor ] -{inv_Formatter _bor.final}-
+          [ &f <- { f with current = _bor.final } ] s5)
+      [ _ck -> (! {[@expl:type invariant] inv_Formatter f.current} any) ]
+    | s5 = debug_struct_field1_finish [%#srng] {_3} {_5} {_7} {_8} (fun (_x: t_Result_unit_Error) -> [ &_ret <- _x ] s6)
+    | s6 = s7 [ _ck -> (! {[@expl:type invariant] inv_refmut_Formatter f} any) ]
+    | s7 = -{resolve_refmut_Formatter f}- s8
+    | s8 = return {_ret} ] ]
+  [ & _ret: t_Result_unit_Error = Any.any_l ()
+  | & self: t_Mulberry32 = self
+  | & f: MutBorrow.t t_Formatter = f
+  | & _3: MutBorrow.t t_Formatter = Any.any_l ()
+  | & _5: string = Any.any_l ()
+  | & _7: string = Any.any_l ()
+  | & _8: dyn_Debug = Any.any_l ()
+  | & _10: UInt32.t = Any.any_l () ]) [ return (result: t_Result_unit_Error) -> (! return {result}) ]

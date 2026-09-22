@@ -1,0 +1,12 @@
+{
+  "profile": [],
+  "proofs": {
+    "Coma": {
+      "vc_debug_struct_field1_finish": {
+        "prover": "alt-ergo",
+        "time": 0.018
+      },
+      "vc_fmt_Mulberry32": { "prover": "alt-ergo", "time": 0.018 }
+    }
+  }
+}

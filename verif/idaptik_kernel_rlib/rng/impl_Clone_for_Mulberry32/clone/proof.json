@@ -1,0 +1,9 @@
+{
+  "profile": [],
+  "proofs": {
+    "Coma": {
+      "vc_clone_Mulberry32": { "prover": "alt-ergo", "time": 0.011 },
+      "vc_clone_u32": { "prover": "alt-ergo", "time": 0.015 }
+    }
+  }
+}

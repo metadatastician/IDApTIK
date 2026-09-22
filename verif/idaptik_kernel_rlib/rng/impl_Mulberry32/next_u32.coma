@@ -1,0 +1,80 @@
+(* #"crates/idaptik-kernel/src/rng.rs" 65 4 65 37 *)
+
+(* rng::Mulberry32 *)
+
+let%span srng = "crates/idaptik-kernel/src/rng.rs" 66 45 66 56
+let%span srng'0 = "crates/idaptik-kernel/src/rng.rs" 66 21 66 57
+let%span srng'1 = "crates/idaptik-kernel/src/rng.rs" 68 23 68 25
+let%span srng'2 = "crates/idaptik-kernel/src/rng.rs" 68 17 68 26
+let%span srng'3 = "crates/idaptik-kernel/src/rng.rs" 68 45 68 46
+let%span srng'4 = "crates/idaptik-kernel/src/rng.rs" 68 12 68 47
+let%span srng'5 = "crates/idaptik-kernel/src/rng.rs" 69 39 69 40
+let%span srng'6 = "crates/idaptik-kernel/src/rng.rs" 69 33 69 41
+let%span srng'7 = "crates/idaptik-kernel/src/rng.rs" 69 60 69 62
+let%span srng'8 = "crates/idaptik-kernel/src/rng.rs" 69 28 69 63
+let%span srng'9 = "crates/idaptik-kernel/src/rng.rs" 69 13 69 64
+let%span srng'10 = "crates/idaptik-kernel/src/rng.rs" 70 18 70 20
+let%span srng'11 = "crates/idaptik-kernel/src/rng.rs" 70 12 70 21
+let%span snum = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 338 26 338 48
+let%span snum'0 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 338 26 338 48
+
+use creusot.int.UInt32
+use creusot.prelude.MutBorrow
+use creusot.int.Int32
+use creusot.prelude.Any
+
+type t_Mulberry32 = { state: UInt32.t }
+
+let wrapping_add (self_: UInt32.t) (rhs: UInt32.t) (return (x: UInt32.t)) = any
+  [ return (result: UInt32.t) -> {[@stop_split] [@expl:wrapping_add ensures] [%#snum] result = UInt32.add self_ rhs}
+    (! return {result}) ]
+
+predicate resolve_refmut_Mulberry32 [@inline:trivial] (_1: MutBorrow.t t_Mulberry32) = _1.final = _1.current
+
+meta "rewrite_def" predicate resolve_refmut_Mulberry32
+
+let wrapping_mul (self_: UInt32.t) (rhs: UInt32.t) (return (x: UInt32.t)) = any
+  [ return (result: UInt32.t) -> {[@stop_split] [@expl:wrapping_mul ensures] [%#snum'0] result = UInt32.mul self_ rhs}
+    (! return {result}) ]
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let next_u32 [#"crates/idaptik-kernel/src/rng.rs" 65 4 65 37] (self: MutBorrow.t t_Mulberry32) (return (x: UInt32.t)) =
+(! bb0
+  [ bb0 = s0
+    [ s0 = wrapping_add [%#srng'0] {self.current.state} {[%#srng] (1831565813: UInt32.t)}
+        (fun (_x: UInt32.t) -> [ &_2 <- _x ] s1)
+    | s1 = [ &self <- { self with current = { state = _2 } } ] s2
+    | s2 = -{resolve_refmut_Mulberry32 self}- s3
+    | s3 = [ &t <- self.current.state ] s4
+    | s4 = UInt32.shr [%#srng'2] {t} {Int32.to_int ([%#srng'1] (15: Int32.t))} (fun (_x: UInt32.t) -> [ &_8 <- _x ] s5)
+    | s5 = [ &_6 <- UInt32.bw_xor t _8 ] s6
+    | s6 = [ &_10 <- UInt32.bw_or t ([%#srng'3] (1: UInt32.t)) ] s7
+    | s7 = wrapping_mul [%#srng'4] {_6} {_10} (fun (_x: UInt32.t) -> [ &_5 <- _x ] s8)
+    | s8 = [ &t <- _5 ] s9
+    | s9 = UInt32.shr [%#srng'6] {t} {Int32.to_int ([%#srng'5] (7: Int32.t))} (fun (_x: UInt32.t) -> [ &_17 <- _x ] s10)
+    | s10 = [ &_15 <- UInt32.bw_xor t _17 ] s11
+    | s11 = [ &_19 <- UInt32.bw_or t ([%#srng'7] (61: UInt32.t)) ] s12
+    | s12 = wrapping_mul [%#srng'8] {_15} {_19} (fun (_x: UInt32.t) -> [ &_14 <- _x ] s13)
+    | s13 = wrapping_add [%#srng'9] {t} {_14} (fun (_x: UInt32.t) -> [ &_12 <- _x ] s14)
+    | s14 = [ &t <- UInt32.bw_xor t _12 ] s15
+    | s15 = UInt32.shr [%#srng'11] {t} {Int32.to_int ([%#srng'10] (14: Int32.t))}
+        (fun (_x: UInt32.t) -> [ &_22 <- _x ] s16)
+    | s16 = [ &_ret <- UInt32.bw_xor t _22 ] s17
+    | s17 = return {_ret} ] ]
+  [ & _ret: UInt32.t = Any.any_l ()
+  | & self: MutBorrow.t t_Mulberry32 = self
+  | & _2: UInt32.t = Any.any_l ()
+  | & t: UInt32.t = Any.any_l ()
+  | & _5: UInt32.t = Any.any_l ()
+  | & _6: UInt32.t = Any.any_l ()
+  | & _8: UInt32.t = Any.any_l ()
+  | & _10: UInt32.t = Any.any_l ()
+  | & _12: UInt32.t = Any.any_l ()
+  | & _14: UInt32.t = Any.any_l ()
+  | & _15: UInt32.t = Any.any_l ()
+  | & _17: UInt32.t = Any.any_l ()
+  | & _19: UInt32.t = Any.any_l ()
+  | & _22: UInt32.t = Any.any_l () ]) [ return (result: UInt32.t) -> (! return {result}) ]
