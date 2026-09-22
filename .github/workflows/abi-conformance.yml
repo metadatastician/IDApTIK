@@ -86,8 +86,9 @@ jobs:
         run: |
           set -euo pipefail
           base="https://raw.githubusercontent.com/hyperpolymath/hypatia"
-          rev=bcb8bb3730c2520117e565d80d5638ff384c1222
+          rev=f079bc06061951d8e4c12f86675f81e97ec6e3a7
           old=2bbd3b2
+          prev=bcb8bb3730c2520117e565d80d5638ff384c1222
           fail=0
           # NB: fetch to a FILE, never to a shell variable. Command
           # substitution strips trailing newlines, which silently changes
@@ -143,16 +144,39 @@ jobs:
           # --- NORMATIVE LAYER: the Idris2 ABI ----------------------------
           # Owner ruling 2026-09-21: the ABI is written in Idris2 and IS the
           # specification; the Zig FFI below conforms to it.
-          check "$rev" src/Hypatia/ABI/Types.idr      a5f794b11cfbb38b9c38ba861af71d7cbd3e9b97c29a14973b212642d2f0d84e
+          # Gen.idr and its ipkg are pinned here too: they are not the spec,
+          # but they define what "generated from the spec" means, so pinning
+          # the ABI without its generator leaves a hole the size of a
+          # generator change.
+          check "$rev" src/Hypatia/ABI/Types.idr      5f6692718b262e9926179144fb527946cbe94503e37815473f18b9c37ed4f3f4
           check "$rev" src/Hypatia/ABI/FFI.idr        e7fb117bfe137e76232ddb220db82a389808a63d3eda29e3d47057052366c669
           check "$rev" src/Hypatia/ABI/REST.idr       3d3bfe554afcfca22d5fa064621d9f6fb94e16a9b0a2a56b434ef5c66543813f
           check "$rev" src/Hypatia/ABI/GraphQL.idr    a5122cfe2039fd1b06ab1e81fadb9d11b23418edd0b8bc25179d5546200914c5
           check "$rev" src/Hypatia/ABI/GRPC.idr       c04165ae3426b7bde34d64d21277bbf5d0e0f66fdfa08ac71c9968df6888e5b4
           check "$rev" src/Hypatia/ABI/RuleEngine.idr a191ada02ed9534cd66eb2b3c8de45e354682358e8f9cec4b676b68788adc3bd
+          check "$rev" src/Hypatia/ABI/Gen.idr        912c55624633fbb44e805d0e3c22ceccb73a9bcfb242e648b7e40a1fe890cc30
+          check "$rev" src/abi/hypatia-abi-gen.ipkg   3f4f2f8955fdef0db847335810f4c3380f0820f8f01f92c6ceca0f9b32580ce4
 
-          # --- IMPLEMENTATION LAYER: the Zig FFI + wire manifest ----------
-          check "$rev" ffi/zig/src/unified-api-adapter.zig f9a0b6fa9158ac7055d2d68f39a126800d8724a5c171bb2d35994e60dc3b5676
-          check "$rev" ffi/connectors.json                 33ee987eeb20283676e663bb6eacb5534ecb0da4bec344891aca08e7933be842
+          # --- GENERATED LAYER: emitted from the ABI, never hand-edited ---
+          # connectors.json moved layer at hypatia #811: it used to call
+          # itself the "Golden source-of-truth" and is now generated output.
+          check "$rev" ffi/connectors.json                                   a96fc2ef5cd83ea36be3953eadbf214eca012e7f6efebccaf4e48a8ae2adf330
+          check "$rev" ffi/zig/src/connector_generated.zig                   0dae1baa3774e1b9dc14cc317c1f50a75a7f1397f36f9ccb508a94a104f6e86e
+          check "$rev" clients/rust/hypatia-client/src/connector_generated.rs e16acd06bbad43336032c9ea108510a38b72fd4db5355648e431aa57ffb5ea69
+
+          # --- IMPLEMENTATION LAYER: the Zig FFI --------------------------
+          check "$rev" ffi/zig/src/unified-api-adapter.zig 8905802c15886f93b9448ceeb35d9fce9221c5def0be27481dc3a0ccf45d9b0e
+
+          # --- SUPERSEDED PIN: bcb8bb37, last hand-maintained revision ----
+          # Only the three files whose digests actually CHANGED between
+          # bcb8bb37 and the current pin are retained. The other five ABI
+          # modules are byte-identical at both revisions, so a second row
+          # would pin the same number twice and imply a difference that does
+          # not exist. (`sort -u` in the doc comparison above would collapse
+          # them anyway, which is precisely why the duplicate rows are noise.)
+          check "$prev" src/Hypatia/ABI/Types.idr           a5f794b11cfbb38b9c38ba861af71d7cbd3e9b97c29a14973b212642d2f0d84e
+          check "$prev" ffi/zig/src/unified-api-adapter.zig f9a0b6fa9158ac7055d2d68f39a126800d8724a5c171bb2d35994e60dc3b5676
+          check "$prev" ffi/connectors.json                 33ee987eeb20283676e663bb6eacb5534ecb0da4bec344891aca08e7933be842
 
           # --- HISTORICAL PIN OF RECORD (pre-rename, for audits) ----------
           # NB: connectors.json DID change across the rename (the advisory
