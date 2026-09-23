@@ -28,10 +28,12 @@ k9-generate:
 k9-build:
     @k9iser build --manifest k9iser.toml
 
-# Run the MUST hard-gate probes (informational aggregate).
+# Run the MUST hard-gate probes (critical probes gate the exit status).
+# The runner resolves the repository root from its own path, so this recipe
+# works from any directory: just -f .machine_readable/contractiles/Justfile must-check
 must-check:
-    @echo "See .machine_readable/contractiles/Mustfile.a2ml for the probe list."
+    @bash "{{justfile_directory()}}/../../scripts/must_check.sh"
 
 # Show the current project phase from STATE.a2ml.
 phase:
-    @grep -oP 'current-phase\s*=\s*"\K[^"]+' .machine_readable/6a2/STATE.a2ml | head -1
+    @grep -oP 'current-phase\s*=\s*"\K[^"]+' .machine_readable/descriptiles/STATE.a2ml | head -1

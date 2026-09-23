@@ -1,0 +1,264 @@
+# Machine-checked proof of the IDApTIK determinism kernel (issue #121).
+#
+# Two jobs, deliberately separated by cost:
+#
+#   ledgers  cheap, no toolchain. Enforces both Creusot ledgers against the
+#            source tree and runs their controls. This is the job that catches
+#            the everyday regression -- a new #[trusted] with no row, an
+#            unclassified file -- and it reports in seconds.
+#   proof    builds Creusot from a pinned source ref and discharges the kernel's
+#            proof obligations, then PLANTS A MUTANT and requires it to go red.
+#
+# NO `paths:` FILTER, on purpose. A required check that never runs because the
+# path filter did not match does not report "skipped" -- it reports nothing, and
+# the pull request waits forever for a context that will never arrive. The
+# estate has been bitten by this. Both jobs run on every pull request.
+#
+# NO MATRIX, also on purpose. GitHub appends the matrix combination to a job's
+# posted check name whenever `name:` does not interpolate the matrix, so a
+# ruleset matching on display name stops matching. A plain job posts the name
+# written here, verbatim.
+
+name: Creusot Proof
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned identically to developer/tools, which is where this was measured.
+  # A tag would be a moving target under sha_pinning_required; the commit is not.
+  CREUSOT_REF: 318615be3b8bbc60d1f6d52469ba5c0bdebed4f1
+  CREUSOT_VERSION: v0.13.0
+
+jobs:
+  ledgers:
+    name: Creusot ledgers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The controls run FIRST. If the gate cannot distinguish a clean tree from
+      # a mutated one, its verdict on the real tree means nothing, and we want
+      # that failure to be the one reported.
+      - name: Gate controls (a gate that cannot fail is worse than no gate)
+        run: ./scripts/creusot_ledger_check.sh --self-test
+
+      - name: Classification and proof-debt ledgers vs disk
+        run: ./scripts/creusot_ledger_check.sh all
+
+  proof:
+    name: Creusot proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Creusot needs its own nightly with rustc-dev; this is the toolchain the
+      # pinned Creusot ref declares, not a choice made here.
+      - name: Install Creusot's rustc
+        run: |
+          rustup toolchain install nightly-2026-06-22 \
+            --component rustfmt --component rustc-dev --component llvm-tools
+          rustup default nightly-2026-06-22
+
+      # The why3/prover bootstrap is the expensive part (opam switch + four
+      # provers). Keyed on the Creusot ref, so a pin bump rebuilds and nothing
+      # else does.
+      - name: Cache the Creusot toolchain
+        id: creusot-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.local/share/creusot
+            ~/.config/creusot
+            ~/.cargo/bin/cargo-creusot
+          key: creusot-${{ runner.os }}-${{ env.CREUSOT_REF }}
+
+      - name: Build and provision Creusot
+        if: steps.creusot-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq opam pkg-config libgmp-dev zlib1g-dev autoconf
+
+          # MEASURED (run 35671485327): apt ships the opam binary but creates no
+          # opam root, and creusot-install's first act is `opam switch create`,
+          # which needs one:
+          #   [ERROR] Opam has not been initialised, please run `opam init`
+          # --bare makes the root and the default repository WITHOUT a default
+          # switch, which is right because creusot-install brings its own.
+          # Sandboxing off: bubblewrap is not in the default runner image and
+          # the runner is ephemeral, so it could only add a failure mode.
+          opam init --bare --yes --disable-sandboxing --no-setup
+
+          # MEASURED (run 35671959918): with the root initialised, the switch
+          # then failed because creusot-deps pulls **why3-ide**, whose GTK
+          # depexts (libcairo2-dev, libgtk-3-dev, libgtksourceview-3.0-dev)
+          # triggered opam's depext prompt, which answered `n` non-interactively
+          # and aborted the switch.
+          #
+          # The cure is upstream's own, not a workaround. creusot-deps.opam
+          # declares the IDE conditionally:
+          #     "why3-ide" {= "git-54c92f96" & !?in-creusot-ci}
+          # so setting that variable drops the GUI and the entire GTK stack with
+          # it. why3, why3find and the four provers -- everything a headless
+          # proof actually uses -- are unaffected. This is how Creusot's own CI
+          # builds, and it is the ONE difference from the developer/tools
+          # install, which has the IDE because a human might want it.
+          opam var in-creusot-ci=true --global
+          # Belt and braces: should any other package carry a system dependency,
+          # install it rather than prompt into a non-interactive `n`.
+          opam option depext-run-installs=true --global
+
+          git clone https://github.com/creusot-rs/creusot.git "$RUNNER_TEMP/creusot"
+          git -C "$RUNNER_TEMP/creusot" checkout --detach "$CREUSOT_REF"
+          # Refuse to proceed on anything but the pinned ref: a silent fallback
+          # to a different Creusot would make every result below unattributable.
+          got="$(git -C "$RUNNER_TEMP/creusot" rev-parse HEAD)"
+          [ "$got" = "$CREUSOT_REF" ] || { echo "::error::creusot ref is $got, expected $CREUSOT_REF"; exit 1; }
+          cd "$RUNNER_TEMP/creusot"
+          ./INSTALL
+
+      # Runs on a cache hit too, so the PATH is set either way. why3 and the
+      # four provers live in the switch creusot-install provisions; creusot-rustc
+      # lives under toolchains/<toolchain>/bin in the same tree.
+      - name: Record the toolchain actually in use
+        run: |
+          set -euo pipefail
+          echo "$HOME/.local/share/creusot/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/share/creusot/bin:$PATH"
+          echo "creusot ref pinned: $CREUSOT_REF ($CREUSOT_VERSION)"
+          rustc --version
+          # Deliberately NOT tolerated with `|| true`. If why3 is not runnable
+          # here then every proof verdict below is unattributable, and that is
+          # the failure worth reporting -- not a confusing one three steps on.
+          why3 --version
+          for p in alt-ergo cvc4 cvc5 z3; do
+            command -v "$p" >/dev/null || { echo "::error::prover $p is missing"; exit 1; }
+          done
+
+      - name: Translate the kernel
+        run: |
+          set -euo pipefail
+          cargo creusot -p idaptik-kernel --only coma --span-mode relative 2>&1 | tee coma.log
+          if grep -qE '^error' coma.log; then
+            echo "::error::translation reported errors"; exit 1
+          fi
+
+      # The denominator is the point. "ok" with no count is how a vacuous gate
+      # reads, so the proved-file count is extracted and required to be > 0.
+      - name: Prove, and print the denominator
+        run: |
+          set -euo pipefail
+          cargo creusot --only prove 2>&1 | tee prove.log
+          n="$(sed -n 's/.*Proved (\([0-9]\+\) files).*/\1/p' prove.log | tail -1)"
+          if [ -z "$n" ]; then
+            echo "::error::no 'Proved (N files)' line -- the prover did not report a verdict"; exit 1
+          fi
+          if [ "$n" -eq 0 ]; then
+            echo "::error::proved 0 files: a zero denominator is not a pass"; exit 1
+          fi
+          echo "PROVED $n files"
+
+      # Criterion (d): the gate must be able to say NO. The mutant deletes the
+      # .max(1) in Trace::advance -- the exact bug that function's own doc
+      # comment warns about, where a hacker pivots through enough hops to
+      # integer-divide the trace rate to zero and stall it forever.
+      #
+      # A non-zero exit is NOT sufficient evidence that the gate has teeth.
+      # `cargo creusot --only prove` also exits non-zero when the mutant fails
+      # to COMPILE or TRANSLATE, and a control that cannot tell those apart
+      # passes for the wrong reason -- the precise failure this repository has
+      # already been bitten by. So the mutant must translate cleanly first,
+      # and then the prover must name the goal it could not discharge.
+      - name: Control -- planted mutant must fail the PROOF, not the build
+        run: |
+          set -euo pipefail
+          restore() { cp /tmp/trace.orig crates/idaptik-kernel/src/trace.rs; }
+          cp crates/idaptik-kernel/src/trace.rs /tmp/trace.orig
+          sed -i 's|(base / hops\.max(1))\.max(1)|base / hops.max(1)|' crates/idaptik-kernel/src/trace.rs
+          if git diff --quiet crates/idaptik-kernel/src/trace.rs; then
+            echo "::error::mutant did not apply -- the control is vacuous"; exit 1
+          fi
+          touch crates/idaptik-kernel/src/lib.rs
+
+          # Must still translate. Previously this was `|| true`, which would
+          # have let a translation failure masquerade as a proof failure.
+          if ! cargo creusot -p idaptik-kernel --only coma --span-mode relative > mutant-coma.log 2>&1; then
+            echo "::error::the mutant failed to TRANSLATE, so the control cannot distinguish a build failure from a proof failure"
+            tail -40 mutant-coma.log; restore; exit 1
+          fi
+
+          if cargo creusot --only prove > mutant.log 2>&1; then
+            echo "::error::THE GATE HAS NO TEETH -- the anti-stall mutant still proved"
+            cat mutant.log; restore; exit 1
+          fi
+
+          # It failed. Now prove it failed for the RIGHT reason. why3find lists
+          # a goal line only for a goal it could not discharge, so the presence
+          # of this one IS the proof obligation failing:
+          #     Goal Coma.vc_advance: X (5/6)
+          # Matched without the verdict glyph so a locale or encoding change
+          # cannot silently turn this assertion into a false negative.
+          if ! grep -q 'Goal Coma.vc_advance' mutant.log; then
+            echo "::error::mutant failed, but NOT on Coma.vc_advance -- this control proves nothing about the contract"
+            tail -40 mutant.log; restore; exit 1
+          fi
+          if ! grep -q 'unproved file' mutant.log; then
+            echo "::error::mutant failed without an unproved-file verdict -- not a proof failure"
+            tail -40 mutant.log; restore; exit 1
+          fi
+          grep 'Goal Coma.vc_advance' mutant.log
+          echo "mutant correctly rejected by the PROVER, on the advance contract"
+          restore
+
+      - name: Positive control -- clean tree proves again after revert
+        run: |
+          set -euo pipefail
+          git diff --quiet crates/idaptik-kernel/src/trace.rs || { echo "::error::tree not restored"; exit 1; }
+          touch crates/idaptik-kernel/src/lib.rs
+          cargo creusot -p idaptik-kernel --only coma --span-mode relative >/dev/null
+          cargo creusot --only prove 2>&1 | tee restored.log
+          grep -q 'Proved (' restored.log || { echo "::error::clean tree no longer proves"; exit 1; }
+
+      - name: The kernel's own tests
+        run: cargo test -p idaptik-kernel --lib
+
+      # Criterion (c) asks for the evidence to be retained as a build artefact.
+      # `verif/` is committed as well -- that is the durable half, reviewable in
+      # the pull request instead of expiring with the run -- but the RUN's own
+      # output is not in git, and the denominator lives there. Both halves, and
+      # `if: always()` so a red proof uploads the log that explains it.
+      - name: Retain the proof evidence
+        if: always()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: creusot-proof-evidence
+          path: |
+            coma.log
+            prove.log
+            mutant.log
+            mutant-coma.log
+            restored.log
+            verif/
+          # `warn`, not `error`: with `if: always()` a bootstrap failure reaches
+          # this step before any log exists, and a second red there would only
+          # obscure the first. The guarantee that evidence EXISTS on a green run
+          # comes from the prove step, which greps its own denominator out of
+          # prove.log and fails without it -- not from this uploader.
+          if-no-files-found: warn
+          retention-days: 30

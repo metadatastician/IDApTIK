@@ -37,7 +37,7 @@ the repository tidy — stale build artifacts, editor cruft, and metadata drift
 - description: No stray STATE/META/etc. copies in the repository root
 - run: test ! -f STATE.a2ml && test ! -f META.a2ml && test ! -f ECOSYSTEM.a2ml
 - severity: warning
-- notes: The authoritative copies live under .machine_readable/6a2/.
+- notes: The authoritative copies live under .machine_readable/descriptiles/.
 
 ## Generated Output
 

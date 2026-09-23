@@ -2,10 +2,13 @@
 #
 # Layout follows ADR-0003: gameplay truth lives in an engine-agnostic `core`
 # crate; `bevy` is the selected rendering frontend over it; `ffi` is the C-ABI
-# surface that Zig/Idris2 bind to (ADR-0001, ADR-0008).
+# surface, modelled in Idris2 under ffi/abi/ (gated by just abi-model-check);
+# the Zig adapter over it lives in crates/idaptik-ffi/zig-adapter/ (gated by
+# .github/workflows/abi-conformance.yml), see issue #103 (ADR-0001, ADR-0008).
 [workspace]
 resolver = "2"
 members = [
+    "crates/idaptik-kernel",
     "crates/idaptik-core",
     "crates/idaptik-ffi",
     "crates/idaptik-tui",
@@ -21,6 +24,7 @@ authors = ["IDApTIK contributors"]
 repository = "https://github.com/metadatastician/IDApTIK"
 
 [workspace.dependencies]
+idaptik-kernel = { path = "crates/idaptik-kernel", version = "0.1.0" }
 idaptik-core = { path = "crates/idaptik-core", version = "0.1.0" }
 idaptik-tui = { path = "crates/idaptik-tui", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
@@ -38,6 +42,12 @@ idaptik-net = { path = "crates/idaptik-net", version = "0.1.0" }
 burble-client = { git = "https://github.com/metadatastician/burble", rev = "ef6756cf1591406d434c5c04c3c018e935836e4c", version = "2.0.0" }
 tokio-tungstenite = "0.30"
 futures-util = "0.3"
+
+# Debug builds of the Bevy dependency tree carry gigabytes of DWARF; linking that
+# into idaptik-bevy thrashes a ~4 GiB WSL2 VM for hours without finishing. Keep
+# full debug info for IDApTIK's own crates, drop it for third-party ones.
+[profile.dev.package."*"]
+debug = false
 
 [patch.crates-io]
 bevy_winit = { path = "vendor/bevy_winit" }

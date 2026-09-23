@@ -20,7 +20,7 @@ fi
 mise trust --quiet 2>/dev/null || mise trust 2>/dev/null || true
 
 # 3. Install the fast, prebuilt tools now. Erlang/Elixir are left for `just setup`.
-for tool in zig just nickel; do
+for tool in zig just aqua:nickel-lang/nickel; do
   log "ensuring ${tool}…"
   mise install "${tool}" 2>&1 | sed 's/^/  /' || log "WARN: could not install ${tool} (continuing)"
 done

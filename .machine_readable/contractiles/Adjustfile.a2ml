@@ -31,7 +31,7 @@ actions. Advisory — it warns and trends, it does not block.
 ### state-freshness
 - description: STATE.a2ml should track the real phase and component status
 - tolerance: STATE.a2ml last-updated within one milestone of HEAD
-- corrective: Refresh .machine_readable/6a2/STATE.a2ml from README.md + docs/adr/
+- corrective: Refresh .machine_readable/descriptiles/STATE.a2ml from README.md + docs/adr/
 - severity: advisory
 
 ### adr-coverage

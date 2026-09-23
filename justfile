@@ -12,6 +12,12 @@ default:
 
 # --- Environment ---------------------------------------------------------------
 
+# On a machine without `just` yet, run `./install.sh` directly. Flags pass
+# through, e.g. `just install --no-build` or `just install --full`.
+# One-shot fresh-clone install (Debian/Ubuntu/WSL2): rustup, Rust, mise tools, Bevy libs (sudo), build, doctor.
+install *ARGS:
+    bash install.sh {{ARGS}}
+
 # Install the pinned toolchains (mise) + Rust targets. Erlang/Elixir build from
 # source on first run and take a while; subsequent runs are cached.
 setup:
@@ -34,6 +40,13 @@ secret-scan:
 bevy-linux-deps:
     sudo apt-get update
     sudo apt-get install -y pkg-config libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev
+
+# WSL2 fallback client, used by launcher.sh when WSLg Copy Mode is broken: the
+# Windows Rust target plus the MinGW cross-linker (Debian/Ubuntu).
+windows-client-deps:
+    rustup target add x86_64-pc-windows-gnu
+    sudo apt-get update
+    sudo apt-get install -y gcc-mingw-w64-x86-64
 
 # Fast bootstrap for ephemeral/web sessions: mise + prebuilt tools only
 # (skips the slow Erlang/Elixir source builds). Called by the SessionStart hook.
@@ -61,6 +74,29 @@ repair:
 # Deterministic fixture coverage for fatal/warning runtime diagnosis.
 runtime-doctor-test:
     @bash tests/runtime_doctor_test.sh
+
+# Launcher/multiplayer-runtime fixture coverage: host/join URL formation,
+# spaces in checkout paths, environment overrides, readiness timeout, stale
+# PID, relay early exit, and cleanup (issue #102).
+launcher-fixture-test:
+    bash tests/launcher_fixture_test.sh
+
+# Fixture coverage for the bevy_winit vendor gate (issue #105).
+vendor-winit-test:
+    bash tests/vendor_winit_check_test.sh
+
+# Run every shell fixture suite (no Rust toolchain needed).
+fixture-tests: runtime-doctor-test launcher-fixture-test vendor-winit-test
+
+# Execute the Mustfile physical-state probes (the estate `must check` verb).
+# Critical probes gate; a probe whose tool is missing fails, never skips.
+must-check:
+    bash scripts/must_check.sh
+
+# Gate the Idris2 ABI model: escape scan, total typecheck, runtime smoke,
+# header + snapshot-format parity (issue #103).
+abi-model-check:
+    bash scripts/abi_model_check.sh
 
 # Show the pinned versions at a glance.
 versions:
@@ -124,10 +160,30 @@ lint:
 supply-chain:
     cargo deny check --hide-inclusion-graph
 
+# --- Vendored bevy_winit patch (issue #105) -------------------------------------
+
+# Gate the temporary bevy_winit feature patch: the vendored copy must match
+# the published crate except for the documented Wayland CSD feature split, and
+# the resolved graph must keep the font-parser path out with the title-free
+# CSD feature active. Run this on every Bevy upgrade (vendor/README.md).
+vendor-winit-check:
+    bash scripts/vendor_bevy_winit_check.sh parity
+    bash scripts/vendor_bevy_winit_check.sh graph
+
+# Watch published bevy_winit releases for the patch's retirement condition:
+# independently selectable Wayland CSD features. Exits non-zero (with removal
+# steps) once upstream makes the vendored patch unnecessary — then remove
+# vendor/bevy_winit and the [patch.crates-io] section (issue #105).
+vendor-winit-watch:
+    bash scripts/vendor_bevy_winit_check.sh watch
+
 # --- Config (Nickel) -----------------------------------------------------------
 
+# Check the typed Nickel configuration. A missing nickel binary is a hard
+# failure, not a skip: run `just setup` first.
 config-check:
-    @if command -v nickel >/dev/null 2>&1; then nickel export config/default.ncl >/dev/null && nickel export config/grounded_slice.ncl >/dev/null && nickel export config/ghost_lobby_floor.ncl >/dev/null && just config-scenario-check && echo "config: ok (schema applied)"; else echo "nickel not installed: run 'just setup'"; fi
+    @command -v nickel >/dev/null 2>&1 || { echo "nickel is not installed: run 'just setup'" >&2; exit 1; }
+    nickel export config/default.ncl >/dev/null && nickel export config/grounded_slice.ncl >/dev/null && nickel export config/ghost_lobby_floor.ncl >/dev/null && just config-scenario-check && echo "config: ok (schema applied)"
 
 # Check the Nickel-authored scenario against scenario-schema.ncl: the good
 # fixture must export and round-trip through the Rust validator unchanged, and

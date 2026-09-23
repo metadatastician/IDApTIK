@@ -1,0 +1,42 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 45 4 45 37 *)
+
+(* <trace::Trace as std::cmp::PartialEq> *)
+
+let%span snum = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 27 28 27 33
+let%span smodel = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/model.rs" 37 8 37 28
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 46 8 46 72
+let%span strace'0 = "crates/idaptik-kernel/src/trace.rs" 44 53 44 102
+let%span strace'1 = "crates/idaptik-kernel/src/trace.rs" 34 8 34 65
+
+use creusot.int.UInt32
+use creusot.prelude.Any
+
+type t_Trace = { progress: UInt32.t; threshold: UInt32.t }
+
+type tup2_Int_Int = { f0: int; f1: int }
+
+function deep_model_u32 [@inline:trivial] (self: UInt32.t) : int = [%#snum] UInt32.t'int self
+
+meta "rewrite_def" function deep_model_u32
+
+function deep_model_Trace [#"crates/idaptik-kernel/src/trace.rs" 33 4 33 77] (self: t_Trace) : tup2_Int_Int =
+  [%#strace'1] { f0 = deep_model_u32 self.progress; f1 = deep_model_u32 self.threshold }
+
+function deep_model_ref_Trace [@inline:trivial] (self: t_Trace) : tup2_Int_Int = [%#smodel] deep_model_Trace self
+
+meta "rewrite_def" function deep_model_ref_Trace
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let eq_Trace [#"crates/idaptik-kernel/src/trace.rs" 45 4 45 37] (self: t_Trace) (rhs: t_Trace) (return (x: bool)) =
+(! bb0
+  [ bb0 = s0
+    [ s0 = [ &_6 <- self.progress = rhs.progress ] s1 | s1 = any [ br0 -> {_6 = false} (! bb2) | br1 -> {_6} (! bb1) ] ]
+  | bb1 = s0 [ s0 = [ &_ret <- self.threshold = rhs.threshold ] s1 | s1 = return {_ret} ]
+  | bb2 = s0 [ s0 = [ &_ret <- [%#strace] false ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: bool = Any.any_l () | & self: t_Trace = self | & rhs: t_Trace = rhs | & _6: bool = Any.any_l () ])
+  [ return (result: bool) -> {[@stop_split] [@expl:eq ensures] [%#strace'0] result
+    = (deep_model_ref_Trace self = deep_model_ref_Trace rhs)}
+    (! return {result}) ]

@@ -1,0 +1,15 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 133 16 133 21 *)
+
+(* <trace::Alert as std::clone::Clone> *)
+
+use creusot.prelude.Any
+
+type t_Alert = FailedLogin | PortScan | FirewallTrip | PowerCut
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let clone_Alert [#"crates/idaptik-kernel/src/trace.rs" 133 16 133 21] (self: t_Alert) (return (x: t_Alert)) = (! bb0
+  [ bb0 = s0 [ s0 = [ &_ret <- self ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: t_Alert = Any.any_l () | & self: t_Alert = self ]) [ return (result: t_Alert) -> (! return {result}) ]

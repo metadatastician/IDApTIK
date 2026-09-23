@@ -1,0 +1,71 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 133 9 133 14 *)
+
+(* <trace::Alert as std::fmt::Debug> *)
+
+let%span sfmt = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/fmt.rs" 7 26 7 30
+let%span sinvariant = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/invariant.rs" 93 20 93 44
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 133 9 133 14
+
+use creusot.prelude.MutBorrow
+use creusot.prelude.Any
+
+type t_Alert = FailedLogin | PortScan | FirewallTrip | PowerCut
+
+type t_Formatter
+
+predicate inv_Formatter (_1: t_Formatter)
+
+type t_Result_unit_Error = Ok () | Err ()
+
+predicate invariant_refmut_Formatter [@inline:trivial] (self: MutBorrow.t t_Formatter) =
+  [%#sinvariant] inv_Formatter self.current /\ inv_Formatter self.final
+
+meta "rewrite_def" predicate invariant_refmut_Formatter
+
+predicate inv_refmut_Formatter [@inline:trivial] (_1: MutBorrow.t t_Formatter) = invariant_refmut_Formatter _1
+
+meta "rewrite_def" predicate inv_refmut_Formatter
+
+let write_str (self_: MutBorrow.t t_Formatter) (data: string) (return (x: t_Result_unit_Error)) =
+{[@stop_split] [@expl:write_str 'self_' type invariant] [%#sfmt] inv_refmut_Formatter self_}
+  any [ return (result: t_Result_unit_Error) -> (! return {result}) ]
+
+predicate resolve_refmut_Formatter [@inline:trivial] (_1: MutBorrow.t t_Formatter) = _1.final = _1.current
+
+meta "rewrite_def" predicate resolve_refmut_Formatter
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let fmt_Alert [#"crates/idaptik-kernel/src/trace.rs" 133 9 133 14] (self: t_Alert) (f: MutBorrow.t t_Formatter)
+  (return (x: t_Result_unit_Error)) = {[@stop_split] [@expl:fmt 'f' type invariant] [%#strace] inv_refmut_Formatter f}
+  (! bb0
+  [ bb0 = any
+    [ br0 -> {self = FailedLogin} (! bb8)
+    | br1 -> {self = PortScan} (! bb7)
+    | br2 -> {self = FirewallTrip} (! bb6)
+    | br3 -> {self = PowerCut} (! bb5) ]
+  | bb5 = s0 [ s0 = [ &_9 <- [%#strace] "PowerCut" ] s1 | s1 = [ &_4 <- _9 ] s2 | s2 = bb9 ]
+  | bb6 = s0 [ s0 = [ &_8 <- [%#strace] "FirewallTrip" ] s1 | s1 = [ &_4 <- _8 ] s2 | s2 = bb9 ]
+  | bb7 = s0 [ s0 = [ &_7 <- [%#strace] "PortScan" ] s1 | s1 = [ &_4 <- _7 ] s2 | s2 = bb9 ]
+  | bb8 = s0 [ s0 = [ &_6 <- [%#strace] "FailedLogin" ] s1 | s1 = [ &_4 <- _6 ] s2 | s2 = bb9 ]
+  | bb9 = s0
+    [ s0 = MutBorrow.borrow_final <t_Formatter> {f.current} {MutBorrow.get_id f}
+        (fun (_bor: MutBorrow.t t_Formatter) ->
+          [ &_3 <- _bor ] -{inv_Formatter _bor.final}-
+          [ &f <- { f with current = _bor.final } ] s1)
+      [ _ck -> (! {[@expl:type invariant] inv_Formatter f.current} any) ]
+    | s1 = write_str [%#strace] {_3} {_4} (fun (_x: t_Result_unit_Error) -> [ &_ret <- _x ] s2)
+    | s2 = s3 [ _ck -> (! {[@expl:type invariant] inv_refmut_Formatter f} any) ]
+    | s3 = -{resolve_refmut_Formatter f}- s4
+    | s4 = return {_ret} ] ]
+  [ & _ret: t_Result_unit_Error = Any.any_l ()
+  | & self: t_Alert = self
+  | & f: MutBorrow.t t_Formatter = f
+  | & _3: MutBorrow.t t_Formatter = Any.any_l ()
+  | & _4: string = Any.any_l ()
+  | & _6: string = Any.any_l ()
+  | & _7: string = Any.any_l ()
+  | & _8: string = Any.any_l ()
+  | & _9: string = Any.any_l () ]) [ return (result: t_Result_unit_Error) -> (! return {result}) ]

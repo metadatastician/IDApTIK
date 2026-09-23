@@ -20,7 +20,10 @@ pub mod netsim;
 pub mod network;
 pub mod package;
 pub mod scenario;
-pub mod trace;
+/// The trace clock and alert enum live in [`idaptik_kernel`], where they are
+/// machine-checked (issue #121). Re-exported as a module so `crate::trace::Trace`
+/// keeps the path every caller already uses.
+pub use idaptik_kernel::trace;
 
 pub use companion::{
     CompanionDefinition, MOLETAIRE_JSON, MoleCommand, MoleEvent, MoleParams, MoletaireSim,

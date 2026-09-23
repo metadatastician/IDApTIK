@@ -1,0 +1,21 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 98 4 98 33 *)
+
+(* trace::Trace *)
+
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 97 53 97 78
+
+use creusot.int.UInt32
+use creusot.prelude.Any
+
+type t_Trace = { progress: UInt32.t; threshold: UInt32.t }
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let progress'0 [#"crates/idaptik-kernel/src/trace.rs" 98 4 98 33] (self: t_Trace) (return (x: UInt32.t)) = (! bb0
+  [ bb0 = s0 [ s0 = [ &_ret <- self.progress ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: UInt32.t = Any.any_l () | & self: t_Trace = self ])
+  [ return (result: UInt32.t) -> {[@stop_split] [@expl:progress ensures] [%#strace] UInt32.t'int result
+    = UInt32.t'int self.progress}
+    (! return {result}) ]

@@ -1,0 +1,36 @@
+(* #"crates/idaptik-kernel/src/rng.rs" 41 4 41 42 *)
+
+(* <rng::Mulberry32 as std::cmp::PartialEq> *)
+
+let%span srng = "crates/idaptik-kernel/src/rng.rs" 40 53 40 102
+let%span srng'0 = "crates/idaptik-kernel/src/rng.rs" 33 8 33 31
+let%span snum = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 27 28 27 33
+let%span smodel = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/model.rs" 37 8 37 28
+
+use creusot.int.UInt32
+use creusot.prelude.Any
+
+type t_Mulberry32 = { state: UInt32.t }
+
+function deep_model_u32 [@inline:trivial] (self: UInt32.t) : int = [%#snum] UInt32.t'int self
+
+meta "rewrite_def" function deep_model_u32
+
+function deep_model_Mulberry32 [#"crates/idaptik-kernel/src/rng.rs" 32 4 32 50] (self: t_Mulberry32) : int =
+  [%#srng'0] deep_model_u32 self.state
+
+function deep_model_ref_Mulberry32 [@inline:trivial] (self: t_Mulberry32) : int = [%#smodel] deep_model_Mulberry32 self
+
+meta "rewrite_def" function deep_model_ref_Mulberry32
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let eq_Mulberry32 [#"crates/idaptik-kernel/src/rng.rs" 41 4 41 42] (self: t_Mulberry32) (rhs: t_Mulberry32)
+  (return (x: bool)) = (! bb0
+  [ bb0 = s0 [ s0 = [ &_ret <- self.state = rhs.state ] s1 | s1 = return {_ret} ] ]
+  [ & _ret: bool = Any.any_l () | & self: t_Mulberry32 = self | & rhs: t_Mulberry32 = rhs ])
+  [ return (result: bool) -> {[@stop_split] [@expl:eq ensures] [%#srng] result
+    = (deep_model_ref_Mulberry32 self = deep_model_ref_Mulberry32 rhs)}
+    (! return {result}) ]

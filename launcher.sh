@@ -188,6 +188,14 @@ run_solo() {
   if [ "${IDAPTIK_CLIENT_PLATFORM:-linux}" = "windows" ]; then
     bevy_bin="$REPO_DIR/target/x86_64-pc-windows-gnu/debug/idaptik-bevy.exe"
     "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy --target x86_64-pc-windows-gnu
+    # Debug builds make wgpu label Vulkan render passes via VK_EXT_debug_utils.
+    # Some Windows Vulkan drivers (seen: Intel HD 620) advertise the extension
+    # but cannot load cmd_begin_debug_utils_label_ext, so the client panics a
+    # second after opening its window. Disable the labels, and forward the
+    # variable across the WSL->Windows boundary (plain name; the /u flag does not
+    # forward it). An explicit user setting still wins.
+    export WGPU_DEBUG="${WGPU_DEBUG:-0}"
+    case ":${WSLENV:-}:" in *":WGPU_DEBUG:"*) ;; *) export WSLENV="${WSLENV:+$WSLENV:}WGPU_DEBUG" ;; esac
   else
     "$MISE_BIN" exec -- cargo build -q -p idaptik-bevy
   fi

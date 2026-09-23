@@ -1,0 +1,30 @@
+(* #"crates/idaptik-kernel/src/rng.rs" 20 16 20 21 *)
+
+(* <rng::Mulberry32 as std::clone::Clone> *)
+
+let%span srng = "crates/idaptik-kernel/src/rng.rs" 23 4 23 18
+let%span snum = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 50 26 50 32
+
+use creusot.int.UInt32
+use creusot.prelude.Any
+
+type t_Mulberry32 = { state: UInt32.t }
+
+let clone_u32 (self_: UInt32.t) (return (x: UInt32.t)) = any
+  [ return (result: UInt32.t) -> {[@stop_split] [@expl:clone ensures] [%#snum] result = self_} (! return {result}) ]
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let clone_Mulberry32 [#"crates/idaptik-kernel/src/rng.rs" 20 16 20 21] (self: t_Mulberry32) (return (x: t_Mulberry32)) =
+(! bb0
+  [ bb0 = s0
+    [ s0 = [ &_4 <- self.state ] s1
+    | s1 = clone_u32 [%#srng] {_4} (fun (_x: UInt32.t) -> [ &_2 <- _x ] s2)
+    | s2 = [ &_ret <- { state = _2 } ] s3
+    | s3 = return {_ret} ] ]
+  [ & _ret: t_Mulberry32 = Any.any_l ()
+  | & self: t_Mulberry32 = self
+  | & _2: UInt32.t = Any.any_l ()
+  | & _4: UInt32.t = Any.any_l () ]) [ return (result: t_Mulberry32) -> (! return {result}) ]

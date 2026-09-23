@@ -1,0 +1,134 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 81 4 81 51 *)
+
+(* trace::Trace *)
+
+let%span snum = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 347 20 348 51
+let%span snum'0 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 351 26 351 83
+let%span snum'1 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 352 26 352 83
+let%span snum'2 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/num.rs" 27 28 27 33
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 82 30 82 31
+let%span strace'0 = "crates/idaptik-kernel/src/trace.rs" 83 12 83 13
+let%span strace'1 = "crates/idaptik-kernel/src/trace.rs" 85 29 85 30
+let%span strace'2 = "crates/idaptik-kernel/src/trace.rs" 85 20 85 31
+let%span strace'3 = "crates/idaptik-kernel/src/trace.rs" 85 12 85 32
+let%span strace'4 = "crates/idaptik-kernel/src/trace.rs" 85 37 85 38
+let%span strace'5 = "crates/idaptik-kernel/src/trace.rs" 85 12 85 39
+let%span strace'6 = "crates/idaptik-kernel/src/trace.rs" 87 24 87 58
+let%span strace'7 = "crates/idaptik-kernel/src/trace.rs" 87 24 87 78
+let%span strace'8 = "crates/idaptik-kernel/src/trace.rs" 76 53 76 93
+let%span strace'9 = "crates/idaptik-kernel/src/trace.rs" 77 53 77 92
+let%span strace'10 = "crates/idaptik-kernel/src/trace.rs" 79 8 80 53
+let%span scmp = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 66 26 66 66
+let%span scmp'0 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 67 26 67 63
+let%span scmp'1 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 68 36 68 40
+let%span scmp'2 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 69 26 69 30
+let%span scmp'3 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 70 75 70 79
+let%span scmp'4 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 76 26 76 66
+let%span scmp'5 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 77 26 77 63
+let%span scmp'6 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 78 36 78 40
+let%span scmp'7 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 79 26 79 79
+let%span scmp'8 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 80 26 80 77
+let%span sord = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/logic/ord.rs" 22 8 22 20
+let%span sord'0 = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/logic/ord.rs" 34 8 34 21
+
+use creusot.int.UInt32
+use creusot.prelude.MutBorrow
+use creusot.prelude.Any
+use int.Int
+
+predicate ge_log_Int [@inline:trivial] (self: int) (other: int) = [%#sord'0] other <= self
+
+meta "rewrite_def" predicate ge_log_Int
+
+function deep_model_u32 [@inline:trivial] (self: UInt32.t) : int = [%#snum'2] UInt32.t'int self
+
+meta "rewrite_def" function deep_model_u32
+
+let max_u32 (self_: UInt32.t) (o: UInt32.t) (return (x: UInt32.t)) = any
+  [ return (result: UInt32.t) ->
+  {[@stop_split] [@expl:max_u32 ensures] ([@stop_split] [@expl:max ensures #0] [%#scmp] ge_log_Int (deep_model_u32 result) (deep_model_u32 self_))
+    /\ ([@stop_split] [@expl:max ensures #1] [%#scmp'0] ge_log_Int (deep_model_u32 result) (deep_model_u32 o))
+    /\ ([@stop_split] [@expl:max ensures #2] [%#scmp'1] result = self_ \/ result = o)
+    /\ ([@stop_split] [@expl:max ensures #3] [%#scmp'2] deep_model_u32 self_ <= deep_model_u32 o -> result = o)
+    /\ ([@stop_split] [@expl:max ensures #4] [%#scmp'3] deep_model_u32 o < deep_model_u32 self_ -> result = self_)}
+    (! return {result}) ]
+
+type t_Trace = { progress: UInt32.t; threshold: UInt32.t }
+
+constant const_MIN: UInt32.t = (0: UInt32.t)
+
+constant const_MAX: UInt32.t = (4294967295: UInt32.t)
+
+predicate gt_log_Int [@inline:trivial] (self: int) (other: int) = [%#sord] other < self
+
+meta "rewrite_def" predicate gt_log_Int
+
+let saturating_add (self_: UInt32.t) (rhs: UInt32.t) (return (x: UInt32.t)) = any
+  [ return (result: UInt32.t) ->
+  {[@stop_split] [@expl:saturating_add ensures] ([@stop_split] [@expl:saturating_add ensures #0] [%#snum] ge_log_Int (UInt32.t'int self_
+          + UInt32.t'int rhs) (UInt32.t'int const_MIN)
+        /\ UInt32.t'int self_ + UInt32.t'int rhs <= UInt32.t'int const_MAX
+      -> UInt32.t'int result = UInt32.t'int self_ + UInt32.t'int rhs)
+    /\ ([@stop_split] [@expl:saturating_add ensures #1] [%#snum'0] UInt32.t'int self_ + UInt32.t'int rhs
+        < UInt32.t'int const_MIN -> UInt32.t'int result = UInt32.t'int const_MIN)
+    /\ ([@stop_split] [@expl:saturating_add ensures #2] [%#snum'1] gt_log_Int (UInt32.t'int self_
+      + UInt32.t'int rhs) (UInt32.t'int const_MAX) -> UInt32.t'int result = UInt32.t'int const_MAX)}
+    (! return {result}) ]
+
+let min_u32 (self_: UInt32.t) (o: UInt32.t) (return (x: UInt32.t)) = any
+  [ return (result: UInt32.t) ->
+  {[@stop_split] [@expl:min_u32 ensures] ([@stop_split] [@expl:min ensures #0] [%#scmp'4] deep_model_u32 result
+      <= deep_model_u32 self_)
+    /\ ([@stop_split] [@expl:min ensures #1] [%#scmp'5] deep_model_u32 result <= deep_model_u32 o)
+    /\ ([@stop_split] [@expl:min ensures #2] [%#scmp'6] result = self_ \/ result = o)
+    /\ ([@stop_split] [@expl:min ensures #3] [%#scmp'7] deep_model_u32 self_ < deep_model_u32 o -> result = self_)
+    /\ ([@stop_split] [@expl:min ensures #4] [%#scmp'8] deep_model_u32 o <= deep_model_u32 self_ -> result = o)}
+    (! return {result}) ]
+
+predicate resolve_refmut_Trace [@inline:trivial] (_1: MutBorrow.t t_Trace) = _1.final = _1.current
+
+meta "rewrite_def" predicate resolve_refmut_Trace
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let advance [#"crates/idaptik-kernel/src/trace.rs" 81 4 81 51] (self: MutBorrow.t t_Trace) (base: UInt32.t)
+  (hops: UInt32.t) (return (x: ())) = (! bb0
+  [ bb0 = s0
+    [ s0 = [ &_12 <- base = ([%#strace] (0: UInt32.t)) ] s1
+    | s1 = any [ br0 -> {_12 = false} (! bb2) | br1 -> {_12} (! bb1) ] ]
+  | bb1 = s0 [ s0 = [ &rate <- [%#strace'0] (0: UInt32.t) ] s1 | s1 = bb6 ]
+  | bb2 = s0
+    [ s0 = max_u32 [%#strace'2] {hops} {[%#strace'1] (1: UInt32.t)} (fun (_x: UInt32.t) -> [ &_16 <- _x ] s1)
+    | s1 = [ &_18 <- _16 = ([%#strace'3] (0: UInt32.t)) ] s2
+    | s2 = {[@expl:division by zero] [%#strace'3] not _18} s3
+    | s3 = UInt32.div [%#strace'3] {base} {_16} (fun (_x: UInt32.t) -> [ &_14 <- _x ] s4)
+    | s4 = max_u32 [%#strace'5] {_14} {[%#strace'4] (1: UInt32.t)} (fun (_x: UInt32.t) -> [ &rate <- _x ] s5)
+    | s5 = bb6 ]
+  | bb6 = s0
+    [ s0 = saturating_add [%#strace'6] {self.current.progress} {rate} (fun (_x: UInt32.t) -> [ &_20 <- _x ] s1)
+    | s1 = min_u32 [%#strace'7] {_20} {self.current.threshold} (fun (_x: UInt32.t) -> [ &_19 <- _x ] s2)
+    | s2 = [ &self <- { self with current = { self.current with progress = _19 } } ] s3
+    | s3 = -{resolve_refmut_Trace self}- s4
+    | s4 = return {_ret} ] ]
+  [ & _ret: () = Any.any_l ()
+  | & self: MutBorrow.t t_Trace = self
+  | & base: UInt32.t = base
+  | & hops: UInt32.t = hops
+  | & rate: UInt32.t = Any.any_l ()
+  | & _12: bool = Any.any_l ()
+  | & _14: UInt32.t = Any.any_l ()
+  | & _16: UInt32.t = Any.any_l ()
+  | & _18: bool = Any.any_l ()
+  | & _19: UInt32.t = Any.any_l ()
+  | & _20: UInt32.t = Any.any_l () ])
+  [ return (result: ()) ->
+  {[@stop_split] [@expl:advance ensures] ([@stop_split] [@expl:advance ensures #0] [%#strace'8] UInt32.t'int self.final.threshold
+      = UInt32.t'int self.current.threshold)
+    /\ ([@stop_split] [@expl:advance ensures #1] [%#strace'9] UInt32.t'int self.final.progress
+      <= UInt32.t'int self.current.threshold)
+    /\ ([@stop_split] [@expl:advance ensures #2] [%#strace'10] gt_log_Int (UInt32.t'int base) 0
+      /\ UInt32.t'int self.current.progress < UInt32.t'int self.current.threshold
+    -> gt_log_Int (UInt32.t'int self.final.progress) (UInt32.t'int self.current.progress))}
+    (! return {result}) ]

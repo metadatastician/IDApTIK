@@ -1,0 +1,15 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 133 29 133 31 *)
+
+(* <trace::Alert as std::cmp::Eq> *)
+
+use creusot.prelude.Any
+
+type t_Alert = FailedLogin | PortScan | FirewallTrip | PowerCut
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let assert_fields_are_eq_Alert [#"crates/idaptik-kernel/src/trace.rs" 133 29 133 31] (self: t_Alert) (return (x: ())) =
+(! bb0
+  [ bb0 = return {_ret} ] [ & _ret: () = Any.any_l () ]) [ return (result: ()) -> (! return {result}) ]

@@ -1,0 +1,16 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 20 23 20 25 *)
+
+(* <trace::Trace as std::cmp::Eq> *)
+
+use creusot.prelude.Any
+use creusot.int.UInt32
+
+type t_Trace = { progress: UInt32.t; threshold: UInt32.t }
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+let assert_fields_are_eq_Trace [#"crates/idaptik-kernel/src/trace.rs" 20 23 20 25] (self: t_Trace) (return (x: ())) =
+(! bb0
+  [ bb0 = return {_ret} ] [ & _ret: () = Any.any_l () ]) [ return (result: ()) -> (! return {result}) ]

@@ -45,6 +45,6 @@ require-rerun-after-fix = true
 release-claim-requires-hard-pass = true
 
 [automation-hooks]
-# on-enter: Read 0-AI-MANIFEST.a2ml, then .machine_readable/6a2/STATE.a2ml.
+# on-enter: Read 0-AI-MANIFEST.a2ml, then .machine_readable/descriptiles/STATE.a2ml.
 # on-change: Keep STATE.a2ml in sync with README.md and docs/adr/.
 # on-commit: Sign off (git commit -s); run `just config-check` when config/ changes.

@@ -181,7 +181,7 @@ on map iteration order. Combine, discount, decay and query operations require
 replay, overflow and rounding tests.
 
 Cross-language implementations follow the estate seam policy: Idris2 owns the
-ABI contract, Zig implements the unified hexadeca-compatible FFI, and the C
+ABI contract, Zig implements the unified-api-adapter-compatible FFI, and the C
 header is generated. Any future BEAM-hosted native computation runs as a SNIF
 inside the approved WebAssembly sandbox, never as a raw NIF. Rust components
 are Rust/Crusoe components. These are boundary requirements, not claims that a

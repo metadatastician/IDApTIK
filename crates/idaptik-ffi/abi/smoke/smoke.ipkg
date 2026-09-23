@@ -1,0 +1,8 @@
+package idaptik-abi-smoke
+version = 0.1.0
+brief = "Runtime smoke for the idaptik-abi model (issue #103)"
+
+sourcedir = "."
+depends = idaptik-abi
+executable = abi-smoke
+main = Main
