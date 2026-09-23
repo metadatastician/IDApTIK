@@ -30,14 +30,15 @@ target IDApTIK's real tree, not a generic template.
 - severity: critical
 
 ### ai-manifest-present
-- description: Root 0-AI-MANIFEST.a2ml must exist
-- run: test -f 0-AI-MANIFEST.a2ml
+- description: Root 0-AI-MANIFEST.a2ml must exist under .machine_readable/
+- run: test -f .machine_readable/0-AI-MANIFEST.a2ml
 - severity: critical
 
 ### governance-docs
 - description: GOVERNANCE.md, MAINTAINERS, CODE_OF_CONDUCT.md, and CODEOWNERS must exist
-- run: test -f GOVERNANCE.md && test -f MAINTAINERS && test -f CODE_OF_CONDUCT.md && test -f .github/CODEOWNERS
+- run: test -f GOVERNANCE.md && test -f .github/MAINTAINERS && test -f CODE_OF_CONDUCT.md && test -f .github/CODEOWNERS
 - severity: critical
+- notes: MAINTAINERS lives under .github/ with the CODEOWNERS file it names.
 
 ## Toolchain Pins
 
@@ -68,9 +69,12 @@ target IDApTIK's real tree, not a generic template.
   the live one, so it failed against the real tree.
 
 ### server-and-config
-- description: The Elixir server relay and the Nickel config dir exist
-- run: test -d server && test -d config
+- description: The Nickel config dir exists (the session relay lives in the external burble repository, ADR-0006)
+- run: test -d config
 - severity: critical
+- notes: IDApTIK no longer contains its own relay server; the Bandit/Phoenix
+  relay is pinned from the sibling metadatastician/burble checkout and gated
+  through `just loopback-check`.
 
 ### adr-records
 - description: The architecture decision records exist (ADR-0001..0008)
@@ -141,9 +145,11 @@ target IDApTIK's real tree, not a generic template.
 - severity: critical
 
 ### six-directory-present
-- description: 6a2 directory holds all six core A2ML files
-- run: test -d .machine_readable/6a2 && test -f .machine_readable/6a2/META.a2ml && test -f .machine_readable/6a2/ECOSYSTEM.a2ml && test -f .machine_readable/6a2/STATE.a2ml && test -f .machine_readable/6a2/PLAYBOOK.a2ml && test -f .machine_readable/6a2/AGENTIC.a2ml && test -f .machine_readable/6a2/NEUROSYM.a2ml
+- description: The descriptiles directory holds all six core A2ML files
+- run: test -d .machine_readable/descriptiles && test -f .machine_readable/descriptiles/META.a2ml && test -f .machine_readable/descriptiles/ECOSYSTEM.a2ml && test -f .machine_readable/descriptiles/STATE.a2ml && test -f .machine_readable/descriptiles/PLAYBOOK.a2ml && test -f .machine_readable/descriptiles/AGENTIC.a2ml && test -f .machine_readable/descriptiles/NEUROSYM.a2ml
 - severity: critical
+- notes: The six-file A2ML set was moved from the historical `6a2` name to
+  `descriptiles` (see 0-AI-MANIFEST.a2ml "Where things live").
 
 ### contractiles-present
 - description: All four primary contractile files plus bust/dust exist
@@ -154,3 +160,34 @@ target IDApTIK's real tree, not a generic template.
 - description: k9iser.toml manifest exists at the repository root
 - run: test -f k9iser.toml
 - severity: critical
+
+## Boundary Honesty (issue #103)
+
+# Machine-readable state must not claim an implementation language the
+# repository does not contain, and — once sources land — must not fail to
+# claim it. The claim and the tree are checked against each other in both
+# directions, so the metadata cannot drift from reality in either direction.
+
+### ffi-language-claims-honest
+- description: Zig/Idris2 implementation claims match the sources actually present
+- run: bash -c 'zig=$(find . -name "*.zig" -not -path "./target/*" -not -path "./.git/*" -not -path "./vendor/*" | wc -l); idr=$(find . -name "*.idr" -not -path "./target/*" -not -path "./.git/*" -not -path "./vendor/*" | wc -l); m=.machine_readable/descriptiles/META.a2ml; s=.machine_readable/descriptiles/STATE.a2ml; if [ "$zig" -eq 0 ]; then ! grep -qE "^languages\s*=.*\bzig\b" "$m" && ! grep -qE "^\s*ffi-language\s*=\s*\"zig\"" "$s"; else grep -qE "^languages\s*=.*\bzig\b" "$m" && grep -qE "^\s*ffi-language\s*=\s*\"zig\"" "$s"; fi && if [ "$idr" -eq 0 ]; then ! grep -qE "^languages\s*=.*\bidris2\b" "$m" && ! grep -qE "^\s*abi-model-language\s*=\s*\"idris2\"" "$s"; else grep -qE "^languages\s*=.*\bidris2\b" "$m" && grep -qE "^\s*abi-model-language\s*=\s*\"idris2\"" "$s" && grep -q "abi_model_check.sh" .github/workflows/ci.yml; fi'
+- severity: critical
+- notes: |
+  Issue #103's metadata gate: machine-readable files may speak *policy*
+  (`ffi-language-policy = "zig"` plus a missing-status note) while no sources
+  exist, but never implementation (`ffi-language = "zig"`). The probe flips
+  automatically when Zig/Idris2 sources land, so the positive claim becomes
+  mandatory at the same moment it becomes true — and once Idris2 sources
+  exist, the CI wiring of `scripts/abi_model_check.sh` must exist too, so the
+  claim is backed by a gate rather than policy intent alone.
+
+### vendor-patch-gated
+- description: The temporary bevy_winit vendor patch (issue #105) is wired and gated
+- run: test -x scripts/vendor_bevy_winit_check.sh && test -x tests/vendor_winit_check_test.sh && grep -q 'wayland-csd-adwaita-notitle' Cargo.toml && grep -q '^\[patch.crates-io\]' Cargo.toml
+- severity: critical
+- notes: |
+  Presence-only probe (network-free): the vendored bevy_winit patch must stay
+  wired to the workspace and carry its gate + fixture test. The behavioural
+  checks — published-crate parity, font-parser-free graph, and the upstream
+  retirement watch — run in `just vendor-winit-check` and the CI vendor-parity
+  and vendor-winit-watch jobs.

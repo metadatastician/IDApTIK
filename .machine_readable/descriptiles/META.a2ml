@@ -6,12 +6,18 @@
 
 [metadata]
 version = "0.1.0"
-last-updated = "2026-07-26"
+last-updated = "2026-09-20"
 
 [project-info]
 name = "IDApTIK"
-type = "game"  # asymmetric two-player infiltration game (Cargo workspace + Elixir server)
-languages = ["rust", "elixir", "zig", "idris2", "nickel"]
+type = "game"  # asymmetric two-player infiltration game (Cargo workspace + external Elixir relay)
+# Languages with sources in THIS repository. Zig joined the list when the FFI
+# adapter landed (crates/idaptik-ffi/zig-adapter, issue #103, ADR-0001) — it is
+# no longer a policy target; the Elixir/OTP session layer lives in the sibling
+# metadatastician/burble relay (ADR-0002, ADR-0006). The Mustfile's
+# ffi-language-claims-honest probe diffs this list against the sources actually
+# present, both ways, so this line is not free-text.
+languages = ["rust", "nickel", "shell", "idris2", "zig"]
 # Layered licensing — each layer is licensed for what it is (README "Licensing").
 license-engine = "AGPL-3.0-or-later"      # engine & code (strong copyleft, incl. hosted service)
 license-content = "CC-BY-SA-4.0"          # art, levels, narrative, character designs, audio

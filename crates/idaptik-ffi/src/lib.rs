@@ -1,8 +1,10 @@
 //! C-ABI surface over [`idaptik_core`].
 //!
 //! This is the current boundary that non-Rust code binds to. It is exported
-//! directly from Rust; the estate-required Zig adapter and Idris2 ABI models do
-//! not exist yet and are tracked in issue #103 (ADR-0001). Keep this layer thin:
+//! directly from Rust; the Idris2 ABI model now exists (`abi/` in this crate,
+//! gated by `just abi-model-check`), while the estate-required Zig adapter and
+//! the UnifiedApiAdapter/serde-wire conformance work do not and are tracked in issue
+//! #103 (ADR-0001). Keep this layer thin:
 //! it owns only pointer/lifetime handling and delegates decisions to
 //! `idaptik-core`.
 //!

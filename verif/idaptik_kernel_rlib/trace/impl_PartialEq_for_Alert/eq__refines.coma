@@ -1,0 +1,32 @@
+(* #"crates/idaptik-kernel/src/trace.rs" 146 4 146 37 *)
+
+(* <trace::Alert as std::cmp::PartialEq> *)
+
+let%span smodel = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/model.rs" 37 8 37 28
+let%span strace = "crates/idaptik-kernel/src/trace.rs" 145 53 145 102
+let%span strace'0 = "crates/idaptik-kernel/src/trace.rs" 135 27 135 56
+let%span scmp = "../../tools/opt/cargo/registry/src/index.crates.io-1949cf8c6b5b557f/creusot-std-0.13.0/src/std/cmp.rs" 14 26 14 75
+
+type t_Alert = FailedLogin | PortScan | FirewallTrip | PowerCut
+
+type t_AlertDeepModel = FailedLogin'0 | PortScan'0 | FirewallTrip'0 | PowerCut'0
+
+function deep_model_Alert [#"crates/idaptik-kernel/src/trace.rs" 135 27 135 56] (self: t_Alert) : t_AlertDeepModel =
+  [%#strace'0] match self with
+    | FailedLogin -> FailedLogin'0
+    | PortScan -> PortScan'0
+    | FirewallTrip -> FirewallTrip'0
+    | PowerCut -> PowerCut'0
+    end
+
+function deep_model_ref_Alert [@inline:trivial] (self: t_Alert) : t_AlertDeepModel = [%#smodel] deep_model_Alert self
+
+meta "rewrite_def" function deep_model_ref_Alert
+
+meta "compute_max_steps" 1000000
+
+meta "select_lsinst" "all"
+
+goal refines: forall self_: t_Alert, rhs: t_Alert. forall result: bool. ([%#strace] result
+        = (deep_model_ref_Alert self_ = deep_model_ref_Alert rhs))
+      -> ([%#scmp] result = (deep_model_ref_Alert self_ = deep_model_ref_Alert rhs))

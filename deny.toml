@@ -27,10 +27,29 @@ allow = [
   "Zlib",
 ]
 
+# Creusot's proof library is LGPL-2.1-or-later, which this workspace's AGPL-3.0
+# licence is compatible with (LGPL-2.1+ may be taken up as GPLv3). It is scoped
+# as an exception rather than added to `allow` above so the permission names the
+# two crates it was granted for and cannot silently widen to anything else that
+# arrives LGPL. Both are inert on stable: the `creusot` feature is off by
+# default and only creusot-rustc sets `cfg(creusot)` (issue #121).
+exceptions = [
+  { allow = ["LGPL-2.1-or-later"], name = "creusot-std" },
+  { allow = ["LGPL-2.1-or-later"], name = "creusot-std-proc" },
+]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
 allow-wildcard-paths = true
+# The vendored bevy_winit feature patch (issue #105) exists to keep Bevy's
+# Wayland CSD title text — and with it this font-parser path — out of the
+# graph. Keep these bans so the path cannot quietly return on a Bevy upgrade.
+deny = [
+  { name = "ttf-parser" },
+  { name = "ab_glyph" },
+  { name = "ab_glyph_rasterizer" },
+]
 
 [sources]
 unknown-registry = "deny"

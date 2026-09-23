@@ -56,13 +56,17 @@ The Rust era's stack is being pinned as decisions are made, and each decision is
   selected graphical frontend over it
   ([ADR-0008](docs/adr/0008-select-bevy-and-retire-fyrox.md)).
 - **Multiplayer / session:** Elixir/OTP — **Bandit** + **Phoenix Channels**, not LiveView ([ADR-0002](docs/adr/0002-multiplayer-transport.md)).
-- **FFI / ABI policy:** **Zig unified hexadeca APIs/FFIs** for the adapter and **Idris2** for ABI
-  contracts. The current implementation still exports its C ABI directly from
-  Rust/Crusoe and contains neither Zig nor Idris2 source; remediation is tracked in
-  [#103](https://github.com/metadatastician/IDApTIK/issues/103)
+- **FFI / ABI policy:** **Zig unified-api-adapter APIs/FFIs** for the adapter and **Idris2** for ABI
+  contracts. The C ABI is still exported directly from Rust/Crusoe, the Idris2 ABI
+  model exists (`crates/idaptik-ffi/abi`, gated by `just abi-model-check`), and the Zig
+  adapter + UnifiedApiAdapter/serde-wire conformance harness now exist
+  (`crates/idaptik-ffi/zig-adapter`, gated by `.github/workflows/abi-conformance.yml`:
+  surface lockstep, fixture conformance incl. a planted failing fixture, and
+  authority-digest drift rejection per `docs/abi/ABI-AUTHORITY.md`) — remaining
+  work continues in [#103](https://github.com/metadatastician/IDApTIK/issues/103)
   ([ADR-0001](docs/adr/0001-toolchain-and-runtime-management.md)).
 - **Config:** **Nickel** (typed configuration).
-- **Toolchains:** pinned in `mise.toml` + `rust-toolchain.toml`; `just` runs tasks. Provision with `just setup` (or `just bootstrap` for a fast, prebuilt-only bring-up), and check with `just doctor`.
+- **Toolchains:** pinned in `mise.toml` + `rust-toolchain.toml`; `just` runs tasks. On a fresh Debian/Ubuntu/WSL2 clone run `./install.sh` (also `just install`): it installs rustup, the pinned Rust, the mise tools and Bevy's system libraries (asks for `sudo`), builds the Bevy frontend, and ends with the runtime doctor. Otherwise provision with `just setup` (or `just bootstrap` for a fast, prebuilt-only bring-up), and check with `just doctor`.
 
 Still open: persistence/versioning and the long-term Rust↔Elixir wire encoding.
 
@@ -84,7 +88,7 @@ their own build/reachability checklist and green joining result.
 
 ```
 crates/idaptik-core     engine-agnostic gameplay truth — the network sim + Ghost Lobby scenario, no rendering
-crates/idaptik-ffi      Current Rust-exported C ABI; Zig/Idris2 policy gap (#103)
+crates/idaptik-ffi      Rust-exported C ABI + Idris2 ABI model (abi/) + Zig adapter (zig-adapter/, gated) (#103)
 crates/idaptik-tui      ratatui/crossterm evaluation frontend + --headless/--replay/--export verifier over core (ADR-0004)
 crates/idaptik-bevy     selected Bevy rendering frontend (ADR-0008)
 crates/idaptik-net      Phoenix Channels client over burble game-session fabric (ADR-0006)

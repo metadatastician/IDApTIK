@@ -8,6 +8,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+idaptik-kernel.workspace = true
 serde = { workspace = true }
 serde_json = { workspace = true }
 libm = { workspace = true }

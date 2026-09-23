@@ -6,6 +6,8 @@
 #                                 validator AND every bad_*.ncl fixture is rejected
 #   Bevy frontend             -> selected renderer tests + warnings-as-errors Clippy
 #   session loopback          -> relay tests + two-seat determinism/resync
+#   fixture suites            -> shell fixtures (doctor, launcher, vendor gate)
+#   must-check                -> Mustfile physical-state probes
 #
 # The Rust toolchain (channel + clippy/rustfmt/rust-src + wasm32 target) is pinned
 # by rust-toolchain.toml, which rustup installs automatically on first use.
@@ -27,6 +29,155 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Shell fixture suites + Mustfile probes. These need nothing but the checkout
+  # and (for the rust-formatted probe) the pinned Rust toolchain, so they run
+  # before anything slow.
+  fixtures-and-must:
+    name: fixtures-and-must (shell suites + Mustfile probes)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Shell fixture suites (doctor, launcher, vendor gate)
+        run: |
+          bash tests/runtime_doctor_test.sh
+          bash tests/launcher_fixture_test.sh
+          bash tests/vendor_winit_check_test.sh
+      - name: Mustfile physical-state probes
+        run: bash scripts/must_check.sh
+      # The proof-escape scan needs no Idris2 toolchain, so it lives here
+      # rather than in abi-model: a `believe_me` is then caught on every
+      # pull request, not only on the ones where the 20-25 minute compiler
+      # bootstrap runs. Invoked as ./scripts/... on purpose -- `bash script`
+      # ignores the file mode, so a script committed 100644 passes every
+      # local run and dies at exit 126 in CI. Running it directly makes the
+      # executable bit load-bearing and a mode regression fails here.
+      - name: Proof-escape gate self-test (the gate must be able to fail)
+        run: ./scripts/idris_escape_scan.sh --self-test
+      - name: Proof-escape scan (Idris2 ABI model)
+        run: ./scripts/idris_escape_scan.sh
+      # Documentation claims (issue #119). Same placement and same ./scripts/
+      # invocation as the proof-escape gate above, for the same two reasons:
+      # no toolchain is needed, so a false digest or a lying step name is
+      # caught on every pull request; and running the file directly keeps the
+      # executable bit load-bearing, so a 100644 regression dies here at exit
+      # 126 rather than passing silently under `bash script`.
+      - name: Documentation-claims gate self-test (the gate must be able to fail)
+        run: ./scripts/doc_claims_check.sh --self-test
+      - name: Documentation-claims scan (digest coverage + step-name claims)
+        run: ./scripts/doc_claims_check.sh
+
+# Idris2 ABI model gate (issue #103): bootstrap Idris 2 0.8.0 with a source
+# built Chez (no system deps beyond libc), then run the model gate.
+#
+# Deliberately no actions/cache (and no new `uses:` entries): the estate
+# manages actions through .github/workflows/actions.lock, and the toolchain
+# build is deterministic. Cost: roughly 20-25 minutes on a standard runner.
+  abi-model:
+    name: abi-model (Idris2 gate)
+    runs-on: ubuntu-latest
+    env:
+      # The single constant both halves agree on. scripts/abi_model_check.sh
+      # searches this exact path (see its toolchain-resolution list), so the
+      # wrapper must be written here and nowhere else.
+      IDRIS2_BOOTSTRAP_BIN: /tmp/idris-bootstrap/bin
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: "Bootstrap Chez + Idris2 (recipe: crates/idaptik-ffi/abi/README.md)"
+        run: |
+          mkdir -p /tmp/idris-bootstrap && cd /tmp/idris-bootstrap
+          git clone --depth 1 --branch v10.4.1 --recurse-submodules --shallow-submodules \
+            https://github.com/cisco/ChezScheme.git ChezScheme
+          cd ChezScheme
+          ./configure --threads --disable-curses --disable-x11 \
+            --installprefix=/tmp/idris-bootstrap/chez-native
+          make -j"$(nproc)" && make install
+          cd /tmp/idris-bootstrap
+          git clone https://github.com/idris-lang/Idris2.git
+          cd Idris2 && git checkout v0.8.0
+          export PATH=/tmp/idris-bootstrap/chez-native/bin:$PATH
+          export LD_LIBRARY_PATH=/tmp/idris-bootstrap/chez-native/lib
+          # On a fresh clone, `make bootstrap` stops early building the RefC
+          # support (gmp.h) before ever reaching the compiler stages. Building
+          # the C support library first satisfies the bootstrap's support
+          # target, so the bootstrap then runs stage 1 + stage 2 and only its
+          # final install-refc step can fail - harmless for the Chez codegen.
+          make -C support/c
+          make bootstrap SCHEME=/tmp/idris-bootstrap/chez-native/bin/scheme || true
+          test -x build/exec/idris2
+          export IDRIS2_DATA=/tmp/idris-bootstrap/Idris2/support
+          export IDRIS2_PREFIX=/tmp/idris-bootstrap/idris-install
+          for lib in prelude base linear network; do
+            (cd libs/$lib && ../../build/exec/idris2 --install $lib.ipkg)
+          done
+          # `make bootstrap` installs libidris2_support.so into the BOOTSTRAP's
+          # own prefix (.../Idris2/bootstrap-build/idris2-0.8.0/lib) and nothing
+          # ever places it in $IDRIS2_PREFIX, where the libraries above just
+          # went. `idris2 --build` copies that library out of
+          # <prefix>/idris2-0.8.0/lib into the generated <exe>_app/ dir, and the
+          # generated launcher is what adds that dir to LD_LIBRARY_PATH -- but
+          # scripts/abi_model_check.sh runs build/exec/abi-smoke DIRECTLY, so a
+          # missing copy stays invisible until the binary loads. A prefix
+          # holding packages but no lib/ therefore BUILDS clean and dies at run
+          # time with `Exception: (while loading libidris2_support.so)`.
+          # These are the same two install lines Idris2's own `install-support`
+          # target uses; the `test -s` turns a future silent skip into a loud
+          # bootstrap failure.
+          mkdir -p "$IDRIS2_PREFIX/idris2-0.8.0/lib"
+          install -m 755 support/c/libidris2_support.so "$IDRIS2_PREFIX/idris2-0.8.0/lib/"
+          install -m 644 support/c/libidris2_support.a  "$IDRIS2_PREFIX/idris2-0.8.0/lib/"
+          test -s "$IDRIS2_PREFIX/idris2-0.8.0/lib/libidris2_support.so"
+          # Absolute, not cwd-relative: this block's cwd is
+          # /tmp/idris-bootstrap/Idris2, so `mkdir -p bin` wrote the wrapper to
+          # .../Idris2/bin/idris2 while scripts/abi_model_check.sh searches
+          # /tmp/idris-bootstrap/bin/idris2 -- one directory apart (issue #124).
+          mkdir -p "$IDRIS2_BOOTSTRAP_BIN"
+          cat > "$IDRIS2_BOOTSTRAP_BIN/idris2" <<'WRAPPER'
+          #!/usr/bin/env bash
+          export PATH="/tmp/idris-bootstrap/chez-native/bin:$PATH"
+          export LD_LIBRARY_PATH="/tmp/idris-bootstrap/chez-native/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+          export IDRIS2_DATA=/tmp/idris-bootstrap/Idris2/support
+          # The prefix is the single thing every lookup derives from, so name it
+          # explicitly instead of inheriting whatever prefix this binary was
+          # compiled with. It resolves BOTH the installed packages and
+          # <prefix>/idris2-0.8.0/lib, from which `--build` copies
+          # libidris2_support.so into the generated <exe>_app/ directory.
+          export IDRIS2_PREFIX=/tmp/idris-bootstrap/idris-install
+          export IDRIS2_PACKAGE_PATH="/tmp/idris-bootstrap/idris-install/idris2-0.8.0${IDRIS2_PACKAGE_PATH:+:$IDRIS2_PACKAGE_PATH}"
+          exec /tmp/idris-bootstrap/Idris2/build/exec/idris2 "$@"
+          WRAPPER
+          # (No de-indent pass: YAML strips the block scalar's common indentation,
+          # so the heredoc body already lands at column 0.)
+          chmod +x "$IDRIS2_BOOTSTRAP_BIN/idris2"
+          # Prove the toolchain is COMPLETE here, in seconds, rather than 14
+          # minutes later as a confusing loader error in the gate. This builds
+          # and runs a trivial program exactly as scripts/abi_model_check.sh
+          # does -- `--build`, then the produced binary invoked DIRECTLY, with
+          # no launcher and no LD_LIBRARY_PATH of its own. Issue #124 was the
+          # wrapper in the wrong place; this is the arm underneath it.
+          probe=$(mktemp -d)
+          printf 'module Main\nmain : IO ()\nmain = putStrLn "ok"\n' > "$probe/Main.idr"
+          printf 'package probe\nmain = Main\nexecutable = probe\nsourcedir = "."\n' > "$probe/probe.ipkg"
+          (cd "$probe" && "$IDRIS2_BOOTSTRAP_BIN/idris2" --build probe.ipkg)
+          test "$("$probe/build/exec/probe")" = "ok"
+          # Step environments do not survive into the next step; publish both the
+          # PATH entry and an explicit IDRIS2 so the gate cannot miss the toolchain.
+          echo "$IDRIS2_BOOTSTRAP_BIN" >> "$GITHUB_PATH"
+          echo "IDRIS2=$IDRIS2_BOOTSTRAP_BIN/idris2" >> "$GITHUB_ENV"
+      - name: ABI model gate
+        run: bash scripts/abi_model_check.sh
+
   # Fails in seconds on a formatting problem, instead of after a full test and
   # clippy cycle. `just test-ghost` still ends with the same check, so the local
   # gate stays complete and this job is a fast path, not a replacement.
@@ -64,6 +215,29 @@ jobs:
         run: cargo install cargo-deny --version 0.20.2 --locked
       - name: Check advisories, dependencies, licences, and sources
         run: cargo deny check --hide-inclusion-graph
+
+  # Gate for the vendored bevy_winit feature patch (issue #105): source and
+  # manifest parity with the published crate, font-parser-free resolved graph,
+  # and the fixture coverage that keeps the gate itself honest. The bevy-frontend
+  # job covers that the selected Wayland+X11 build actually compiles.
+  vendor-parity:
+    name: vendor-parity (bevy_winit patch gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git"
+          git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach --force FETCH_HEAD
+      - name: Provision pinned Rust toolchain (rust-toolchain.toml)
+        run: rustup show
+      - name: Fixture self-test (clean + firing fixtures, no network)
+        run: bash tests/vendor_winit_check_test.sh
+      - name: Vendored copy matches the published crate
+        run: bash scripts/vendor_bevy_winit_check.sh parity
+      - name: Font-parser-free graph with title-free CSD active
+        run: bash scripts/vendor_bevy_winit_check.sh graph
 
   test-ghost:
     name: test-ghost (core/tui/ffi + clippy + fmt)

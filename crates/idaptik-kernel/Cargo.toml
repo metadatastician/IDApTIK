@@ -1,0 +1,18 @@
+[package]
+name = "idaptik-kernel"
+description = "The float-free, machine-checked core of IDApTIK: the types and operations Creusot can actually prove."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+creusot-std = "0.13.0"
+
+# `creusot` is set by `creusot-rustc`, not by cargo, so cargo does not know it is
+# a real cfg and warns on every use. Declaring it here keeps the warning active
+# for genuine typos while silencing the 24 false positives.
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(creusot)'] }
