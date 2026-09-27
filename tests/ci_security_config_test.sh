@@ -58,10 +58,37 @@ checks=0
 
 trap 'rm -rf "$FIXTURE"' EXIT
 
+# ── EMIT GITHUB ANNOTATIONS AS WELL AS CONSOLE LINES ────────────────────────
+#
+# The Actions log endpoint has been unreachable from this repository's
+# development environment twice in one day: once for the Pages failure that took
+# the website dark, and once for this suite. Both times the only evidence
+# obtainable was an annotation reading "Process completed with exit code 1."
+# against a step number -- the log blob lives on a host this environment cannot
+# reach, and the rendered job page requires sign-in even for a public repo.
+#
+# A gate whose failure reason is trapped in an unreadable log is a much weaker
+# gate than it looks. Annotations are readable through the check-runs API
+# without the log blob, so a failure that annotates is a failure that can still
+# be diagnosed when the log cannot be fetched. This is not CI decoration; it is
+# the difference between "step 6 failed" and "the sonar prose arm failed".
+#
+# Only active under GITHUB_ACTIONS=true, so local runs are unaffected.
+annotate() { # $1 level, $2 message
+  [ "${GITHUB_ACTIONS:-}" = "true" ] || return 0
+  local m
+  # Workflow commands are single-line and treat % as an escape introducer, so %
+  # must be escaped FIRST, then the line terminators folded. Escaping in the
+  # other order turns every folded newline into literal %250A text.
+  m="$(printf '%s' "$2" | sed -e 's/%/%25/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ | /g')"
+  printf '::%s::%s\n' "$1" "$m"
+}
+
 note() { checks=$((checks + 1)); printf '  ok: %s\n' "$1"; }
 
 fail() {
   printf '  FAIL: %s\n' "$1" >&2
+  annotate error "ci-security-config: $1"
   failures=$((failures + 1))
 }
 
@@ -76,7 +103,12 @@ expect_pass() { # $1 description, rest = command
   if "$@" >/dev/null; then
     note "$desc"
   else
-    printf '  FAIL: expected success: %s\n' "$1" >&2
+    # `$1` here -- after the shift -- is the command's first ARGUMENT, a path,
+    # not the assertion name. The original diagnostic printed that, so a failure
+    # read as "expected success: /home/runner/work/..." and named nothing.
+    # `$desc` is captured before the shift for exactly this reason.
+    printf '  FAIL: expected success: %s\n' "$desc" >&2
+    annotate error "ci-security-config: expected success: $desc"
     "$@" 2>&1 | sed 's/^/        /' >&2 || true
     failures=$((failures + 1))
   fi
@@ -86,9 +118,10 @@ expect_fail() { # $1 description, $2 expected output, rest = command
   local desc="$1" want="$2" out
   shift 2
   if out="$("$@" 2>&1)"; then
-    fail "expected failure: $desc"
+    fail "expected failure: $desc (a mutant that no longer mutates reads as a pass)"
   elif ! printf '%s' "$out" | grep -qF "$want"; then
     printf '  FAIL: %s failed for the wrong reason (wanted %s):\n%s\n' "$desc" "$want" "$out" >&2
+    annotate error "ci-security-config: $desc failed for the wrong reason (wanted: $want)"
     failures=$((failures + 1))
   else
     note "$desc"
@@ -1233,6 +1266,7 @@ expect_pass "the same tree parses once the script is fixed" \
 
 if [ "$failures" -ne 0 ]; then
   printf '%d CI security configuration test(s) failed (%d passed)\n' "$failures" "$checks" >&2
+  annotate error "ci-security-config: $failures assertion(s) FAILED, $checks passed -- see the per-assertion annotations above"
   exit 1
 fi
 printf 'CI security configuration fixtures: %d assertion(s) passed, 0 failed\n' "$checks"
