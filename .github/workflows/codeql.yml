@@ -1,6 +1,29 @@
 # This workflow is managed by gh actions-lock.
 # SPDX-License-Identifier: MPL-2.0
-# This workflow is managed by gh actions-lock.
+#
+# ── WHY THESE `uses:` REFS ARE READABLE TAGS, NOT BARE SHAs ─────────────────
+#
+# `.github/workflows/actions.lock` is authoritative for what actually runs. It
+# records, per workflow path, the `uses:` refs that workflow may carry, and for
+# each of those the resolved 40-hex commit. GitHub enforces that at STARTUP: a
+# step-level ref in a lock-managed workflow that the lockfile does not record
+# under that same path makes the run unstartable -- zero jobs are created and
+# the run reports only "This run likely failed because of a workflow file
+# issue." There is no red X on any job, because no job ever existed.
+#
+# That is not hypothetical here. PR #143 rewrote both refs below from
+# `@v4.38.0` to a bare commit SHA in the name of pinning harder. The lockfile
+# still recorded `github/codeql-action@v4.38.0`, so every CodeQL run from
+# 2026-09-23T10:38Z to the fix rendered NO VERDICT AT ALL on the commit --
+# while `code_scanning` is a required rule on `main`, so the org ruleset was
+# being satisfied by a gate that had silently stopped existing.
+#
+# So: the workflow carries the readable ref, the lockfile carries the commit.
+# Writing a SHA here does not pin anything harder; it desynchronises the two
+# files and kills the workflow. To move the version, bump BOTH together and run
+# `just lock-sync-check` (or `scripts/check-lock-sync.sh`) before pushing.
+# `.github/workflows/lock-sync-gate.yml` fails the pull request if you forget,
+# and that gate carries no `uses:` of its own so it cannot die the same way.
 name: CodeQL Security Analysis
 on:
   push:
@@ -40,11 +63,11 @@ jobs:
           git fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach --force FETCH_HEAD
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v3
+        uses: github/codeql-action/init@v4.38.1
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@1c5b675653bb5c22dbe9b12b556ec555138e09fd # v3
+        uses: github/codeql-action/analyze@v4.38.1
         with:
           category: "/language:${{ matrix.language }}"

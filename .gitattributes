@@ -1,41 +1,226 @@
 # SPDX-License-Identifier: MPL-2.0
+# Hyperpolymath estate canonical .gitattributes  (standards#343 phase 1)
+# Canon lives in rsr-template-repo; do not add a per-repo name to this header.
+#
+# Only diff drivers that git actually ships are used here. MEASURED on git
+# 2.47.3: diff=go and diff=zig are NOT drivers (git silently falls back to the
+# default heuristic); the Go driver is named `golang`.
 
 * text=auto eol=lf
 
-# Source
+# --- Source ----------------------------------------------------------------
 *.rs    text eol=lf diff=rust
-*.ex    text eol=lf
-*.exs   text eol=lf
-*.zig   text eol=lf diff=zig
-*.idr   text eol=lf
+*.ex    text eol=lf diff=elixir
+*.exs   text eol=lf diff=elixir
+*.ada   text eol=lf diff=ada
+*.adb   text eol=lf diff=ada
+*.ads   text eol=lf diff=ada
+*.gpr   text eol=lf diff=ada
+*.go    text eol=lf diff=golang
+*.scm   text eol=lf diff=scheme linguist-language=Scheme
+*.rkt   text eol=lf
+*.jl    text eol=lf
+*.hs    text eol=lf
+*.zig   text eol=lf
+*.chpl  text eol=lf
+*.idr   text eol=lf linguist-language=Idris
+*.ipkg  text eol=lf linguist-language=Idris
+*.agda  text eol=lf linguist-language=Agda
+*.lagda text eol=lf linguist-language=Agda
+*.lean  text eol=lf
+# `.v` is ambiguous (Coq / Verilog / V). This estate's `.v` files are Coq
+# proofs; 49 repos currently mislabel them `linguist-language=V`.
+*.v     text eol=lf linguist-language=Coq
 *.ncl   text eol=lf
-*.scm   text eol=lf
-*.nix   text eol=lf
-*.sh    text eol=lf
+*.k9    text eol=lf linguist-language=Nickel
+*.deed  text eol=lf linguist-language=SCM
+*.ebnf  text eol=lf
+*.js    text eol=lf
+*.sh    text eol=lf diff=bash
+*.bash  text eol=lf diff=bash
 
-# Documentation, configuration, and fixtures
+# --- Windows hosts require CRLF --------------------------------------------
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# --- Docs ------------------------------------------------------------------
 *.md    text eol=lf diff=markdown
 *.adoc  text eol=lf
 *.txt   text eol=lf
+*.tex   text eol=lf diff=tex
+*.bib   text eol=lf diff=bibtex
+
+# --- Data / config ---------------------------------------------------------
 *.json  text eol=lf
+*.jsonl text eol=lf
 *.yaml  text eol=lf
 *.yml   text eol=lf
 *.toml  text eol=lf
+*.svg   text eol=lf
+*.csv   text eol=lf
 *.html  text eol=lf diff=html
 *.css   text eol=lf diff=css
-*.svg   text eol=lf
-justfile text eol=lf
 
-# Lock files are reproducibility inputs, but their generated diffs are noisy.
-Cargo.lock      text eol=lf -diff
-server/mix.lock text eol=lf -diff
+# --- Repo control files ----------------------------------------------------
+.gitignore     text eol=lf
+.gitattributes text eol=lf
+.editorconfig  text eol=lf
+.tool-versions text eol=lf
+Justfile       text eol=lf
+*.just         text eol=lf
+Mustfile       text eol=lf
+Containerfile  text eol=lf
 
-# Assets and archives
+# --- Binary ----------------------------------------------------------------
 *.png   binary
 *.jpg   binary
 *.jpeg  binary
 *.gif   binary
 *.webp  binary
+*.ico   binary
+*.pdf   binary
+*.woff  binary
 *.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
 *.zip   binary
+*.tar   binary
 *.gz    binary
+*.xz    binary
+*.bz2   binary
+*.so    binary
+*.dylib binary
+*.dll   binary
+*.exe   binary
+*.wasm  binary
+*.rlib  binary
+*.beam  binary
+
+# --- Generated lockfiles: no diff noise, not counted as source -------------
+Cargo.lock        text eol=lf -diff linguist-generated=true
+mix.lock          text eol=lf -diff linguist-generated=true
+bun.lock          text eol=lf -diff linguist-generated=true
+bun.lockb         binary -diff linguist-generated=true
+pnpm-lock.yaml    text eol=lf -diff linguist-generated=true
+package-lock.json text eol=lf -diff linguist-generated=true
+
+# --- Legacy / retired toolchains (byte hygiene only) -----------------------
+# ReScript is retired (LANGUAGE-POLICY 1.2); Nix was retired 2026-06-01. These
+# lines keep surviving files normalised and keep retired tech out of the
+# GitHub primary-language badge. Removal is a per-repo judgement, never a sweep.
+*.res      text eol=lf
+*.resi     text eol=lf
+**/*.res   linguist-detectable=false
+*.nix      text eol=lf
+flake.lock text eol=lf -diff linguist-generated=true
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PER-REPO ADDENDUM — IDApTIK. Everything above this line is canon verbatim.
+# Everything below is specific to this repository and must not be upstreamed
+# without a standards issue.
+# ═══════════════════════════════════════════════════════════════════════════
+
+# The justfile in this repository is lowercase, so canon's `Justfile` rule does
+# not match it on a case-sensitive filesystem.
+justfile text eol=lf
+
+# ── WHY THE RETIRED `server/mix.lock` LINE IS GONE ──────────────────────────
+# This file carried `server/mix.lock text eol=lf -diff` until 2026-09-27. Issue
+# #74 retired this repository's own Elixir relay in favour of the external
+# metadatastician/burble fabric (ADR-0006) and the `server/` tree went with it.
+# No `.ex`, `.exs`, or `mix.lock` file is tracked here any more, so the line
+# matched nothing. Canon's unqualified `mix.lock` rule above covers the file if
+# an Elixir tree ever returns, which is strictly better than a path-scoped rule
+# that silently stops applying the moment the path is renamed.
+
+# ── GAME ASSET TYPES ────────────────────────────────────────────────────────
+# This repository is a game. Its `source/` tree is text-first by design (see
+# source/README.md: authored content is human-readable and diffable, and
+# `assets/` holds the Bevy-loadable artefacts generated from it), but the
+# finished game will carry audio, video, textures, meshes, and fonts. Declaring
+# them NOW means the first real asset lands with the right eol/binary treatment
+# instead of being normalised to LF on the way in and corrupted.
+#
+# Every type below is one Bevy 0.17 can load, or one a documented authoring
+# pipeline produces. Nothing speculative.
+
+# Audio. Bevy loads ogg, wav, mp3, flac natively (bevy_audio / kira).
+*.ogg   binary
+*.opus  binary
+*.wav   binary
+*.flac  binary
+*.mp3   binary
+*.aiff  binary
+*.m4a   binary
+*.xm    binary
+*.mod   binary
+*.s3m   binary
+*.it    binary
+
+# Video / cutscene containers. Bevy has no first-party video decoder; these are
+# declared because source/video/ holds authored cutscene inputs and the
+# pipeline document records how they become frames or an external player call.
+*.mp4   binary
+*.webm  binary
+*.mov   binary
+*.mkv   binary
+*.avi   binary
+
+# Textures and compressed GPU formats. ktx2/basis are Bevy's preferred runtime
+# formats; the rest are authoring inputs.
+*.ktx2  binary
+*.basis binary
+*.dds   binary
+*.tga   binary
+*.bmp   binary
+*.tif   binary
+*.tiff  binary
+*.psd   binary
+*.xcf   binary
+*.ase   binary
+*.aseprite binary
+
+# Meshes, scenes, and animation. glTF is Bevy's runtime format; the others are
+# authoring inputs that the pipeline converts.
+*.gltf  text eol=lf
+*.glb   binary
+*.fbx   binary
+*.obj   text eol=lf
+*.mtl   text eol=lf
+*.blend binary
+*.dae   text eol=lf
+
+# Fonts. Bevy loads ttf/otf; canon already declares woff/woff2/ttf/otf binary.
+*.fon   binary
+
+# Shaders. WGSL is text and Bevy loads it directly; SPIR-V is the compiled form.
+*.wgsl  text eol=lf
+*.spv   binary
+
+# ── GENERATED ARTEFACTS: suppressed diffs, excluded from language stats ─────
+# `assets/` is derived from `source/` and is reproducible. Marking it generated
+# keeps a regeneration commit from showing as a 40 000-line diff in review and
+# keeps GitHub's primary-language badge measuring the code that is actually
+# written here.
+assets/**           linguist-generated=true
+assets/**  -diff
+
+# The lockfile that decides which GitHub Action revisions run. It IS source
+# (hand-corrected, see scripts/check-lock-sync.sh), so unlike Cargo.lock it is
+# deliberately NOT marked -diff: a reviewer must see exactly which ref moved.
+.github/workflows/actions.lock text eol=lf
+
+# ── GIT LFS: DELIBERATELY NOT CONFIGURED ────────────────────────────────────
+# No `filter=lfs` attribute appears anywhere in this file. That is a decision,
+# not an omission: git-lfs is not installed in this repository's development
+# environment, and an lfs filter in .gitattributes makes a plain `git clone`
+# produce pointer files instead of content for anyone without the client. That
+# failure is silent and confusing.
+#
+# Today the repository tracks zero binary assets, so the question is not yet
+# live. It becomes live the first time a real texture, sound, or cutscene lands.
+# The trade-off is recorded as an open owner ruling in
+# docs/decisions-pending/DR-0003-asset-storage-and-lfs.md rather than being
+# decided here unilaterally.

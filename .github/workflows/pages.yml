@@ -45,19 +45,49 @@ jobs:
             echo "# ${GITHUB_REPOSITORY}" > src/index.md
           fi
           ./.ddraig-ssg/build/exec/ddraig build src _site https://idaptik.net
-      # RFC 9116 requires security.txt at /.well-known/ on the domain. The SSG
-      # builds from src/ and does not carry dotfile directories through, so it
-      # is copied into the artifact explicitly. Without this the file exists in
-      # the repository and 404s on the site, which is the same as not having one.
-      - name: Publish .well-known/security.txt
+      # RFC 9116 requires security.txt at /.well-known/ on the domain, and RSR
+      # criterion 2.2.1 (silver) requires ai.txt and humans.txt beside it. The
+      # SSG builds from src/ and does not carry dotfile directories through, so
+      # they are copied into the artifact explicitly. Without this the files
+      # exist in the repository and 404 on the site, which is the same as not
+      # having one -- and a criterion checked against the deployed URL would
+      # read the 404 as absent, correctly.
+      #
+      # This step used to name security.txt alone. Adding a file to
+      # .well-known/ without adding it here produces the exact silent failure
+      # the comment above warns about: the commit looks complete, the Pages
+      # deploy goes green, and the new file 404s. So the loop copies EVERY file
+      # in the directory and the count is printed. A file that is present in the
+      # repository but missing from the artifact now fails the build instead of
+      # failing quietly a month later.
+      - name: Publish .well-known/ (security.txt, ai.txt, humans.txt)
         run: |
           # The idris2-pack container has no bash, so this step runs under dash;
           # `set -o pipefail` is a bashism that aborts the step at line 1 there.
           set -eu
-          test -f .well-known/security.txt
           mkdir -p _site/.well-known
-          cp .well-known/security.txt _site/.well-known/security.txt
-          echo "published:"; cat _site/.well-known/security.txt
+          src_count=0
+          for f in .well-known/*; do
+            test -f "$f" || continue
+            cp "$f" "_site/.well-known/$(basename "$f")"
+            src_count=$((src_count + 1))
+          done
+          # Printed denominator: "published 0 of 0" reading as success is the
+          # failure mode this step exists to prevent.
+          dst_count=0
+          for f in _site/.well-known/*; do
+            test -f "$f" || continue
+            dst_count=$((dst_count + 1))
+          done
+          echo ".well-known: $src_count file(s) in the repository, $dst_count published into the artifact"
+          test "$src_count" -gt 0 || { echo "ERROR: .well-known/ is empty in the repository"; exit 1; }
+          test "$src_count" -eq "$dst_count" || { echo "ERROR: published count does not match source count"; exit 1; }
+          for f in security.txt ai.txt humans.txt; do
+            test -f "_site/.well-known/$f" || { echo "ERROR: RSR 2.2.1 requires .well-known/$f"; exit 1; }
+          done
+          echo "--- security.txt ---"; cat _site/.well-known/security.txt
+          echo "--- ai.txt (head) ---"; head -20 _site/.well-known/ai.txt
+          echo "--- humans.txt (head) ---"; head -20 _site/.well-known/humans.txt
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5.0.0
         with:

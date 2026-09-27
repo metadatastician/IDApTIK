@@ -1,0 +1,49 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# ai.txt — AI interaction policy
+# See: https://site.spawning.ai/spawning-ai-txt
+#
+# Served from https://idaptik.net/.well-known/ai.txt. Like security.txt, this
+# has to be copied into the Pages artifact explicitly by
+# .github/workflows/pages.yml: the Ddraig SSG builds from src/ and does not
+# carry dotfile directories through, so a file that exists in the repository
+# and is not in that copy step 404s on the site. RSR criterion 2.2.1 counts a
+# file that 404s as absent.
+
+User-Agent: *
+Disallow-Training: yes
+Disallow-Summarization: no
+Disallow-Generation: yes
+
+# ── THIS REPOSITORY HAS THREE LICENCE LAYERS, NOT ONE ───────────────────────
+# The estate template's ai.txt says "this project's code is licensed under
+# MPL-2.0". That is wrong here and copying it verbatim would be a licensing
+# claim, not a comment. IDApTIK's layers are (AGENTS.md, inviolate):
+#
+#   engine and code   AGPL-3.0-or-later    crates/, scripts/, tests/, .github/
+#   game content      CC-BY-SA-4.0         source/, assets/, docs/wiki/
+#   names and marks   trademarked          "IDApTIK", "Moletaire"
+#
+# The distinction matters for AI use specifically. AGPL-3.0-or-later is
+# copyleft and network-copyleft: a model trained on it that emits derivative
+# code creates an obligation the trainer cannot discharge. CC-BY-SA-4.0 is
+# share-alike but permits commercial use with attribution. And the marks are
+# not licensed at all — no AI output may present itself as IDApTIK or Moletaire.
+#
+# AI agents MAY read and analyse both layers to assist contributors.
+# AI agents MUST NOT use either layer for model training without explicit
+# written consent from the maintainer.
+# AI agents MUST NOT reproduce the names IDApTIK or Moletaire as the name of a
+# derived work, a fork, a mod, or a generated asset.
+#
+# For AI agent integration instructions, see:
+#   AGENTS.md                          — the binding repository contract
+#   CLAUDE.md, GEMINI.md               — per-agent entry points
+#   .machine_readable/0-AI-MANIFEST.a2ml — structured state and full invariant list
+#   docs/decisions-pending/            — questions this repository cannot answer
+#                                        for itself, with the evidence gathered
+#
+# An agent starting a fresh session should read AGENTS.md first and
+# docs/decisions-pending/INDEX.adoc second. The pending-rulings directory exists
+# because several questions in this repository are owner decisions rather than
+# engineering ones, and an agent that guesses at them produces a confident
+# answer to a question it was never able to answer.

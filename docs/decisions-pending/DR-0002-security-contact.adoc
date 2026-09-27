@@ -1,0 +1,139 @@
+= DR-0002: Which inbox is the monitored security contact?
+:status: OPEN
+:opened: 2026-09-27
+:guard: tests/ci_security_config_test.sh::check_contact_consistency
+:files: .well-known/security.txt, .well-known/humans.txt, SECURITY.md, CODE_OF_CONDUCT.md
+
+== Question
+
+Which mailbox actually receives and is read for security reports:
+`developer@joshuajewell.dev`, or `jonathan.jewell@gmail.com`?
+
+And, separately and lower-stakes: should `.well-known/humans.txt` name an
+individual maintainer rather than "IDApTIK contributors"?
+
+== Why it is not decidable here
+
+Neither address can be verified from a working tree. Deliverability, ownership
+and monitoring are all facts about mail infrastructure that this repository has
+no visibility into. There is no DMARC/SPF record readable from here, no mailbox
+to test, and no commit in the history that says which one is live.
+
+== What was found instead
+
+Provenance, from the GitHub commit history for the three affected paths — the
+local clone is shallow, so this was read through the API:
+
+[cols="1,2,4", options="header"]
+|===
+|Date |Commit |What it did
+
+|2026-07-26
+|`0eb4ba90`, `2e8feaf8`
+|Imported `SECURITY.md` and `CODE_OF_CONDUCT.md` together from the estate
+"community health files" template, with `developer@joshuajewell.dev` substituted
+in. IDApTIK is the **only** `metadatastician` repository whose `SECURITY.md`
+carries a real `mailto:` rather than a `{{PLACEHOLDER}}`, so that substitution
+was a deliberate act here and not template residue.
+
+|2026-07-27
+|`5fec6b2c`
+|"security: publish a real security.txt at idaptik.net" — written a day later,
+carrying `jonathan.jewell@gmail.com` and no reference to the other address.
+
+|2026-07-28
+|`0f4f9a6b`
+|Dropped the `Encryption:` field because `github.com/metadatastician.gpg`
+returns HTTP 200 with an empty key block. That reasoning is sound and was left
+alone.
+|===
+
+Two further data points, neither decisive:
+
+* The estate's own `squisher-corpus` template names a **third** address,
+  `j.d.a.jewell@open.ac.uk`, as its `{{SECURITY_EMAIL}}` placeholder.
+* `hyperpolymath/axel`'s `security.txt` points its `Encryption:` field at
+  `keys.openpgp.org/search?q=jonathan.jewell@open.ac.uk`.
+* `metadatastician/burble`'s `security.txt` still contains the literal
+  unsubstituted string `mailto:{{SECURITY_EMAIL}}`. That is a separate defect in
+  a separate repository and is recorded here only because it shows the estate's
+  template substitution step is not reliably run.
+
+So three candidate addresses appear across the estate, and this repository named
+two of them in four files that never mentioned each other.
+
+== Current state
+
+All four files name `developer@joshuajewell.dev` and nothing else.
+
+The reasoning for that choice, which is a **provisional reconciliation and not a
+ruling**:
+
+* it appears in more places (two files, imported together, versus one);
+* it is a role address on a project-owned domain rather than a personal mailbox,
+  so it survives a change of maintainer and does not tie a security channel to
+  one person's account;
+* it was substituted deliberately into this repository specifically, whereas the
+  gmail appeared once, in a file written a day later, with no cross-reference.
+
+The harm being closed was never that one address was wrong. It was that a
+researcher arriving through RFC 9116 discovery and one arriving through the
+GitHub policy link were routed to **different inboxes**, with nothing in either
+document acknowledging the other existed.
+
+== Options
+
+[cols="1,3,2", options="header"]
+|===
+|Option |What it means |Cost
+
+|A. Keep the role address
+|Current state. Delete this file.
+|If the gmail is the monitored box, reports go somewhere nobody reads. This is
+the failure the ruling exists to prevent.
+
+|B. Switch all four files to the gmail
+|Matches the file whose commit message claimed to be "a real security.txt".
+|A personal mailbox becomes the project's security channel and outlives the
+person. Four files change.
+
+|C. Name both, everywhere
+|RFC 9116 permits multiple `Contact:` fields and more channels means a report is
+more likely to land. `check_contact_consistency` compares *sets*, so this passes
+as long as all four files name the same set.
+|Two inboxes to monitor. A reporter cannot tell which is preferred.
+|===
+
+On the secondary question: `.well-known/humans.txt` currently says
+"Maintainer: IDApTIK contributors (metadatastician)". That mirrors the
+repository's own choice — `Cargo.toml` carries
+`authors = ["IDApTIK contributors"]` and no source file attributes a person — so
+naming an individual there would be a new claim rather than a restatement of an
+existing one. If the owner wants a name published, it should go into
+`Cargo.toml`'s `authors` and `.github/MAINTAINERS` first, and `humans.txt`
+should then mirror it.
+
+== What a ruling unblocks
+
+* Confidence that the published security channel works at all. Until then the
+  repository states a contact it cannot verify.
+* Whether `humans.txt` should name a person, which affects the `/* TEAM */`
+  block and possibly `Cargo.toml`'s `authors` field.
+
+== Guard
+
+`check_contact_consistency` in `tests/ci_security_config_test.sh`, wired into
+`just ci-security-config-test` and the `fixtures-and-must` CI job. It extracts
+the contact addresses named in `.well-known/security.txt`,
+`.well-known/humans.txt`, `SECURITY.md` and `CODE_OF_CONDUCT.md` and requires all
+four sets to be **identical and non-empty**. A partial edit cannot land.
+
+Two implementation details are load-bearing and both have firing fixtures:
+
+* Comment lines are stripped before extraction. `security.txt`'s header quotes
+  the retired gmail address so the reconciliation stays auditable; without the
+  filter that provenance note reads as a second live contact and the check
+  disagrees with itself on a clean tree.
+* Only `mailto:` links and bare `Contact:` lines are recognised. An address in
+  running prose is too easy to hit by accident — a changelog entry, a worked
+  example, a bot's `noreply` mail.

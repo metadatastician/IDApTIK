@@ -19,14 +19,50 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  # Present so issue #142's acceptance criterion 2 can be discharged WITHOUT two
+  # real merges to main: trigger two runs back to back from the Actions tab and
+  # both must reach a terminal verdict. Under the old ref-keyed group the second
+  # cancelled the first; under the run-id group below neither can.
+  workflow_dispatch:
 
 permissions:
   actions: read
   contents: read
 
+# ── CONCURRENCY: supersede a PULL REQUEST, never a commit on main (issue #142) ──
+#
+# This used to be `group: ci-${{ github.ref }}` with `cancel-in-progress: true`
+# at workflow level, which applied to pushes on main too. The abi-model job below
+# builds Chez Scheme and Idris2 0.8.0 from source and takes 8-14 minutes
+# (measured; the comment on that job still claims 20-25). A second merge landing
+# inside that window cancelled the first run, and `abi-model` reported
+# `cancelled` -- neither pass nor fail, but NO VERDICT AT ALL on that commit.
+#
+# Measured on main, last 13 completed abi-model outcomes as of 2026-09-22:
+# 8 success, 3 cancelled, 2 failure. The cancellations cluster exactly where
+# merges landed inside its runtime, e.g. PR #138's run 3f858fa3 started 11:51:11Z
+# and was cancelled 12:01:28Z by PR #140's push at 12:00:59Z -- with its
+# "ABI model gate" step SKIPPED, never executed.
+#
+# `cancelled` is read as "not red" by almost everything that consumes check
+# results, so a merge burst silently produced commits on main where the Idris2
+# ABI gate rendered no opinion while the commit still looked acceptable. The
+# blind window was exactly when changes were landing.
+#
+# The fix scopes cancellation to the event that benefits from it. Superseding an
+# in-flight PULL REQUEST run is worth having: the old head is about to be
+# replaced and nobody will read its verdict. Superseding a PUSH discards a
+# verdict nothing will ever recompute, because the commit is already on main.
+# So pushes and dispatches get a group per RUN, which is unique, and cannot be
+# cancelled by anything.
+#
+# NO NEW `uses:` ENTRY, which is #142's acceptance criterion 3: the estate
+# manages actions through .github/workflows/actions.lock, and a ref the lockfile
+# does not record makes the whole workflow unstartable (see lock-sync-gate.yml).
+# This change touches no action reference at all.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # Shell fixture suites + Mustfile probes. These need nothing but the checkout
@@ -35,6 +71,7 @@ jobs:
   fixtures-and-must:
     name: fixtures-and-must (shell suites + Mustfile probes)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         run: |
@@ -49,6 +86,33 @@ jobs:
           bash tests/runtime_doctor_test.sh
           bash tests/launcher_fixture_test.sh
           bash tests/vendor_winit_check_test.sh
+      # Issues #141 and its sibling. Two suites were committed under tests/ at
+      # mode 100755 and wired into NOTHING -- no justfile recipe, no workflow
+      # step -- so each provided zero protection while reading as coverage in
+      # the tree and on the pull request. That is strictly worse than no test:
+      # a reviewer seeing tests/abi_authority_pin_test.sh reasonably assumes the
+      # ABI authority pins are regression-guarded when they are not.
+      #
+      # Both are offline: stubbed curl/sha256sum for the pin suite, and pure
+      # YAML structure for the CI-configuration suite. They need no Idris2, no
+      # Rust, and no network, which is why they live in this job rather than
+      # beside the 8-14 minute abi-model bootstrap.
+      #
+      # `bash tests/...` rather than `./tests/...` here on purpose: unlike the
+      # two gates below, these are not scripts whose executable bit is itself
+      # the claim being made, and invoking them the way the justfile does keeps
+      # `just fixture-tests` and this job reading the same command.
+      - name: ABI authority pin fixtures (issue #141, was invoked by nothing)
+        run: bash tests/abi_authority_pin_test.sh
+      - name: CI security configuration fixtures (was invoked by nothing)
+        run: bash tests/ci_security_config_test.sh
+      # Duplicate of .github/workflows/lock-sync-gate.yml, deliberately. That
+      # workflow carries no `uses:` and so cannot die the way it detects; this
+      # copy exists so `just fixture-tests` and CI run the identical set, and so
+      # a desync is still reported here if that gate is ever skipped. One awk
+      # pass over ten small files, about a second.
+      - name: Actions lockfile synchronisation (issue #142 class of failure)
+        run: ./scripts/check-lock-sync.sh
       - name: Mustfile physical-state probes
         run: bash scripts/must_check.sh
       # The proof-escape scan needs no Idris2 toolchain, so it lives here
@@ -78,10 +142,16 @@ jobs:
 #
 # Deliberately no actions/cache (and no new `uses:` entries): the estate
 # manages actions through .github/workflows/actions.lock, and the toolchain
-# build is deterministic. Cost: roughly 20-25 minutes on a standard runner.
+# build is deterministic. Cost: 8-14 minutes measured on a standard runner
+# (issue #142); an earlier revision of this comment claimed 20-25, which was
+# pessimistic and is corrected here rather than left to be rediscovered.
   abi-model:
     name: abi-model (Idris2 gate)
     runs-on: ubuntu-latest
+    # Observed 8-14 minutes end to end (issue #142), not the 20-25 the comment
+    # below claims. 45 leaves headroom for a slow runner without letting a hung
+    # Chez build hold it for the 6-hour default now that pushes cannot cancel.
+    timeout-minutes: 45
     env:
       # The single constant both halves agree on. scripts/abi_model_check.sh
       # searches this exact path (see its toolchain-resolution list), so the
@@ -187,6 +257,7 @@ jobs:
   fmt:
     name: fmt (rustfmt --check)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         run: |
@@ -202,6 +273,7 @@ jobs:
   supply-chain:
     name: supply-chain (cargo-deny)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         run: |
@@ -223,6 +295,7 @@ jobs:
   vendor-parity:
     name: vendor-parity (bevy_winit patch gate)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         run: |
@@ -242,6 +315,7 @@ jobs:
   test-ghost:
     name: test-ghost (core/tui/ffi + clippy + fmt)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         run: |
@@ -259,6 +333,7 @@ jobs:
   bevy-frontend:
     name: bevy-frontend (tests + clippy)
     runs-on: ubuntu-latest
+    timeout-minutes: 40
     steps:
       - name: Checkout
         run: |
@@ -280,6 +355,7 @@ jobs:
   session-loopback:
     name: session-loopback (Burble relay + two-seat determinism gate)
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       # Known-compatible game-session lane plus the post-merge socket fixes.
       BURBLE_REF: ef6756cf1591406d434c5c04c3c018e935836e4c
@@ -311,6 +387,7 @@ jobs:
   config-scenario-check:
     name: config-scenario-check (Nickel negative fixtures + round-trip)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         run: |

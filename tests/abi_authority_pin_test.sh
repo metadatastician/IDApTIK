@@ -1,13 +1,41 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Offline fixture coverage for the ABI authority pin refreshed in PR #138.
+# Offline fixture coverage for the ABI authority pin refreshed in PR #138,
+# and for the wire table that pin exists to protect (issue #139).
 #
 # The production gate is embedded in a GitHub Actions workflow. This suite
 # executes that exact run block with deterministic curl/sha256sum stubs, then
 # independently checks the document-to-workflow revision/path/digest mapping.
 # The independent comparison is intentionally stricter than comparing digest
 # sets: swapping two valid digests between paths must fail.
+#
+# ── WHY THIS FILE WAS REWRITTEN ──────────────────────────────────────────────
+#
+# Issue #141: PR #140 committed these 460 lines at mode 100755 and wired them
+# into NOTHING. No justfile recipe, no workflow step. The ABI authority pin was
+# therefore regression-guarded by a file that never ran, which is worse than no
+# guard at all because the file reads as coverage to anyone auditing the tree.
+# `just abi-authority-pin-test` and the `fixtures-and-must` job in
+# .github/workflows/ci.yml now invoke it. tests/ci_security_config_test.sh's
+# `check_no_dead_test_scripts` is the standing arm that stops the shape
+# recurring for any future suite under tests/.
+#
+# The file also COULD NOT RUN. It exited 2 on the first awk expression, because
+# five of them used gawk's three-argument match(target, regexp, array). mawk --
+# /usr/bin/awk on a stock Debian/Ubuntu image, and the awk inside this
+# repository's development containers -- does not implement it. The suite had
+# never been executed once in the five days it sat there; had it been, that
+# would have been obvious in seconds. Every awk program below is now POSIX:
+# no three-argument match(), no `{n}` regex intervals, no gensub().
+#
+# Issue #139: the wire-table check here compared the document against a fixture
+# file that was itself a transcription of the document, so it proved internal
+# consistency only. A document that drifted from the generated `ffi/connectors.json`
+# it claims to describe would have passed. `validate_wire_manifest` below now
+# compares the document against the actual manifest bytes, and
+# fixtures/abi/connectors-pinned.json is a verbatim copy of the file at the
+# pinned revision -- self-verified by its own digest, so it cannot silently rot.
 
 set -euo pipefail
 
@@ -20,20 +48,26 @@ EXPECTED_CURRENT=f079bc06061951d8e4c12f86675f81e97ec6e3a7
 EXPECTED_PREVIOUS=bcb8bb3730c2520117e565d80d5638ff384c1222
 EXPECTED_HISTORICAL=2bbd3b2
 failures=0
+checks=0
 
 trap 'rm -rf "$FIXTURE"' EXIT
 
-note() { printf '  ok: %s\n' "$1"; }
+note() { checks=$((checks + 1)); printf '  ok: %s\n' "$1"; }
 
 fail() {
   printf '  FAIL: %s\n' "$1" >&2
   failures=$((failures + 1))
 }
 
+# stdout is discarded but STDERR IS NOT. Every extractor below prints its own
+# denominator to stderr, and a printed denominator that nobody can see is worth
+# exactly as much as no denominator at all: the console transcript is the
+# evidence that the check examined 19 tuples rather than zero and reported ok
+# either way. This is why the passing runs below are noisy on purpose.
 expect_pass() { # $1 description, rest = command
   local desc="$1"
   shift
-  if "$@" >/dev/null 2>&1; then
+  if "$@" >/dev/null; then
     note "$desc"
   else
     fail "expected success: $desc"
@@ -87,36 +121,78 @@ extract_authority_script() { # $1 workflow, $2 destination
 
 extract_workflow_tuples() { # $1 workflow
   awk '
-    match($0, /^[[:space:]]*(rev|prev|old)=([0-9a-f]+)$/, value) {
-      refs[value[1]] = value[2]
+    # POSIX only. The gawk original used match($0, regexp, array), which mawk
+    # does not implement -- the suite exited 2 here on any Debian/Ubuntu awk.
+    /^[[:space:]]*(rev|prev|old)=[0-9a-f]+$/ {
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      eq = index(line, "=")
+      refs[substr(line, 1, eq - 1)] = substr(line, eq + 1)
       next
     }
-    match($0, /^[[:space:]]*check "\$(rev|prev|old)"[[:space:]]+([^[:space:]]+)[[:space:]]+([0-9a-f]{64})[[:space:]]*$/, row) {
-      if (!(row[1] in refs)) {
-        printf "undefined workflow revision variable: %s\n", row[1] > "/dev/stderr"
+    /^[[:space:]]*check "\$(rev|prev|old)"/ {
+      line = $0
+      sub(/^[[:space:]]*check "\$/, "", line)
+      q = index(line, "\"")
+      if (q == 0) next
+      name = substr(line, 1, q - 1)
+      rest = substr(line, q + 1)
+      sub(/^[[:space:]]+/, "", rest)
+      nf = split(rest, f, /[[:space:]]+/)
+      if (nf < 2) next
+      digest = f[2]
+      # No {64} interval -- mawk has no regex intervals. Length test instead.
+      if (length(digest) != 64 || digest !~ /^[0-9a-f]+$/) next
+      if (!(name in refs)) {
+        printf "undefined workflow revision variable: %s\n", name > "/dev/stderr"
         exit 2
       }
-      printf "%s\t%s\t%s\n", refs[row[1]], row[2], row[3]
+      printf "%s\t%s\t%s\n", refs[name], f[1], digest
+      tuples++
+    }
+    END {
+      printf "workflow: %d revision/path/digest tuple(s) extracted\n", tuples > "/dev/stderr"
+      if (tuples == 0) {
+        print "DENOMINATOR ZERO: extracted no workflow tuples" > "/dev/stderr"
+        exit 2
+      }
     }
   ' "$1"
 }
 
 extract_document_tuples() { # $1 document
   awk -v current="$EXPECTED_CURRENT" -v previous="$EXPECTED_PREVIOUS" -v historical="$EXPECTED_HISTORICAL" '
-    match($0, /^\| File @ `([^`]+)` \| sha256 \|$/, header) {
-      ref = header[1]
-      next
-    }
-    match($0, /^\| `([^`]+)`[^|]*\| `([0-9a-f]{64})` \|$/, row) {
+    # POSIX only: field extraction by index()/substr(), not three-argument match().
+    function cell(line, i,   n, c) { n = split(line, c, "|"); return (i <= n) ? c[i] : "" }
+    function unback(text,   t) { t = text; sub(/^[^`]*`/, "", t); sub(/`.*$/, "", t); return t }
+
+    /^\| File @ `[^`]+` \| sha256 \|$/ { ref = unback($0); next }
+    /^\| `[^`]+`/ {
       if (ref == "") {
         print "digest row before revision header" > "/dev/stderr"
         exit 2
       }
+      # The digest must be the LAST cell and must be a full 64-hex sha256, so a
+      # table elsewhere in the document that happens to start with a backticked
+      # token cannot be mistaken for a pin row.
+      if (cell($0, 4) ~ /[^[:space:]]/) next
+      dcell = cell($0, 3)
+      if (dcell !~ /`[0-9a-f]+`/) next
+      digest = unback(dcell)
+      if (length(digest) != 64) next
       resolved = ref
       if (ref == substr(current, 1, 8)) resolved = current
       if (ref == substr(previous, 1, 8)) resolved = previous
       if (ref == historical) resolved = historical
-      printf "%s\t%s\t%s\n", resolved, row[1], row[2]
+      printf "%s\t%s\t%s\n", resolved, unback(cell($0, 2)), digest
+      tuples++
+    }
+    END {
+      printf "document: %d revision/path/digest tuple(s) extracted\n", tuples > "/dev/stderr"
+      if (tuples == 0) {
+        print "DENOMINATOR ZERO: extracted no document tuples" > "/dev/stderr"
+        exit 2
+      }
     }
   ' "$1"
 }
@@ -173,8 +249,21 @@ validate_revisions() { # $1 document, $2 workflow
 
 extract_layer_paths() { # $1 heading pattern, $2 document
   awk -v heading="$1" '
+    # POSIX only: no three-argument match(), no {64} regex interval.
+    function cell(line, i,   n, c) { n = split(line, c, "|"); return (i <= n) ? c[i] : "" }
+    function unback(text,   t) { t = text; sub(/^[^`]*`/, "", t); sub(/`.*$/, "", t); return t }
     /^### / { active = index($0, heading) > 0; next }
-    active && match($0, /^\| `([^`]+)`[^|]*\| `[0-9a-f]{64}` \|$/, row) { print row[1] }
+    active && /^\| `[^`]+`/ {
+      if (cell($0, 4) ~ /[^[:space:]]/) next
+      dcell = cell($0, 3)
+      if (dcell !~ /`[0-9a-f]+`/) next
+      if (length(unback(dcell)) != 64) next
+      print unback(cell($0, 2))
+      n++
+    }
+    END {
+      printf "layer %s: %d pinned path(s)\n", heading, n > "/dev/stderr"
+    }
   ' "$2"
 }
 
@@ -190,6 +279,19 @@ validate_layers() { # $1 document
     printf '[superseded]\n'
     extract_layer_paths 'Superseded pin' "$1"
   } > "$actual"
+  # Printed denominator, per the estate's vacuous-gate doctrine: 8 normative +
+  # 3 generated + 1 implementation + 3 superseded = 15 pinned paths. The
+  # historical pin table is deliberately excluded -- those digests are records
+  # for audit, not pins the conformance job re-derives, and counting them here
+  # would imply a gate that does not exist.
+  local npaths
+  npaths="$(grep -cv '^\[' "$actual")"
+  if [ "$npaths" -ne 15 ]; then
+    printf 'expected 15 pinned layer paths across 4 sections, extracted %d\n' "$npaths" >&2
+    printf '(a renamed ### heading silently loses that whole layer)\n' >&2
+  else
+    printf 'layers: %d pinned path(s) across 4 sections\n' "$npaths" >&2
+  fi
   diff -u "$expected" "$actual" >/dev/null || {
     printf 'ABI layer membership mismatch\n' >&2
     return 1
@@ -198,8 +300,24 @@ validate_layers() { # $1 document
 
 extract_wire_entries() { # $1 document
   awk '
-    match($0, /^\| ([0-9]+) \| ([a-z0-9-]+) \| ([0-9]+) \| ([a-z0-9-]+) \|$/, row) {
-      printf "%s\t%s\n%s\t%s\n", row[1], row[2], row[3], row[4]
+    # Two id/name pairs per markdown row, so eight rows carry sixteen entries.
+    # POSIX only: no three-argument match(). The separator row |----|----| does
+    # not match the digit pattern and the header row does not either, so neither
+    # needs special-casing.
+    /^\| [0-9]+ \| [a-z0-9-]+ \| [0-9]+ \| [a-z0-9-]+ \|$/ {
+      n = split($0, c, "|")
+      if (n != 6) next
+      for (i = 2; i <= 5; i++) { sub(/^[[:space:]]+/, "", c[i]); sub(/[[:space:]]+$/, "", c[i]) }
+      printf "%s\t%s\n%s\t%s\n", c[2], c[3], c[4], c[5]
+      rows++
+    }
+    END {
+      printf "wire table: %d markdown row(s), %d id/name entry(ies) extracted\n",
+             rows, rows * 2 > "/dev/stderr"
+      if (rows == 0) {
+        print "DENOMINATOR ZERO: found no wire-table rows" > "/dev/stderr"
+        exit 2
+      }
     }
   ' "$1" | sort -n
 }
@@ -216,6 +334,101 @@ validate_wire_table() { # $1 document
     printf 'wire id/name mapping mismatch\n' >&2
     return 1
   }
+}
+
+# ── issue #139 ──────────────────────────────────────────────────────────────
+#
+# docs/abi/ABI-AUTHORITY.md transcribes the sixteen connector id/name pairs from
+# `ffi/connectors.json`. Nothing ever compared the transcription against the
+# file it transcribes, so a document that drifted from the generated manifest --
+# the exact thing the whole pin apparatus exists to prevent -- would have passed
+# every check in this suite. The prior wire-table fixture could not catch it
+# because its expectation was itself a copy of the document.
+#
+# This compares ORDERED id/name pairs from both sides. Ordering is load-bearing
+# upstream: connectors.json says so in its own `_note`, and `portFor = base + id
+# + 1` means a renumbering silently moves every service onto another service's
+# port.
+extract_manifest_entries() { # $1 connectors.json
+  awk '
+    # POSIX only. The manifest is machine-generated and one pair per line, so a
+    # flat scan is exact; no JSON parser is needed or wanted here.
+    /"id":[[:space:]]*[0-9]+/ {
+      line = $0
+      if (!match(line, /"id":[[:space:]]*[0-9]+/)) next
+      idpart = substr(line, RSTART, RLENGTH)
+      sub(/^"id":[[:space:]]*/, "", idpart)
+      if (!match(line, /"name":[[:space:]]*"[^"]*"/)) next
+      namepart = substr(line, RSTART, RLENGTH)
+      sub(/^"name":[[:space:]]*"/, "", namepart)
+      sub(/"$/, "", namepart)
+      printf "%s\t%s\n", idpart, namepart
+      n++
+    }
+    END {
+      printf "connectors.json: %d id/name pair(s) extracted\n", n > "/dev/stderr"
+      if (n == 0) {
+        print "DENOMINATOR ZERO: extracted no connector pairs from the manifest" > "/dev/stderr"
+        exit 2
+      }
+    }
+  ' "$1" | sort -n
+}
+
+validate_wire_manifest() { # $1 document, $2 connectors.json
+  local from_doc="$FIXTURE/wire-doc.$$" from_json="$FIXTURE/wire-json.$$"
+  extract_wire_entries "$1" > "$from_doc"
+  extract_manifest_entries "$2" > "$from_json"
+
+  local ndoc njson
+  ndoc="$(wc -l < "$from_doc" | tr -d ' ')"
+  njson="$(wc -l < "$from_json" | tr -d ' ')"
+  printf 'wire table: %d of %d rows compared against %s\n' "$ndoc" "$njson" "$2" >&2
+
+  [ "$ndoc" -ne 0 ] || { printf 'DENOMINATOR ZERO: no wire rows in the document\n' >&2; return 1; }
+  [ "$njson" -ne 0 ] || { printf 'DENOMINATOR ZERO: no connector pairs in the manifest\n' >&2; return 1; }
+  if [ "$ndoc" -ne "$njson" ]; then
+    printf 'wire table row count %d != manifest connector count %d\n' "$ndoc" "$njson" >&2
+    return 1
+  fi
+  if ! diff -u "$from_json" "$from_doc" > "$FIXTURE/wire-diff.$$" 2>&1; then
+    printf 'wire table does not match the generated manifest (ordered id/name):\n' >&2
+    sed 's/^/  /' "$FIXTURE/wire-diff.$$" >&2
+    printf 'the document is a transcription of connectors.json; a disagreement here is a\n' >&2
+    printf 'documentation defect, never a reason to renumber the manifest.\n' >&2
+    return 1
+  fi
+}
+
+# The committed fixture must be byte-identical to the file at the pinned
+# revision, or the comparison above proves nothing about upstream. Its digest is
+# pinned in docs/abi/ABI-AUTHORITY.md, so this is self-verifying: the fixture
+# cannot silently rot, and moving the pin without moving the fixture fails here.
+PINNED_CONNECTORS="$REPO_DIR/fixtures/abi/connectors-pinned.json"
+PINNED_CONNECTORS_SHA256=a96fc2ef5cd83ea36be3953eadbf214eca012e7f6efebccaf4e48a8ae2adf330
+
+validate_pinned_manifest_fixture() { # $1 connectors.json fixture
+  local actual documented
+  actual="$(sha256sum "$1" | cut -d' ' -f1)"
+  documented="$(awk '
+      /^\| File @ `[^`]+` \| sha256 \|$/ { ref = $0; sub(/^\| File @ `/, "", ref); sub(/`.*$/, "", ref); next }
+      ref != "" && /^\| `ffi\/connectors.json` \| `[0-9a-f]+` \|$/ {
+        d = $0; sub(/.*\| `/, "", d); sub(/` \|$/, "", d); print d; exit
+      }
+    ' "$DOCUMENT")"
+  [ -n "$documented" ] || { printf 'DENOMINATOR ZERO: could not read the connectors.json pin from the document\n' >&2; return 1; }
+  printf 'pinned manifest fixture: sha256 %s (document says %s for %s)\n' "$actual" "$documented" "$EXPECTED_CURRENT" >&2
+  if [ "$actual" != "$documented" ]; then
+    printf 'fixtures/abi/connectors-pinned.json is NOT the file the document pins\n' >&2
+    printf '  fixture  %s\n' "$actual" >&2
+    printf '  document %s\n' "$documented" >&2
+    printf 're-copy it from hyperpolymath/hypatia at the canonical revision, or move the pin.\n' >&2
+    return 1
+  fi
+  if [ "$actual" != "$PINNED_CONNECTORS_SHA256" ]; then
+    printf 'fixture digest moved away from the value this suite was written against\n' >&2
+    return 1
+  fi
 }
 
 make_case() { # $1 case name
@@ -408,8 +621,54 @@ expect_fail 'duplicate wire ids are rejected' 'wire ids are not unique' \
 expect_pass 'the independent 40-hex source-blob provenance pin is present' \
   grep -qF '`788493e6f54b6d436ea551dbb5d34c6bc0d819ab` for `src/Hypatia/ABI/Types.idr`' "$DOCUMENT"
 
+printf 'wire table vs the generated manifest (issue #139):\n'
+expect_pass 'the committed fixture is byte-identical to the pinned connectors.json' \
+  validate_pinned_manifest_fixture "$PINNED_CONNECTORS"
+expect_pass 'all 16 documented id/name pairs match the manifest, in order' \
+  validate_wire_manifest "$DOCUMENT" "$PINNED_CONNECTORS"
+
+# Firing fixtures. Each mutates ONE side and must be caught, because a check
+# that agrees with itself is the failure mode issue #139 exists to close.
+manifest_wrong_name="$FIXTURE/connectors-wrong-name.json"
+sed 's/"name": "verisimdb-rest"/"name": "verismdb-rest"/' "$PINNED_CONNECTORS" > "$manifest_wrong_name"
+expect_fail 'a manifest name the document misspells is rejected' \
+  'does not match the generated manifest' \
+  validate_wire_manifest "$DOCUMENT" "$manifest_wrong_name"
+
+manifest_swapped="$FIXTURE/connectors-swapped-ids.json"
+sed -e 's/{ "id": 3, "name": "flatbuffers" }/{ "id": 3, "name": "bebop" }/' \
+    -e 's/{ "id": 4, "name": "bebop" }/{ "id": 4, "name": "flatbuffers" }/' \
+    "$PINNED_CONNECTORS" > "$manifest_swapped"
+expect_fail 'swapping two manifest ids against the document is rejected' \
+  'does not match the generated manifest' \
+  validate_wire_manifest "$DOCUMENT" "$manifest_swapped"
+
+manifest_missing="$FIXTURE/connectors-missing-row.json"
+sed '/{ "id": 9, "name": "capnproto" },/d' "$PINNED_CONNECTORS" > "$manifest_missing"
+expect_fail 'a manifest missing one connector is rejected on the count' \
+  'wire table row count 16 != manifest connector count 15' \
+  validate_wire_manifest "$DOCUMENT" "$manifest_missing"
+
+manifest_empty="$FIXTURE/connectors-empty.json"
+printf '{ "connectors": [] }\n' > "$manifest_empty"
+expect_fail 'an empty manifest cannot pass vacuously' \
+  'DENOMINATOR ZERO' \
+  validate_wire_manifest "$DOCUMENT" "$manifest_empty"
+
+doc_wire_missing="$(make_case doc-wire-row-missing)"
+sed -i '/^| 7 | mqtt | 15 | arrow-flight |$/d' "$doc_wire_missing/docs/abi/ABI-AUTHORITY.md"
+expect_fail 'a document that dropped a wire row is rejected' \
+  'wire table row count 14 != manifest connector count 16' \
+  validate_wire_manifest "$doc_wire_missing/docs/abi/ABI-AUTHORITY.md" "$PINNED_CONNECTORS"
+
+rotted_fixture="$FIXTURE/connectors-rotted.json"
+printf '{ "connectors": [ { "id": 0, "name": "grpc" } ] }\n' > "$rotted_fixture"
+expect_fail 'a fixture that is not the pinned file is rejected by its own digest' \
+  'is NOT the file the document pins' \
+  validate_pinned_manifest_fixture "$rotted_fixture"
+
 if [ "$failures" -ne 0 ]; then
-  printf 'ABI authority pin fixtures: %d FAILURES\n' "$failures" >&2
+  printf 'ABI authority pin fixtures: %d FAILURES, %d assertions passed\n' "$failures" "$checks" >&2
   exit 1
 fi
-printf 'ABI authority pin fixtures: all clean and firing fixtures behaved\n'
+printf 'ABI authority pin fixtures: %d assertion(s) passed, 0 failed\n' "$checks"

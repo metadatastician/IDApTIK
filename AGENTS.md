@@ -1,9 +1,11 @@
 # Repository instructions
 
 IDApTIK is an asymmetric two-player infiltration game: Rust/Crusoe owns gameplay
-truth, Elixir/OTP owns multiplayer session life. It is a member repository of
-The Metadatastician estate and adopts that estate's governance profile via
-`docs/PROJECT-GOVERNANCE-BINDING.adoc`.
+truth, Elixir/OTP owns multiplayer session life. The Rust half is this
+repository; the Elixir half is `metadatastician/burble`, consumed as a pinned
+Cargo git dependency, and **this repository contains no Elixir at all**. It is a
+member repository of The Metadatastician estate and adopts that estate's
+governance profile via `docs/PROJECT-GOVERNANCE-BINDING.adoc`.
 
 Read `.machine_readable/0-AI-MANIFEST.a2ml`, `README.md`, `GOVERNANCE.md`,
 `.github/MAINTAINERS`, and `docs/PROJECT-GOVERNANCE-BINDING.adoc` before
@@ -18,7 +20,16 @@ Invariants (see `0-AI-MANIFEST.a2ml` for the full list):
 - Gameplay truth lives in `crates/idaptik-core` and stays engine-agnostic and
   deterministic; `crates/idaptik-bevy` is the selected thin graphical
   frontend. Do not move game truth into Bevy.
-- The session layer is Bandit + Phoenix Channels, not LiveView.
+- **The session layer is not in this repository.** It is Bandit + Phoenix
+  Channels (not LiveView) and it lives in `metadatastician/burble`, reached as a
+  Cargo git dependency pinned by rev (`burble-client`, see `Cargo.toml`). ADR-0005
+  designed it here; ADR-0006 records the port out (burble PR #182) and issue #74
+  retired the in-repo relay. There is no Elixir source, no `mix.lock`, and no
+  `server/` tree in this repository — do not propose changes to them here, and
+  do not add an Elixir toolchain, ecosystem, or build step. The dead
+  `.gitignore`, `.gitattributes` and `dependabot.yml` entries that implied
+  otherwise were removed on 2026-09-27; the dependabot one had been failing its
+  weekly `hex in /server` update for a year because of it.
 - State/metadata belongs under `.machine_readable/`, not the repository root.
 - Contributions come in under DCO 1.1 — sign commits with `git commit -s`
   (see `CONTRIBUTING.md`).
@@ -27,7 +38,7 @@ Do not edit generated files directly; none are currently declared. Do not
 change licences, upstream coined names, or evidence-status labels (in
 `docs/PROJECT-ASSURANCE-PROFILE.adoc`) as a side effect of an unrelated change.
 
-## The stack is Rust/Crusoe and Elixir — attempts 1–3 are dead
+## The stack is Rust/Crusoe — attempts 1–3 are dead
 
 `README.md` documents four incarnations. Agents routinely read that lineage
 table as current and propose work against a codebase that no longer exists:
@@ -37,11 +48,23 @@ table as current and propose work against a codebase that no longer exists:
 | 1 | IDApTIK | TypeScript / Excalibur | dead |
 | 2 | IDApixiTIK | AffineScript / PixiJS | dead |
 | 3 | idaptik | AffineScript / PixiJS | dead |
-| 4 | **IDApTIK** | **Rust/Crusoe / Elixir** | **live — this repo** |
+| 4 | **IDApTIK** | **Rust/Crusoe** + Elixir/OTP session fabric | **live — this repo** |
+
+Incarnation 4 is a two-repository system. **Only the Rust half is here.** The
+Elixir/OTP half — Bandit, Phoenix Channels, the `game:` lane relay — lives in
+`metadatastician/burble` and is reached through the pinned `burble-client` Cargo
+dependency. Reading "Rust/Crusoe / Elixir" as "this repository has Elixir in it"
+is the single most common misreading of this file, and it produces proposals to
+edit a `server/` tree that was removed under issue #74 and ADR-0006.
 
 There is no JavaScript runtime here: no browser, no Canvas, no
 `requestAnimationFrame`, no npm, no PixiJS, no Excalibur. A proposal written
 against any of those cannot be applied.
+
+Elixir is likewise not an implementation language *of this repository*, though it
+is of the system: there is no `.ex`, `.exs`, `mix.lock`, or `_build` here, and
+`git ls-files` confirms it. Session-layer changes are pull requests against
+`metadatastician/burble`, not against this tree.
 
 Ruby and Python are also not implementation or project-tooling languages in
 this repository. Do not introduce Ruby/Python source, runtime dependencies,

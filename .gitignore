@@ -4,14 +4,30 @@
 **/mutants.out*/
 *.pdb
 
-# Elixir
-/server/_build/
-/server/deps/
-/server/*.ez
-/server/cover/
-/server/doc/
-/.elixir_ls/
-erl_crash.dump
+# ── NO ELIXIR / `server/` BLOCK, DELIBERATELY ───────────────────────────────
+# This file carried seven Elixir ignore rules until 2026-09-27:
+#
+#   /server/_build/  /server/deps/  /server/*.ez  /server/cover/  /server/doc/
+#   /.elixir_ls/     erl_crash.dump
+#
+# Issue #74 retired this repository's own Elixir relay in favour of the external
+# metadatastician/burble game-session fabric (ADR-0006), and the `server/` tree
+# went with it. `git ls-files` shows no `.ex`, `.exs`, `.beam`, or `mix.lock`
+# tracked here, so every one of those patterns matched nothing.
+#
+# Dead ignore rules are not harmless. They tell a reader this repository
+# contains an Elixir build tree that it does not, and — the part that actually
+# cost something — the matching corpse in .github/dependabot.yml kept a weekly
+# `hex in /server` update failing for a year (run 36117293992, 2026-09-25:
+# "Dependabot encountered an error performing the update"). A permanently red
+# run nobody reads trains everyone to ignore red runs.
+#
+# The pinned burble-client is consumed as a Cargo git dependency, so it is
+# covered by /target/ and Cargo.lock like every other Rust dependency. If an
+# Elixir tree returns, restore the rules AND the dependabot ecosystem together:
+# tests/ci_security_config_test.sh now fails any ecosystem whose directory does
+# not exist, which is the check that would have caught this in the week it
+# happened rather than a year later.
 
 # Local tool state and editors
 /.agents/
@@ -41,3 +57,98 @@ crates/idaptik-ffi/abi/smoke/build/
 
 # why3find local prover cache (per-machine; proof sessions live in verif/)
 .why3find/
+
+# ── GAME AUTHORING AND ASSET PIPELINE ───────────────────────────────────────
+# `source/` is the planned home of authored content (CC-BY-SA-4.0), tracked in
+# full. `assets/` will hold the Bevy-loadable artefacts generated from it and is
+# tracked: the engine loads them at runtime and a checkout that cannot run the
+# game is not a checkout of the game. What is ignored here is the intermediate
+# machinery between the two — caches, scratch renders, and editor state — which
+# is reproducible, per-machine, and enormous.
+#
+# Generated asset outputs land in assets/, never in source/. Anything matching
+# the patterns below is pipeline scratch and must not be committed. The patterns
+# are declared before the trees exist on purpose: an ignore rule added at the
+# same moment as the first artefact arrives is an ignore rule added after that
+# artefact has already been committed, and un-committing a large binary from
+# history is a rewrite, not an edit.
+
+# Importer and DCC scratch state. Each of these is written by a tool named in
+# source/art/PIPELINE.md or source/audio/PIPELINE.md; none is an input.
+/.import/
+/.godot/
+/assets/.cache/
+/assets/**/.import/
+**/*.import
+
+# Blender and image-editor autosave / backup files.
+**/*.blend[0-9]
+**/*.blend1
+**/*~.blend
+**/*.psd.tmp
+**/*.aseprite-wip
+
+# Audio editor and DAW scratch.
+**/*.aup3-wal
+**/*.aup3-shm
+**/*.peak
+**/*.reapeaks
+**/*.sfk
+
+# Video editor render scratch and intermediate proxies. Proxies are regenerated
+# from the authored master, which is what source/video/ holds.
+/proxies/
+**/*.proxy.*
+**/*.prmd
+**/*.mex
+
+# Shader and texture compilation caches.
+/.shader-cache/
+/.naga-cache/
+**/*.spv.tmp
+
+# Bevy runtime scratch written next to the executable during a dev session.
+/saves/
+/screenshots/
+/recordings/
+*.sav
+
+# ── LOCAL PLAYER DATA: NEVER TRACKED, NEVER SYNCED ──────────────────────────
+# settings/bits are the player's own storage — progression, keybinds, audio
+# levels, accessibility preferences. They are per-machine and per-player by
+# definition, they must not feed the deterministic simulation (see
+# source/settings/README.md), and committing one player's save into a shared
+# repository is both a privacy failure and a determinism failure.
+/local/
+**/player-profile.json
+**/local-settings.json
+**/*.save.json
+
+# ── GENERATED DOCUMENTATION OUTPUT ──────────────────────────────────────────
+# docs/wiki/ is authored and tracked. The rendered static site is not.
+/docs/_build/
+/.berrywiki-cache/
+
+# ── GITHUB PAGES BUILD SCRATCH ──────────────────────────────────────────────
+# .github/workflows/pages.yml clones the Ddraig SSG into .ddraig-ssg/, runs
+# `mkdir -p src`, copies README.md to src/index.md when src/ is absent, and
+# builds to _site/. NONE of that is tracked: `src/` does not exist in this
+# repository and is created fresh on the runner each build.
+#
+# Both were unignored until 2026-09-27. That is not a hypothetical risk -- it is
+# a trap with a specific shape. Anyone reproducing the Pages build locally gets
+# a working tree containing src/index.md (a copy of README.md) and a full
+# _site/ tree, and `git add -A` commits both. The committed src/index.md then
+# shadows the runner's README.md copy forever, so the deployed site quietly
+# stops tracking the README, and _site/ adds a rendered duplicate of every page
+# to the diff of every subsequent documentation change.
+#
+# NOTE the name collision this sits next to: `src/` here is Pages scratch, while
+# the planned `source/` tree is tracked, authored game content under
+# CC-BY-SA-4.0. They are different directories with different licence layers and
+# different fates, and the similarity of their names is the reason both rules
+# are written out in full here rather than left to be inferred.
+/.ddraig-ssg/
+/src/
+/_site/
+/site/
