@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# humanstxt.org
+#
+# Served from https://idaptik.net/.well-known/humans.txt. Copied into the Pages
+# artifact explicitly by .github/workflows/pages.yml — see the note in ai.txt
+# for why a dotfile that is not in that copy step 404s on the site.
+
+/* TEAM */
+Maintainer: IDApTIK contributors (metadatastician)
+Contact: developer@joshuajewell.dev
+Security: https://github.com/metadatastician/IDApTIK/security/advisories/new
+From: United Kingdom
+
+# The maintainer line names no individual, because this repository deliberately
+# does not either: Cargo.toml carries `authors = ["IDApTIK contributors"]` and
+# no source file attributes a person. Naming one here would be a new claim
+# rather than a mirror of an existing one. The contact address above is the
+# same one SECURITY.md, CODE_OF_CONDUCT.md and .well-known/security.txt name;
+# tests/ci_security_config_test.sh fails the build if those four ever disagree.
+#
+# ⚠ OPEN OWNER RULING — docs/decisions-pending/DR-0002-security-contact.md
+# also asks whether this file should name a person. Until the owner rules, it
+# does not, and the reason is recorded rather than guessed at.
+
+/* SITE */
+Last update: 2026-09-27
+Domain: https://idaptik.net
+Standards: RSR (Rhodium Standard Repository), silver tier in progress
+Generator: Ddraig SSG (Idris2), pinned by commit in .github/workflows/pages.yml
+Source: built from src/ at deploy time; src/index.md is README.md if absent
+
+/* LICENCE LAYERS — three, not one */
+Engine and code: AGPL-3.0-or-later
+Game content:    CC-BY-SA-4.0
+Names and marks: trademarked ("IDApTIK", "Moletaire") — not licensed
+
+/* WHAT THIS IS */
+An asymmetric two-player infiltration game. One player moves a body through a
+facility; the other manipulates the grounded network simulation that facility
+runs on; the guard is an NPC who interprets what it senses through its own
+belief, interest and affect model. Winning is misdirection, not stealth.
+Gameplay truth is a deterministic, event-sourced, engine-agnostic simulation in
+crates/idaptik-core. Bevy renders it. Nothing render-side feeds back in.
+
+/* COMPONENTS */
+Gameplay truth: crates/idaptik-core (Rust, deterministic, 60 Hz fixed step)
+Graphical frontend: crates/idaptik-bevy (Bevy, 2.5D side-on, thin)
+Network frontend: crates/idaptik-net (sans-IO delay-lockstep)
+Terminal frontend: crates/idaptik-tui
+C ABI boundary: crates/idaptik-ffi (Zig adapter, Idris2 ABI model)
+Session kernel: crates/idaptik-kernel
+ABI authority: Idris2, external — hyperpolymath/hypatia, pinned by digest
+Session fabric: Elixir/Phoenix, external — metadatastician/burble, pinned by rev
+Authoring studio: external — metadatastician/universal-modding-studio
+
+/* TOOLS */
+just, mise, cargo, nickel, Idris2, Zig, Bevy, gh actions-lock

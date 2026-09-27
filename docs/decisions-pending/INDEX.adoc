@@ -1,0 +1,91 @@
+= Open Owner Rulings — INDEX
+:toc:
+:toclevels: 3
+:sectnums:
+:source-highlighter: rouge
+
+== What this directory is
+
+Questions about this repository that **cannot be answered from inside it**.
+
+An engineering question has an answer that evidence in the tree, the build, or
+the test output can settle. These do not. Each one needs a person with authority
+over the project to rule, and until that ruling exists the honest state is
+"undecided", not "whatever the last agent to touch the file assumed".
+
+The distinction matters because of how these questions actually get answered in
+practice. An agent or contributor who meets one has three options: guess, stall,
+or record. Guessing produces a confident answer to a question nobody was able to
+answer, and the guess then acquires the authority of having been in the tree for
+six months. Stalling blocks unrelated work. Recording is the only one of the
+three that leaves the repository more truthful than it found it.
+
+So each file here follows the same shape:
+
+[horizontal]
+Question:: What is actually being decided, stated so that a yes/no or A/B answer
+resolves it.
+Why it is not decidable here:: The specific evidence that would settle it and
+why that evidence is not available from a working tree.
+What was found instead:: Everything that *could* be established, with its
+provenance. This is not decoration — it is what stops the next person repeating
+the investigation.
+Current state:: What the tree does today, and whether that state is a decision
+or an accident.
+Options:: The live choices, each with what it costs.
+What a ruling unblocks:: The concrete work waiting on the answer.
+Guard:: The automated check, if any, that prevents a partial or contradictory
+edit landing while the question is open.
+
+== Register
+
+[cols="1,3,2,1", options="header"]
+|===
+|Ref |Question |Current state |Opened
+
+|DR-0001
+|link:DR-0001-sonarcloud-organisation.adoc[Which SonarCloud organisation does
+this project report into?]
+|`metadatastician` in the values, `hyperpolymath` claimed in prose that was
+removed on 2026-09-27
+|2026-09-27
+
+|DR-0002
+|link:DR-0002-security-contact.adoc[Which inbox is the monitored security
+contact?]
+|`developer@joshuajewell.dev` in all four files that name one
+|2026-09-27
+
+|DR-0003
+|link:DR-0003-asset-storage-and-lfs.adoc[Where do binary game assets live, and
+does this repository use Git LFS?]
+|No binary assets tracked; no `filter=lfs` anywhere in `.gitattributes`
+|2026-09-27
+|===
+
+== How to close one
+
+1. Make the change the ruling implies, in **one** commit, touching every file
+   the guard checks. Each ruling below names its guard.
+2. Move the file to `docs/decisions/` as an ADR if the decision is architectural
+   and will constrain future work, following the existing `docs/adr/00NN-*.md`
+   numbering. Delete it outright if it is a one-off configuration answer whose
+   only lasting value is the reasoning, and leave the reasoning in the commit
+   message.
+3. Remove its row from the register above.
+4. If the ruling changes a value that a gate asserts, update the gate's fixture
+   in the same commit. A ruling that lands without its fixture is a ruling that
+   turns the build red.
+
+Do not close a ruling by editing only the file where the contradiction was
+noticed. Both DR-0001 and DR-0002 exist because exactly that happened: one file
+was updated and the others were not, and the disagreement sat undetected because
+nothing compared them.
+
+== Relationship to `docs/adr/`
+
+`docs/adr/` records decisions that were **made**. This directory records
+decisions that are **owed**. An ADR answers a question; a DR names one that is
+still open, together with the evidence gathered so far so that the answer is
+cheap to give. Nothing here should be treated as guidance, and an agent that
+finds itself citing a DR as authority for a choice has misread it.

@@ -1,0 +1,24 @@
+{
+  "_spdx": "MPL-2.0",
+  "_generated": "by hypatia-abi-gen from src/Hypatia/ABI/Types.idr; DO NOT EDIT -- run `just abi-gen` and commit the result",
+  "_abi_source_blob": "788493e6f54b6d436ea551dbb5d34c6bc0d819ab",
+  "_note": "Wire manifest for the unified-api-adapter. The normative source is the Idris2 ABI (src/Hypatia/ABI/Types.idr); this file, ffi/zig/src/connector_generated.zig and clients/rust/hypatia-client/src/connector_generated.rs are all generated from it. id is the C ABI wire id and ordering is load-bearing -- do not renumber by hand.",
+  "connectors": [
+    { "id": 0, "name": "grpc" },
+    { "id": 1, "name": "graphql" },
+    { "id": 2, "name": "rest" },
+    { "id": 3, "name": "flatbuffers" },
+    { "id": 4, "name": "bebop" },
+    { "id": 5, "name": "jsonrpc" },
+    { "id": 6, "name": "websocket" },
+    { "id": 7, "name": "mqtt" },
+    { "id": 8, "name": "trpc" },
+    { "id": 9, "name": "capnproto" },
+    { "id": 10, "name": "soap" },
+    { "id": 11, "name": "verisimdb-rest" },
+    { "id": 12, "name": "bsp" },
+    { "id": 13, "name": "scip" },
+    { "id": 14, "name": "ipfs" },
+    { "id": 15, "name": "arrow-flight" }
+  ]
+}

@@ -1,9 +1,36 @@
 # SPDX-License-Identifier: MPL-2.0
 # Dependabot configuration for IDApTIK's actual package ecosystems.
+#
+# ── NO `mix` / `/server` BLOCK, DELIBERATELY ────────────────────────────────
+#
+# This file carried an Elixir/Mix ecosystem pointed at `directory: "/server"`
+# until 2026-09-27. Issue #74 retired this repository's own relay in favour of
+# the external metadatastician/burble game-session fabric (ADR-0006), and the
+# `server/` tree went with it — but this block stayed. Dependabot has failed its
+# weekly `hex in /server` update ever since: run 36117293992 on 2026-09-25
+# concluded `failure` with "Dependabot encountered an error performing the
+# update", and every scheduled run before it did the same.
+#
+# A permanently red run nobody reads trains everyone to ignore red runs, and it
+# hides the ecosystem that would matter if session life ever came home. It is
+# removed rather than repointed, because there is no Elixir manifest in this
+# repository to point at. The pinned Burble client is consumed as a Cargo git
+# dependency in Cargo.toml, so it is already covered by the `cargo` ecosystem
+# below — that is where a burble-client bump surfaces.
+#
+# If an Elixir tree returns to this repository, add the block back AND add the
+# directory check below to whatever gate runs it: tests/ci_security_config_test.sh
+# now fails any ecosystem whose `directory:` does not exist, which is the check
+# that would have caught this in the week it happened rather than the year after.
 
 version: 2
 updates:
-  # GitHub Actions - always include
+  # GitHub Actions. Capped at two open pull requests and grouped into one,
+  # because Dependabot rewrites `uses:` refs in workflow YAML and cannot touch
+  # .github/workflows/actions.lock — so every merged bump desynchronises the
+  # lockfile and GitHub refuses the affected workflow at startup (zero jobs, no
+  # verdict). The cap keeps that to one merge at a time, and
+  # .github/workflows/lock-sync-gate.yml fails the pull request before it lands.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -14,16 +41,10 @@ updates:
           - "*"
     open-pull-requests-limit: 2
 
-  # Rust/Cargo
+  # Rust/Cargo — the gameplay-truth workspace, the frontends, and the pinned
+  # burble-client git dependency.
   - package-ecosystem: "cargo"
     directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  # Elixir/Mix
-  - package-ecosystem: "mix"
-    directory: "/server"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5

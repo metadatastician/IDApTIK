@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: Lock Sync Gate
+
+# Fails any pull request or push whose .github/workflows/actions.lock has drifted
+# from the workflow YAML. That drift is not cosmetic: GitHub refuses such a run
+# at STARTUP, creating ZERO jobs, and reports only "This run likely failed
+# because of a workflow file issue." There is no red X on any job, because no job
+# ever existed — so a required check silently stops being reported and the branch
+# ruleset waiting on it is satisfied by nothing.
+#
+# This repository measured that. PR #143 (2026-09-23) re-pinned codeql.yml's two
+# refs from `@v4.38.0` to a bare commit SHA; the lockfile still recorded the tag.
+# Every CodeQL run from 10:38Z that day concluded `startup_failure` with
+# `jobs: 0` — eight runs across four branches — while CI, Pages, Creusot and the
+# secret scanner stayed green and the tree looked healthy. `code_scanning` is a
+# required rule on `main`, so the hole was load-bearing.
+#
+# Dependabot rewrites refs in workflow YAML and cannot touch the lockfile, and
+# this repository's dependabot.yml groups every action into one weekly PR, so
+# regenerating the lockfile once buys exactly one week. This gate is the
+# recurrence cure, following metadatastician/burble#224.
+#
+# ⚠ NO `uses:` ANYWHERE IN THIS FILE, DELIBERATELY. Checkout is a `git` call in
+# a `run:` step, matching ci.yml and codeql.yml. A gate that detects lockfile
+# desync must not itself carry a ref that can desync. Do not add a `uses:` here;
+# scripts/check-lock-sync.sh will not save you, because this file would then need
+# a lockfile entry, and the entry is the thing that goes stale.
+#
+# ⚠ NO `paths:` FILTER, also deliberately. A filtered workflow never reports on
+# pull requests that miss the filter, which deadlocks any ruleset that requires
+# the check. The estate has been bitten by this; see creusot-proof.yml's header
+# for the same reasoning. The whole gate is one awk pass over nine small files
+# and runs in about a second, so there is nothing to save by filtering.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lock-sync-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lock-sync:
+    name: actions.lock is in sync with the workflow YAML
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out without actions/checkout
+        env:
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          git init -q .
+          git remote add origin "${SERVER}/${REPO}.git"
+          git fetch -q --no-tags --depth 1 origin "${SHA}"
+          git checkout -q --detach --force FETCH_HEAD
+          echo "checked out ${SHA}"
+
+      # The self-test runs FIRST and on every pull request. A gate that cannot
+      # fail is worse than no gate, so each of the checker's arms has a mutant
+      # that must kill it, and each mutant must fail for the named reason rather
+      # than for a parse error. This is also where the awk portability claim is
+      # exercised: the checker is POSIX awk because two sibling suites in this
+      # repository were measured dying under mawk.
+      - name: Lock-sync gate self-test (the gate must be able to fail)
+        run: ./scripts/check-lock-sync.sh --self-test
+
+      - name: Verify actions.lock against every workflow
+        run: |
+          set -euo pipefail
+          test -x scripts/check-lock-sync.sh || {
+            echo "::error::scripts/check-lock-sync.sh is not executable (mode $(stat -c %a scripts/check-lock-sync.sh))"
+            echo "This gate is invoked as ./scripts/... on purpose: 'bash script' ignores the"
+            echo "file mode, so a 100644 regression passes locally and dies at exit 126 here."
+            exit 1
+          }
+          ./scripts/check-lock-sync.sh
+
+      # A `cancelled` conclusion is NOT a pass. This gate is short, so it is not
+      # the workflow issue #142 is about, but the tally rule is recorded here
+      # because this is the workflow that reads check results for a living.
+      - name: Report what a non-verdict looks like
+        if: always()
+        run: |
+          echo "If this job's conclusion is 'cancelled', no verdict was rendered on this"
+          echo "commit. Do not fold 'cancelled' into green in any tally, dashboard, or"
+          echo "select(.conclusion==\"failure\") filter. See issue #142."

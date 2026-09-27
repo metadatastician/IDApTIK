@@ -1,0 +1,117 @@
+= DR-0001: Which SonarCloud organisation does this project report into?
+:status: OPEN
+:opened: 2026-09-27
+:guard: tests/ci_security_config_test.sh::check_sonar_consistency
+:files: sonar-project.properties
+
+== Question
+
+Is the SonarCloud project for this repository provisioned under the
+`metadatastician` organisation or the `hyperpolymath` one, and therefore is
+`sonar.projectKey` `metadatastician_IDApTIK` or `hyperpolymath_IDApTIK`?
+
+This is a yes/no question with a single correct answer that exists in the world.
+It is not a design decision.
+
+== Why it is not decidable here
+
+`sonarcloud.io` is unreachable from the development sandbox: the TLS handshake
+fails (`SSL_ERROR_SYSCALL`) for every endpoint tried, including
+
+* `/api/projects/search?projects=metadatastician_IDApTIK`
+* `/api/components/show?component=metadatastician_IDApTIK`
+* `/api/components/show?component=hyperpolymath_IDApTIK`
+
+So neither candidate project could be queried to see which one exists, which one
+has received analyses, or which one the repository's `SONAR_TOKEN` is scoped to.
+No workflow in `.github/workflows/` runs a SonarCloud scan, so there is no build
+log to read the answer out of either. The repository does not currently contain
+the answer anywhere.
+
+== What was found instead
+
+* The two effective lines are mutually consistent with each other and with the
+  header comment's overview URL, which names `metadatastician_IDApTIK`. All
+  three agree.
+* Issue #38 asked the organisation question and was closed by PR #42. The prose
+  that was removed on 2026-09-27 paraphrased that closure as deciding
+  `hyperpolymath`, on the stated reasoning that "the estate consolidates
+  SonarCloud under a single organisation, so metadatastician-org GitHub repos
+  still use `hyperpolymath` here — the GitHub-org boundary deliberately does not
+  mirror the SonarCloud one."
+* That reasoning is coherent as estate policy. It is also directly contradicted
+  by the values it sat above, and it did not say whether the values were wrong
+  or whether the policy had been reversed since PR #42.
+
+Both readings were therefore live in one file, and the prose was the more
+confident of the two.
+
+== Current state
+
+`sonar.organization=metadatastician`, `sonar.projectKey=metadatastician_IDApTIK`.
+
+This is **not a decision**. It is the value that was in the file, left alone
+because changing it on the available evidence would replace one unverified claim
+with another. What changed on 2026-09-27 is that the prose no longer asserts the
+opposite: the retired claim is now quoted verbatim inside an explicit
+`BEGIN/END RETIRED-VALUES QUOTE` marker block, labelled as retired.
+
+There is no `SONAR_TOKEN` secret in use by any workflow, so nothing is currently
+reporting anywhere. That is what makes this safe to leave open — but see the
+warning below, because it stops being safe the moment the token is added.
+
+== Options
+
+[cols="1,3,2", options="header"]
+|===
+|Option |What it means |Cost
+
+|A. Keep `metadatastician`
+|The values, the URL and the repository's GitHub organisation all agree. Nothing
+to change; delete this file.
+|Contradicts the estate consolidation policy quoted in PR #42, if that policy is
+still current. This repository's findings would sit outside the estate's single
+SonarCloud organisation.
+
+|B. Move to `hyperpolymath`
+|Matches the estate policy. Change `sonar.organization`, `sonar.projectKey` and
+the header overview URL together.
+|Requires a provisioned `hyperpolymath_IDApTIK` project. If it does not exist,
+the scan fails at project lookup — loudly, which is the good failure.
+|===
+
+[WARNING]
+====
+The dangerous direction is neither of these. Adding `SONAR_TOKEN` while
+`sonar.projectKey` points at a project that belongs to a *different* repository
+does not fail. It reports this repository's findings into that other project and
+goes green. `sonar-project.properties` warned about exactly this before the
+2026-09-27 edit and the warning was kept. **Rule this before adding the token,
+not after.**
+====
+
+== What a ruling unblocks
+
+* Adding the `SONAR_TOKEN` secret and a scan job to CI.
+* Any estate-wide SonarCloud consolidation sweep, which cannot include this
+  repository while its organisation is ambiguous.
+
+== Guard
+
+`check_sonar_consistency` in `tests/ci_security_config_test.sh`, wired into
+`just ci-security-config-test` and the `fixtures-and-must` CI job. It asserts
+offline that
+
+* exactly one `sonar.organization` and one `sonar.projectKey` line exist;
+* `sonar.projectKey` is exactly `<organization>_<repository>`, with the
+  repository name taken from the git remote;
+* the header overview URL names the same project as `sonar.projectKey`;
+* no `<something>_<Repo>` token anywhere in the file's prose names a *different*
+  project than `sonar.projectKey` does, except inside a marked
+  `RETIRED-VALUES QUOTE` block;
+* the quote markers are balanced, so an unclosed block cannot swallow the
+  effective configuration and read as consistency.
+
+The fourth arm is the one that would have caught the original defect. It has six
+firing fixtures, including one for the unbalanced-marker case and one proving
+that a retired value inside a marked block is not read as a live claim.

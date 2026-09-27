@@ -85,8 +85,31 @@ launcher-fixture-test:
 vendor-winit-test:
     bash tests/vendor_winit_check_test.sh
 
+# Offline fixture coverage for the ABI authority pins and the wire table
+# (issues #139, #141). Runs the workflow's own pin block against stubbed
+# curl/sha256sum, then checks the document independently. Was committed by
+# PR #140 at mode 100755 and invoked by nothing for five days; this recipe and
+# the `fixtures-and-must` CI job are what make it a gate rather than a file.
+abi-authority-pin-test:
+    bash tests/abi_authority_pin_test.sh
+
+# Offline fixture coverage for the CI/CD security configuration: the dependabot
+# pull-request cap, that no ecosystem points at a directory that does not exist,
+# the CodeQL entry points and their actions.lock pin, issue #142's concurrency
+# scoping, per-job timeouts, and that no suite under tests/ is invoked by
+# nothing. Added by PR #143 and, like the above, wired by nothing until now.
+ci-security-config-test:
+    bash tests/ci_security_config_test.sh
+
+# Prove .github/workflows/actions.lock agrees with the workflow YAML before
+# GitHub proves it by refusing to start the run. Self-test first: a gate that
+# cannot fail is worse than no gate.
+lock-sync-check:
+    ./scripts/check-lock-sync.sh --self-test
+    ./scripts/check-lock-sync.sh
+
 # Run every shell fixture suite (no Rust toolchain needed).
-fixture-tests: runtime-doctor-test launcher-fixture-test vendor-winit-test
+fixture-tests: runtime-doctor-test launcher-fixture-test vendor-winit-test abi-authority-pin-test ci-security-config-test lock-sync-check
 
 # Execute the Mustfile physical-state probes (the estate `must check` verb).
 # Critical probes gate; a probe whose tool is missing fails, never skips.

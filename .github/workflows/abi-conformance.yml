@@ -192,3 +192,137 @@ jobs:
             exit 1
           fi
           echo "authority-pin: all pins verified against $rev"
+
+      # ── ISSUE #139: the wire table is a transcription, and transcriptions drift ──
+      #
+      # The step above proves the FETCHED BYTES of ffi/connectors.json equal the
+      # pinned digest. It says nothing about the sixteen-row markdown table in
+      # docs/abi/ABI-AUTHORITY.md that transcribes those bytes into prose, which
+      # is hand-maintained and therefore free to disagree with the file it
+      # describes while every digest stays green.
+      #
+      # That is not hypothetical. The table's id-11 entry was already wrong once
+      # (`verismbd-rest`), and tests/abi_authority_pin_test.sh guards it against
+      # a fixture that was itself a copy of the document -- so the guard proved
+      # internal consistency only, and a document drifting from the manifest
+      # would have passed it.
+      #
+      # Ordering is compared, not just membership: connectors.json says in its
+      # own _note that "id is the C ABI wire id and ordering is load-bearing --
+      # do not renumber by hand", and portFor = base + id + 1 means a renumbering
+      # moves every service onto another service's port without changing the set.
+      #
+      # NO NEW `uses:` ENTRY. This step runs entirely in `run:`, so the
+      # actions.lock situation for this workflow is unchanged.
+      - name: Wire table agrees with the generated manifest (issue #139)
+        run: |
+          set -euo pipefail
+          base="https://raw.githubusercontent.com/hyperpolymath/hypatia"
+          rev=f079bc06061951d8e4c12f86675f81e97ec6e3a7
+          doc=docs/abi/ABI-AUTHORITY.md
+          manifest="$(mktemp)"
+
+          # Fetch to a FILE. Command substitution strips trailing newlines, and
+          # this repository has already been bitten by exactly that (the note in
+          # the step above).
+          if ! curl -fsSL "$base/$rev/ffi/connectors.json" -o "$manifest"; then
+            echo "WIRE TABLE: FETCH FAILED for ffi/connectors.json @$rev"
+            echo "  an unverifiable manifest is treated as drift, never as agreement"
+            exit 1
+          fi
+
+          # Extract one "id<TAB>name" line per connector, ordered by id.
+          # POSIX awk only: mawk is /usr/bin/awk on the development containers
+          # and has no three-argument match() and no {n} regex intervals. The
+          # runner image ships gawk, but a check that only works on one awk is a
+          # check that cannot be run locally, and this one is run locally by
+          # tests/abi_authority_pin_test.sh.
+          extract_manifest() {
+            awk '
+              /"id":[[:space:]]*[0-9]+/ {
+                line = $0
+                if (!match(line, /"id":[[:space:]]*[0-9]+/)) next
+                id = substr(line, RSTART, RLENGTH); sub(/^"id":[[:space:]]*/, "", id)
+                if (!match(line, /"name":[[:space:]]*"[^"]*"/)) next
+                nm = substr(line, RSTART, RLENGTH)
+                sub(/^"name":[[:space:]]*"/, "", nm); sub(/"$/, "", nm)
+                printf "%s\t%s\n", id, nm
+                n++
+              }
+              END {
+                printf "manifest: %d connector pair(s)\n", n > "/dev/stderr"
+                if (n == 0) { print "DENOMINATOR ZERO: no connectors in the manifest" > "/dev/stderr"; exit 2 }
+              }
+            ' "$1" | sort -n
+          }
+
+          # The document's table carries TWO id/name pairs per markdown row, so
+          # eight rows must yield sixteen entries.
+          extract_doc() {
+            awk '
+              /^\| [0-9]+ \| [a-z0-9-]+ \| [0-9]+ \| [a-z0-9-]+ \|$/ {
+                n = split($0, c, "|")
+                if (n != 6) next
+                for (i = 2; i <= 5; i++) { sub(/^[[:space:]]+/, "", c[i]); sub(/[[:space:]]+$/, "", c[i]) }
+                printf "%s\t%s\n%s\t%s\n", c[2], c[3], c[4], c[5]
+                rows++
+              }
+              END {
+                printf "document: %d wire row(s) -> %d entry(ies)\n", rows, rows * 2 > "/dev/stderr"
+                if (rows == 0) { print "DENOMINATOR ZERO: no wire rows in the document" > "/dev/stderr"; exit 2 }
+              }
+            ' "$1" | sort -n
+          }
+
+          extract_manifest "$manifest" > /tmp/wire-manifest.tsv
+          extract_doc "$doc"           > /tmp/wire-document.tsv
+
+          ndoc="$(wc -l < /tmp/wire-document.tsv | tr -d ' ')"
+          nman="$(wc -l < /tmp/wire-manifest.tsv | tr -d ' ')"
+
+          # Printed denominator. "0 of 0 rows compared" reading as success is
+          # the failure mode this whole job exists to prevent.
+          echo "wire table: $ndoc of $nman rows compared against ffi/connectors.json @$rev"
+          if [ "$ndoc" -eq 0 ] || [ "$nman" -eq 0 ]; then
+            echo "WIRE TABLE: refusing to compare an empty side"
+            exit 1
+          fi
+          if [ "$ndoc" -ne "$nman" ]; then
+            echo "WIRE TABLE: document has $ndoc entries, manifest has $nman"
+            exit 1
+          fi
+
+          # Positive control: prove the comparison can fail before trusting that
+          # it passed. A mutated copy that differs in exactly one name must be
+          # rejected; if it is not, the diff below is vacuous.
+          mutant=/tmp/wire-mutant.tsv
+          sed '1s/grpc/GRPC-MUTANT/' /tmp/wire-manifest.tsv > "$mutant"
+          if diff -q "$mutant" /tmp/wire-document.tsv >/dev/null 2>&1; then
+            echo "WIRE TABLE: CONTROL FAILED — a deliberately mutated manifest still compared equal"
+            echo "  the comparison is vacuous; do not trust the pass below"
+            exit 1
+          fi
+
+          if ! diff -u /tmp/wire-manifest.tsv /tmp/wire-document.tsv > /tmp/wire-diff.txt 2>&1; then
+            echo "WIRE TABLE: DRIFT between ffi/connectors.json and $doc"
+            sed 's/^/  /' /tmp/wire-diff.txt
+            echo "  the document transcribes the manifest. A disagreement here is a"
+            echo "  documentation defect: fix the table, never renumber the manifest."
+            exit 1
+          fi
+
+          # The committed offline fixture must be the same bytes, or the local
+          # suite in tests/abi_authority_pin_test.sh is proving something about a
+          # file that is not this one. Its digest is pinned in the document, so
+          # this is self-verifying and cannot silently rot.
+          fixture=fixtures/abi/connectors-pinned.json
+          live="$(sha256sum "$manifest" | cut -d' ' -f1)"
+          offline="$(sha256sum "$fixture" | cut -d' ' -f1)"
+          echo "fixture: $fixture sha256 $offline (live manifest $live)"
+          if [ "$live" != "$offline" ]; then
+            echo "WIRE TABLE: fixtures/abi/connectors-pinned.json is not the manifest at the pinned revision"
+            echo "  re-copy it, or move the pin in $doc and this workflow together"
+            exit 1
+          fi
+
+          echo "wire table: all $nman connector id/name pairs agree, in order"
