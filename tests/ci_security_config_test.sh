@@ -624,6 +624,160 @@ check_sonar_consistency() { # $1 properties file, $2 repository root
   ' "$props"
 }
 
+# ── Mergify must not auto-merge a pull request with a failing check ─────────
+#
+# PR #148 merged to main with three checks red, seven still running, and one
+# that never started, because the whole of `.mergify.yml`'s
+# `auto_merge_conditions` was a single line: `author = dependabot[bot]`. The
+# comment above it claimed auto-merge happened "after GitHub's protected-branch
+# checks have passed". Nothing implemented that claim.
+#
+# The consequence was concrete. PR #148 bumped `github/codeql-action` to
+# v4.38.2 in codeql.yml without touching actions.lock -- which Dependabot
+# cannot do -- and the lock-sync gate added three minutes earlier by PR #147
+# correctly reported `failure`. The merge proceeded regardless, and main went
+# back to rendering no CodeQL verdict at all. A gate that nothing is required
+# to wait for is a suggestion.
+check_mergify_conditions() { # $1 mergify config, $2 lock-sync gate workflow
+  local cfg="$1" gatewf="$2"
+  if [ ! -f "$cfg" ]; then
+    printf 'no .mergify.yml; nothing auto-merges, nothing to check\n' >&2
+    return 0
+  fi
+  # The job name the lock-sync gate reports under. Read from the workflow rather
+  # than hardcoded: a `check-success = <name>` condition whose name no longer
+  # matches anything is silently satisfied by nothing and blocks everything, or
+  # worse, is one of several conditions and the others carry the merge. Either
+  # way a rename must not be able to disable the condition unnoticed.
+  local gatename
+  gatename="$(awk '
+      /^jobs:/ { injobs = 1; next }
+      injobs && /^    name:[[:space:]]*/ {
+        v = $0; sub(/^    name:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v)
+        print v; exit
+      }
+    ' "$gatewf" 2>/dev/null || true)"
+  require_nonempty "lock-sync gate job name read from $gatewf" "$gatename" || return 1
+
+  awk -v gatename="$gatename" -v GATEWF="$gatewf" '
+    /^[[:space:]]*auto_merge_conditions:/ { inconds = 1; next }
+    inconds && /^[a-z]/ { inconds = 0 }
+    inconds && /^[[:space:]]*-[[:space:]]*/ {
+      c = $0
+      sub(/^[[:space:]]*-[[:space:]]*/, "", c)
+      sub(/[[:space:]]+$/, "", c)
+      # Strip YAML quoting. `"#check-failure = 0"` MUST be quoted in YAML,
+      # because a leading `#` otherwise starts a comment and the condition
+      # silently becomes an empty list item. Matching the unquoted form only
+      -- as the first draft did -- counts zero of them and fails a correct
+      # policy, which is how a check ends up being "fixed" by deleting it.
+      if (c ~ /^".*"$/) { sub(/^"/, "", c); sub(/"$/, "", c) }
+      nconds++
+      if (c ~ /^author[[:space:]]*=[[:space:]]*dependabot/) nauthor++
+      if (c ~ /^head[[:space:]]*~=/) { nhead++; headre = c }
+      if (c ~ /^#check-failure[[:space:]]*=[[:space:]]*0/) nfailzero++
+      if (c ~ /^#check-neutral[[:space:]]*=[[:space:]]*0/) nneutralzero++
+      if (c ~ /^check-success[[:space:]]*=/) { nchecksuccess++; success_conds[++ns] = c }
+      next
+    }
+    END {
+      printf "mergify: %d auto_merge condition(s) -- %d author, %d head-pattern, %d check-success, %d #check-failure=0, %d #check-neutral=0\n",
+             nconds, nauthor, nhead, nchecksuccess, nfailzero, nneutralzero > "/dev/stderr"
+      if (nconds == 0) {
+        printf "DENOMINATOR ZERO: no auto_merge_conditions found\n"
+        exit 1
+      }
+      bad = 0
+      if (nauthor == 0) {
+        printf "no author condition: this would auto-merge human-authored work too\n" > "/dev/stderr"
+        bad = 1
+      }
+      # An author-only condition is the exact defect that shipped.
+      if (nconds == nauthor) {
+        printf "auto_merge_conditions is author-only: it merges regardless of check status\n" > "/dev/stderr"
+        printf "  PR #148 merged to main with 3 checks failing and 7 in progress on this\n" > "/dev/stderr"
+        printf "  exact configuration, re-breaking CodeQL three minutes after it was fixed.\n" > "/dev/stderr"
+        bad = 1
+      }
+      if (nfailzero != 1) {
+        printf "expected `\"#check-failure = 0\"`, found %d\n", nfailzero > "/dev/stderr"
+        bad = 1
+      }
+      if (nneutralzero != 1) {
+        printf "expected `\"#check-neutral = 0\"`, found %d (a neutral conclusion is not a pass)\n", nneutralzero > "/dev/stderr"
+        bad = 1
+      }
+      if (nchecksuccess == 0) {
+        printf "no check-success condition\n" > "/dev/stderr"
+        printf "  `#check-failure = 0` is satisfied by a check that NEVER RAN. When GitHub\n" > "/dev/stderr"
+        printf "  refuses a workflow at startup it creates zero jobs and contributes no check\n" > "/dev/stderr"
+        printf "  to any count, so a startup_failure is invisible to a nothing-failed test.\n" > "/dev/stderr"
+        printf "  A positive check-success is the only form that catches it.\n" > "/dev/stderr"
+        bad = 1
+      }
+      # The lock-sync gate specifically must be named, and must match the
+      # workflow'"'"'s current job name.
+      found = 0
+      for (i = 1; i <= ns; i++) {
+        if (index(success_conds[i], gatename) > 0) found = 1
+      }
+      if (!found) {
+        printf "no check-success condition names the lock-sync gate job \"%s\"\n", gatename > "/dev/stderr"
+        printf "  that name was read from %s just now, so this is not a stale hardcode\n", GATEWF > "/dev/stderr"
+        bad = 1
+      }
+      # A github_actions bump can never satisfy the lockfile condition, so it
+      # must not be admitted to auto-merge at all.
+      if (nhead == 0) {
+        printf "no head-pattern condition: github_actions bumps are admitted to auto-merge\n" > "/dev/stderr"
+        printf "  Dependabot cannot regenerate actions.lock, so every such bump merges a\n" > "/dev/stderr"
+        printf "  desynchronised lockfile and breaks CI with no log to read.\n" > "/dev/stderr"
+        bad = 1
+      } else if (headre ~ /github_actions/) {
+        printf "the head pattern admits github_actions branches: %s\n", headre > "/dev/stderr"
+        bad = 1
+      } else if (headre !~ /cargo/) {
+        # A bare `^dependabot/` admits every ecosystem including github_actions,
+        # so requiring the pattern to NAME an allowed ecosystem is what makes the
+        # default closed. Matching on the absence of a bad name is not enough.
+        printf "the head pattern does not name an allowed ecosystem: %s\n", headre > "/dev/stderr"
+        printf "  a bare ^dependabot/ admits github_actions bumps, which can never satisfy\n" > "/dev/stderr"
+        printf "  the lockfile condition because Dependabot cannot regenerate actions.lock.\n" > "/dev/stderr"
+        bad = 1
+      }
+      exit bad
+    }
+  ' "$cfg"
+}
+
+# ── every shell script here must at least parse ─────────────────────────────
+#
+# `bash -n` is free and catches the failure mode that no fixture can: a script
+# with a syntax error still runs every line ABOVE the error and reports their
+# results before aborting, so a truncated suite can print forty passing
+# assertions and an exit code that only a reader of the last line would notice.
+# This file shipped one -- a literal two-character `\n` inserted between the
+# last fixture and the summary block by a patch script -- and it presented as
+# "49 ok" followed by exit 2.
+check_shell_syntax() { # $1 repository root
+  local root="$1" f total=0 bad=""
+  for f in "$root"/scripts/*.sh "$root"/tests/*.sh; do
+    [ -e "$f" ] || continue
+    total=$((total + 1))
+    if ! bash -n "$f" 2>/dev/null; then
+      bad="$bad ${f##*/}"
+    fi
+  done
+  require_nonempty "shell scripts to parse" "$total" || return 1
+  printf 'shell syntax: %d script(s) parsed with bash -n, %d clean\n' \
+    "$total" "$((total - $(printf '%s' "$bad" | wc -w)))" >&2
+  if [ -n "$bad" ]; then
+    printf 'script(s) that do not parse:%s\n' "$bad" >&2
+    for f in $bad; do bash -n "$root/scripts/$f" 2>&1 || bash -n "$root/tests/$f" 2>&1 || true; done >&2
+    return 1
+  fi
+}
+
 printf 'production configuration:\n'
 expect_pass "GitHub Actions updates are capped at two open pull requests" \
   check_dependabot_limit "$DEPENDABOT"
@@ -643,6 +797,10 @@ expect_pass "every file naming a security contact names the same one" \
   check_contact_consistency "$REPO_DIR"
 expect_pass "sonar-project.properties agrees with itself and with its prose" \
   check_sonar_consistency "$REPO_DIR/sonar-project.properties" "$REPO_DIR"
+expect_pass "Mergify will not auto-merge over a failing or absent check" \
+  check_mergify_conditions "$REPO_DIR/.mergify.yml" "$REPO_DIR/.github/workflows/lock-sync-gate.yml"
+expect_pass "every shell script under scripts/ and tests/ parses" \
+  check_shell_syntax "$REPO_DIR"
 
 printf 'Dependabot firing fixtures:\n'
 awk '
@@ -728,19 +886,56 @@ expect_fail "a ref the lockfile does not record is rejected (the PR #143 defect)
   "is not recorded in actions.lock" \
   check_codeql_pins "$FIXTURE/codeql-unrecorded.yml" "$LOCK"
 
+# The ref and the commit are DERIVED, never hardcoded. The first draft of this
+# suite spelled `v4.38.1` and the matching sha1 literally, and within a day
+# Dependabot had bumped the workflow to v4.38.2: both `sed` expressions stopped
+# matching, both mutants became byte-identical to the original, and two firing
+# fixtures quietly turned into passes. A mutant that no longer mutates is worse
+# than no mutant, because the suite still reports a number.
+CODEQL_REF="$(awk '
+    match($0, /github\/codeql-action\/init@[^[:space:]#]+/) {
+      r = substr($0, RSTART, RLENGTH); sub(/^.*init@/, "", r); print r; exit
+    }
+  ' "$CODEQL")"
+require_nonempty "the CodeQL ref currently used in codeql.yml" "$CODEQL_REF" || exit 1
+CODEQL_COMMIT="$(awk '
+    /^    .github\/codeql-action@/ { indep = 1; next }
+    indep && /^        commit: / {
+      c = $0; sub(/^        commit: ./, "", c); sub(/.$/, "", c); print c; exit
+    }
+    # Exactly four spaces then a NON-space: the next dependency key. A plain
+    # `/^    ./` also matches the eight-space `ref:` and `commit:` lines inside
+    # the block, because their fifth character is a space, so the first draft of
+    # this closed the block on its own second line and extracted nothing.
+    indep && /^    [^[:space:]]/ { indep = 0 }
+  ' "$LOCK")"
+require_nonempty "the commit actions.lock resolves the CodeQL ref to" "$CODEQL_COMMIT" || exit 1
+printf 'derived from the live tree: codeql ref %s, lockfile commit %s\n' \
+  "$CODEQL_REF" "$CODEQL_COMMIT" >&2
+
 # A bare SHA in the YAML: superficially "harder pinned", actually a startup
 # failure, because the lockfile records the readable tag instead.
-SHA=1c5b675653bb5c22dbe9b12b556ec555138e09fd
-sed "s|github/codeql-action/init@v4.38.1|github/codeql-action/init@${SHA} # v4.38.1|;
-     s|github/codeql-action/analyze@v4.38.1|github/codeql-action/analyze@${SHA} # v4.38.1|" \
+# Synthetic on purpose. Any 40-hex string the lockfile does not record makes the
+# point; using a REAL commit sha would be a fixture that starts passing the day
+# somebody records it, and a 40-hex constant that looks like a real pin invites
+# exactly that mistake.
+SHA=deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+sed "s|github/codeql-action/init@${CODEQL_REF}|github/codeql-action/init@${SHA}|;
+     s|github/codeql-action/analyze@${CODEQL_REF}|github/codeql-action/analyze@${SHA}|" \
   "$CODEQL" > "$FIXTURE/codeql-bare-sha.yml"
+if cmp -s "$CODEQL" "$FIXTURE/codeql-bare-sha.yml"; then
+  fail "the bare-SHA mutant did not change the workflow; the derived ref no longer matches"
+fi
 expect_fail "a bare SHA the lockfile does not record is rejected, not rewarded" \
   "is not recorded in actions.lock" \
   check_codeql_pins "$FIXTURE/codeql-bare-sha.yml" "$LOCK"
 
 # The lockfile records the ref but resolves it to nothing.
-sed 's|commit: .sha1-1c5b675653bb5c22dbe9b12b556ec555138e09fd.|commit: "sha1-notahex"|' \
+sed "s|commit: '${CODEQL_COMMIT}'|commit: 'sha1-notahex'|" \
   "$LOCK" > "$FIXTURE/actions-nocommit.lock"
+if cmp -s "$LOCK" "$FIXTURE/actions-nocommit.lock"; then
+  fail "the no-commit mutant did not change the lockfile; the derived commit no longer matches"
+fi
 expect_fail "a recorded ref that resolves to no commit is rejected" \
   "resolves to no sha1-" \
   check_codeql_pins "$CODEQL" "$FIXTURE/actions-nocommit.lock"
@@ -932,6 +1127,109 @@ sed 's#overview?id=example-org_IDApTIK#overview?id=other-org_IDApTIK#' \
 expect_fail "a header URL naming another project is rejected" \
   "the header overview URL names" \
   check_sonar_consistency "$sonar_root/badurl.properties" "$sonar_root"
+
+
+printf 'mergify firing fixtures:\n'
+mergify_root="$FIXTURE/mergify-tree"
+mkdir -p "$mergify_root/.github/workflows"
+printf 'name: Lock Sync Gate\njobs:\n  gate:\n    name: actions.lock is in sync with the workflow YAML\n' \
+  > "$mergify_root/.github/workflows/lock-sync-gate.yml"
+cat > "$mergify_root/good.yml" <<'MERGIFY'
+merge_protections_settings:
+  auto_merge_conditions:
+    - author = dependabot[bot]
+    - head ~= ^dependabot/cargo/
+    - "#check-failure = 0"
+    - "#check-neutral = 0"
+    - check-success = actions.lock is in sync with the workflow YAML
+MERGIFY
+expect_pass "a fully conditioned auto-merge policy passes" \
+  check_mergify_conditions "$mergify_root/good.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+
+# The exact configuration that shipped and merged PR #148 over three red checks.
+cat > "$mergify_root/author-only.yml" <<'MERGIFY'
+merge_protections_settings:
+  auto_merge_conditions:
+    - author = dependabot[bot]
+MERGIFY
+expect_fail "an author-only auto-merge condition is rejected (the PR #148 defect)" \
+  "author-only" \
+  check_mergify_conditions "$mergify_root/author-only.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+
+# `#check-failure = 0` alone is not enough: a workflow refused at startup
+# creates zero jobs and therefore contributes no failing check.
+cat > "$mergify_root/no-positive.yml" <<'MERGIFY'
+merge_protections_settings:
+  auto_merge_conditions:
+    - author = dependabot[bot]
+    - head ~= ^dependabot/cargo/
+    - "#check-failure = 0"
+    - "#check-neutral = 0"
+MERGIFY
+expect_fail "a policy with no positive check-success is rejected" \
+  "no check-success condition" \
+  check_mergify_conditions "$mergify_root/no-positive.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+
+# A check-success that names a job the workflow no longer has is satisfied by
+# nothing. The expected name is read from the workflow at check time, so
+# renaming the job must fail the policy rather than silently disable it.
+cat > "$mergify_root/stale-name.yml" <<'MERGIFY'
+merge_protections_settings:
+  auto_merge_conditions:
+    - author = dependabot[bot]
+    - head ~= ^dependabot/cargo/
+    - "#check-failure = 0"
+    - "#check-neutral = 0"
+    - check-success = the old gate name
+MERGIFY
+expect_fail "a check-success naming a job that no longer exists is rejected" \
+  "no check-success condition names the lock-sync gate job" \
+  check_mergify_conditions "$mergify_root/stale-name.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+
+# Admitting github_actions branches to auto-merge guarantees merging a
+# desynchronised lockfile, because Dependabot cannot regenerate it.
+cat > "$mergify_root/actions-admitted.yml" <<'MERGIFY'
+merge_protections_settings:
+  auto_merge_conditions:
+    - author = dependabot[bot]
+    - head ~= ^dependabot/
+    - "#check-failure = 0"
+    - "#check-neutral = 0"
+    - check-success = actions.lock is in sync with the workflow YAML
+MERGIFY
+expect_fail "a bare ^dependabot/ head pattern is rejected: the default must be closed" \
+  "does not name an allowed ecosystem" \
+  check_mergify_conditions "$mergify_root/actions-admitted.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+cat > "$mergify_root/actions-explicit.yml" <<'MERGIFY'
+merge_protections_settings:
+  auto_merge_conditions:
+    - author = dependabot[bot]
+    - head ~= ^dependabot/(cargo|github_actions)/
+    - "#check-failure = 0"
+    - "#check-neutral = 0"
+    - check-success = actions.lock is in sync with the workflow YAML
+MERGIFY
+expect_fail "a head pattern that explicitly admits github_actions is rejected" \
+  "admits github_actions branches" \
+  check_mergify_conditions "$mergify_root/actions-explicit.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+
+# Neutral is not a pass. Dropping the #check-neutral arm must fail.
+grep -v 'check-neutral' "$mergify_root/good.yml" > "$mergify_root/no-neutral.yml"
+expect_fail "dropping #check-neutral = 0 is rejected" \
+  "a neutral conclusion is not a pass" \
+  check_mergify_conditions "$mergify_root/no-neutral.yml" "$mergify_root/.github/workflows/lock-sync-gate.yml"
+
+printf 'shell-syntax firing fixture:\n'
+syntax_root="$FIXTURE/syntax-tree"
+mkdir -p "$syntax_root/scripts" "$syntax_root/tests"
+printf '#!/usr/bin/env bash\nif [ 1 -eq 1 ]; then echo ok\n' > "$syntax_root/scripts/broken.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$syntax_root/tests/fine.sh"
+expect_fail "a script that does not parse is rejected" \
+  "do not parse" \
+  check_shell_syntax "$syntax_root"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$syntax_root/scripts/broken.sh"
+expect_pass "the same tree parses once the script is fixed" \
+  check_shell_syntax "$syntax_root"
 
 if [ "$failures" -ne 0 ]; then
   printf '%d CI security configuration test(s) failed (%d passed)\n' "$failures" "$checks" >&2

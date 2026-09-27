@@ -61,6 +61,13 @@ contact?]
 does this repository use Git LFS?]
 |No binary assets tracked; no `filter=lfs` anywhere in `.gitattributes`
 |2026-09-27
+
+|DR-0004
+|link:DR-0004-required-status-checks.adoc[Is the lock-sync gate a required
+status check, and who owns branch protection?]
+|Enforced in `.mergify.yml` only; GitHub's required-checks list is not readable
+with this repository's token
+|2026-09-27
 |===
 
 == How to close one

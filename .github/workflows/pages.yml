@@ -62,32 +62,117 @@ jobs:
       # failing quietly a month later.
       - name: Publish .well-known/ (security.txt, ai.txt, humans.txt)
         run: |
-          # The idris2-pack container has no bash, so this step runs under dash;
-          # `set -o pipefail` is a bashism that aborts the step at line 1 there.
+          # ── THIS STEP RUNS UNDER dash IN A MINIMAL NIX CONTAINER ──────────
+          # The idris2-pack image has no bash, so `set -o pipefail` is a bashism
+          # that aborts the step at line 1. It also has no guarantee of anything
+          # beyond the four external commands the original version of this step
+          # proved are present: mkdir, cp, cat and the shell builtins test and
+          # echo.
+          #
+          # That constraint was learned the expensive way. The first revision of
+          # this step (PR #147, 2026-09-27) added `basename` and `head`, which
+          # the previous version had never needed. It failed on main with exit
+          # code 1 and no usable log -- the Actions results endpoint was
+          # unreachable, so the only evidence was "Process completed with exit
+          # code 1" against step 7 of 8. Every external command below is now
+          # either one of those four proven ones or a POSIX shell builtin /
+          # parameter expansion, and tests/pages_wellknown_test.sh extracts this
+          # step from this file and runs it under dash against a stub tree, with
+          # firing mutants, so the next revision cannot repeat it.
           set -eu
-          mkdir -p _site/.well-known
+
+          # Diagnostics BEFORE the assertions. If this step fails again, the log
+          # must already say what the container had. `pwd` is a POSIX special
+          # builtin, not an external command.
+          echo "publish .well-known: shell is $0, cwd is $(pwd)"
           src_count=0
           for f in .well-known/*; do
-            test -f "$f" || continue
-            cp "$f" "_site/.well-known/$(basename "$f")"
-            src_count=$((src_count + 1))
+            if test -f "$f"; then
+              src_count=$((src_count + 1))
+              echo "  source: $f"
+            fi
           done
-          # Printed denominator: "published 0 of 0" reading as success is the
-          # failure mode this step exists to prevent.
+          echo "publish .well-known: $src_count source file(s) found"
+
+          if test "$src_count" -eq 0; then
+            echo "ERROR: .well-known/ is empty or absent in the checkout"
+            echo "  RSR criterion 2.2.1 (silver) requires security.txt, ai.txt and"
+            echo "  humans.txt. An empty directory is not a published directory."
+            exit 1
+          fi
+
+          mkdir -p _site/.well-known
+          copied=0
+          for f in .well-known/*; do
+            test -f "$f" || continue
+            # ${f##*/} is POSIX parameter expansion. It is used instead of
+            # basename(1) deliberately: basename is an external command that the
+            # previous revision assumed and this container may not ship. Note
+            # also that under `set -e` a FAILED COMMAND SUBSTITUTION INSIDE AN
+            # ARGUMENT does not abort the shell in dash -- cp simply runs with an
+            # empty destination and fails there, which is why the missing tool
+            # did not announce itself.
+            name=${f##*/}
+            cp "$f" "_site/.well-known/$name"
+            copied=$((copied + 1))
+            echo "  copied: $name"
+          done
+
+          # Every source file must have landed. This is the real requirement and
+          # it is checked per file rather than by comparing counts.
+          missing=0
+          for f in .well-known/*; do
+            test -f "$f" || continue
+            name=${f##*/}
+            if test ! -f "_site/.well-known/$name"; then
+              echo "ERROR: $name was not published into the artifact"
+              missing=$((missing + 1))
+            fi
+          done
+          if test "$missing" -ne 0; then
+            echo "ERROR: $missing of $src_count .well-known file(s) did not reach _site/"
+            exit 1
+          fi
+
+          # RSR 2.2.1 names these three specifically. A fourth file is allowed;
+          # these three are not optional.
+          for required in security.txt ai.txt humans.txt; do
+            if test ! -f "_site/.well-known/$required"; then
+              echo "ERROR: RSR criterion 2.2.1 requires .well-known/$required"
+              echo "  A file that exists in the repository and is not in the Pages"
+              echo "  artifact 404s on the deployed site, which a criterion checked"
+              echo "  against the URL correctly reads as absent."
+              exit 1
+            fi
+          done
+
+          # Anything else the SSG may have emitted into _site/.well-known/ is
+          # reported, NOT treated as a failure. An earlier revision compared
+          # source and destination counts and failed on inequality, which would
+          # have blocked the site deploy because the generator happened to emit
+          # something extra -- a false positive whose cost is a dark website.
+          # The requirement is that our files arrive, not that nothing else does.
           dst_count=0
           for f in _site/.well-known/*; do
             test -f "$f" || continue
             dst_count=$((dst_count + 1))
           done
-          echo ".well-known: $src_count file(s) in the repository, $dst_count published into the artifact"
-          test "$src_count" -gt 0 || { echo "ERROR: .well-known/ is empty in the repository"; exit 1; }
-          test "$src_count" -eq "$dst_count" || { echo "ERROR: published count does not match source count"; exit 1; }
-          for f in security.txt ai.txt humans.txt; do
-            test -f "_site/.well-known/$f" || { echo "ERROR: RSR 2.2.1 requires .well-known/$f"; exit 1; }
-          done
-          echo "--- security.txt ---"; cat _site/.well-known/security.txt
-          echo "--- ai.txt (head) ---"; head -20 _site/.well-known/ai.txt
-          echo "--- humans.txt (head) ---"; head -20 _site/.well-known/humans.txt
+          echo "publish .well-known: $copied of $src_count source file(s) copied, $dst_count file(s) in the artifact"
+          if test "$dst_count" -gt "$copied"; then
+            echo "notice: the artifact contains $((dst_count - copied)) file(s) this step did not copy"
+            for f in _site/.well-known/*; do
+              test -f "$f" || continue
+              echo "  artifact: ${f##*/}"
+            done
+          fi
+
+          echo "--- published security.txt ---"
+          cat _site/.well-known/security.txt
+          echo "--- published ai.txt ---"
+          cat _site/.well-known/ai.txt
+          echo "--- published humans.txt ---"
+          cat _site/.well-known/humans.txt
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5.0.0
         with:

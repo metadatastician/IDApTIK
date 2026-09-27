@@ -1,0 +1,167 @@
+= DR-0004: Is the lock-sync gate a required status check, and who owns branch protection?
+:status: OPEN
+:opened: 2026-09-27
+:guard: tests/ci_security_config_test.sh::check_mergify_conditions (partial — see below)
+:files: .mergify.yml
+
+== Question
+
+Is `actions.lock is in sync with the workflow YAML` — the check produced by
+`.github/workflows/lock-sync-gate.yml` — a **required status check** on `main`,
+enforced by GitHub rather than by Mergify's configuration?
+
+And more generally: which checks are required on `main`, and who is able to
+change that list?
+
+== Why it is not decidable here
+
+`GET /repos/metadatastician/IDApTIK/branches/main/protection` returns
+`403 Resource not accessible by integration` for the token this repository's
+automation uses. The classic branch-protection API is therefore unreadable.
+
+Six rulesets are visible through `GET /repos/.../rulesets`, and five of the six
+have `source_type: Organization`:
+
+[cols="2,2,2,1", options="header"]
+|===
+|Name |Target |Source |Enforcement
+
+|Branch-Floor |branch |Organization (metadatastician) |active
+|Estate Baseline |repository |Organization (metadatastician) |active
+|EstateBranching |branch |Organization (metadatastician) |active
+|EstateTagging |tag |Organization (metadatastician) |active
+|Tag-Floor |tag |Organization (metadatastician) |active
+|Immutable-Tags |tag |Repository |active
+|===
+
+Their *bodies* were not retrieved, and a ruleset's required-status-check list
+lives in its body. So the answer exists and is readable — just not with this
+token, and not from a working tree.
+
+== What was found instead
+
+The question is not academic. It was asked because a gate fired and was
+overridden, measurably, on 2026-09-27:
+
+* 04:22:57Z — PR #147 merged. `Lock Sync Gate`, `Secret Scanner`,
+  `ABI Conformance` and `Creusot Proof` all concluded `success` on main.
+* 04:25:05Z — Dependabot opened PR #148, bumping `github/codeql-action` from
+  v4.38.1 to v4.38.2 in `codeql.yml` without touching `actions.lock`, which
+  Dependabot cannot do.
+* The check runs GitHub recorded for `f4b2013` were:
++
+[source]
+----
+actions.lock is in sync with the workflow YAML   failure
+fixtures-and-must (shell suites + Mustfile...)   failure
+build (GitHub Pages)                             failure
+abi-model, test-ghost, session-loopback,
+supply-chain, bevy-frontend, config-scenario     in_progress
+CodeQL Security Analysis                         startup_failure
+----
+* Mergify merged it. `.mergify.yml`'s entire `auto_merge_conditions` was
+  `- author = dependabot[bot]`, while the comment above it claimed auto-merge
+  happened "after GitHub's protected-branch checks have passed". Nothing
+  implemented that claim.
+
+The decisive observation is that **GitHub did not stop the merge either**. If
+`actions.lock is in sync with the workflow YAML` had been a required status
+check, the merge would have been refused regardless of what Mergify's config
+said. It was not refused, so either the check is not required, or required
+checks are not enforced against this merge path, or the organisation rulesets
+exempt the merge queue. Those have different fixes and cannot be distinguished
+from here.
+
+Note also that `CodeQL Security Analysis` contributed **no check run at all** on
+that pull request. When GitHub refuses a workflow at startup it creates zero
+jobs, so there is nothing for a `#check-failure = 0` condition to count. A
+policy phrased as "nothing failed" is satisfied by a check that never ran; only
+a positive `check-success = <name>` catches it. That is why `.mergify.yml` now
+carries both forms rather than the count alone.
+
+== Current state
+
+`.mergify.yml` requires, for auto-merge:
+
+* `author = dependabot[bot]`
+* `head ~= ^dependabot/cargo/` — `github_actions` bumps are excluded outright,
+  because they can never satisfy the lockfile condition. Those wait for a human
+  to run `gh actions-lock --no-migrate-local-actions --no-narrow`, review the
+  diff, and push.
+* `"#check-failure = 0"` and `"#check-neutral = 0"` — a neutral conclusion is
+  not a pass either.
+* `check-success = actions.lock is in sync with the workflow YAML`
+
+`"#check-pending = 0"` is deliberately absent: third-party checks (Codeac,
+Semgrep, GitGuardian, CodeRabbit) report through the statuses API and were still
+pending when #148 merged. A stalled third party would wedge every routine cargo
+bump indefinitely, presenting as "Dependabot stopped working" — a quiet stall in
+the opposite direction from the one being fixed. If cargo bumps ever start
+merging with checks still running, add it *together with* a `checks_timeout`;
+adding one without the other trades a loud failure for a silent one.
+
+This is a **repository-level mitigation of an organisation-level gap**. It
+constrains Mergify. It does not constrain a maintainer clicking "Merge", another
+automation, or an admin override.
+
+== Options
+
+[cols="1,3,2", options="header"]
+|===
+|Option |What it means |Cost
+
+|A. Add the gate to the required-checks list
+|Enforced by GitHub, not by any one client's configuration. Survives a Mergify
+change, an admin merge, and the addition of a second merge bot.
+|Needs organisation or admin rights this repository's token does not have. If the
+list lives in an org ruleset, the change is estate-wide and affects every
+repository it covers -- most of which have no `actions.lock` and would fail a
+check that does not exist for them. That needs a ruleset that targets only
+repositories carrying the lockfile.
+
+|B. Leave it to `.mergify.yml`
+|Already done. No further action.
+|Constrains one merge path. The 2026-09-27 incident is evidence that a
+configuration-level condition can be wrong for months while reading as correct,
+because the comment describing it and the config implementing it are different
+artefacts.
+
+|C. Make the gate self-healing instead of blocking
+|A workflow that regenerates `actions.lock` and pushes to the Dependabot branch,
+so the bump arrives already in sync and there is nothing to block.
+|Needs the `gh actions-lock` extension on a runner, a token with write access to
+pull-request branches, and a decision about who reviews the regenerated file.
+The released tool is known to be blind to job-level reusable refs and to de-pin
+bare SHAs to floating tags, so its output is a draft needing review -- which
+puts the human back in the loop anyway.
+|===
+
+== What a ruling unblocks
+
+* Whether `Lock Sync Gate` should be added to a required-checks list, and at
+  which level (repository ruleset versus organisation ruleset).
+* Whether other estate repositories carrying an `actions.lock` need the same
+  treatment. `hyperpolymath/standards`#968 records 39 repositories with silently
+  dead CI from exactly this desync; IDApTIK became #40 twice in four days, and
+  the second time it happened while a fix for the first was on main. A
+  repository-level fix in one repository does not address that.
+* Whether the Mergify conditions added here are the intended estate default or a
+  local workaround. If the former, they belong in the template rather than here.
+
+== Guard
+
+Partial, and the limitation is the point.
+
+`check_mergify_conditions` in `tests/ci_security_config_test.sh` asserts the
+`.mergify.yml` conditions above, with seven firing fixtures including the
+author-only configuration that shipped. The expected `check-success` name is
+read from `lock-sync-gate.yml`'s job name at check time rather than hardcoded,
+so renaming the job fails the policy instead of silently disabling the
+condition. A bare `^dependabot/` head pattern is rejected: the pattern must name
+an allowed ecosystem, so the default stays closed when one is added.
+
+It cannot assert anything about GitHub's own required-checks list, because that
+list is not readable with this token. **A green build here does not mean the
+gate is enforced; it means the one merge path this repository controls is
+configured correctly.** If the answer to the question above turns out to be "no,
+it is not a required check", nothing in this repository's CI will say so.
