@@ -106,6 +106,24 @@ jobs:
         run: bash tests/abi_authority_pin_test.sh
       - name: CI security configuration fixtures (was invoked by nothing)
         run: bash tests/ci_security_config_test.sh
+      # The .well-known/ publish step in pages.yml runs under dash inside a
+      # Nix-based container with no bash and no guaranteed coreutils. PR #147
+      # widened that step, reached for basename(1) and head(1), and failed on
+      # main with "Process completed with exit code 1" and no retrievable log --
+      # the Pages deploy went dark and the only evidence was an exit code.
+      #
+      # This suite extracts the step text from pages.yml and runs it under dash
+      # with a PATH containing only mkdir, cp and cat, the three external
+      # commands the previous version of the step already proved are present in
+      # that container. A revision that needs a fourth one fails here in about a
+      # second instead of failing on main with no log. It has a firing mutant
+      # that reintroduces basename(1) and asserts it fails FOR THAT REASON, so
+      # the minimal PATH cannot silently stop being minimal.
+      #
+      # dash is /bin/sh on ubuntu-latest, so this needs no setup step. It fails
+      # closed rather than skipping if dash is somehow absent.
+      - name: Pages .well-known publish fixtures (dash + minimal PATH)
+        run: bash tests/pages_wellknown_test.sh
       # Duplicate of .github/workflows/lock-sync-gate.yml, deliberately. That
       # workflow carries no `uses:` and so cannot die the way it detects; this
       # copy exists so `just fixture-tests` and CI run the identical set, and so

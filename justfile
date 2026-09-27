@@ -108,8 +108,18 @@ lock-sync-check:
     ./scripts/check-lock-sync.sh --self-test
     ./scripts/check-lock-sync.sh
 
+# Offline fixture coverage for the .well-known/ publish step in pages.yml.
+# Extracts the real step text from the real workflow and runs it under dash with
+# a PATH containing only mkdir, cp and cat -- the three external commands the
+# pre-#147 version of that step already proved exist in the idris2-pack
+# container. PR #147 widened the step and reached for basename(1) and head(1);
+# it failed on main with exit code 1 and no retrievable log, taking the deployed
+# website with it. This recipe is why the next revision cannot do that quietly.
+pages-wellknown-test:
+    bash tests/pages_wellknown_test.sh
+
 # Run every shell fixture suite (no Rust toolchain needed).
-fixture-tests: runtime-doctor-test launcher-fixture-test vendor-winit-test abi-authority-pin-test ci-security-config-test lock-sync-check
+fixture-tests: runtime-doctor-test launcher-fixture-test vendor-winit-test abi-authority-pin-test ci-security-config-test pages-wellknown-test lock-sync-check
 
 # Execute the Mustfile physical-state probes (the estate `must check` verb).
 # Critical probes gate; a probe whose tool is missing fails, never skips.
