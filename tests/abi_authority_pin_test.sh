@@ -52,10 +52,36 @@ checks=0
 
 trap 'rm -rf "$FIXTURE"' EXIT
 
+# ── EMIT GITHUB ANNOTATIONS AS WELL AS CONSOLE LINES ────────────────────────
+#
+# The Actions log endpoint has been unreachable from this repository's
+# development environment twice in one day: once for the Pages failure that took
+# the website dark, and once for a fixture suite. Both times the only evidence
+# obtainable was an annotation reading "Process completed with exit code 1."
+# against a step number -- the log blob lives on a host this environment cannot
+# reach, and the rendered job page requires sign-in even for a public repo.
+#
+# A gate whose failure reason is trapped in an unreadable log is a much weaker
+# gate than it looks. Annotations are readable through the check-runs API
+# without the log blob, so a failure that annotates is a failure that can still
+# be diagnosed when the log cannot be fetched.
+#
+# Only active under GITHUB_ACTIONS=true, so local runs are unaffected.
+annotate() { # $1 level, $2 message
+  [ "${GITHUB_ACTIONS:-}" = "true" ] || return 0
+  local m
+  # Workflow commands are single-line and treat % as an escape introducer, so %
+  # must be escaped FIRST, then the line terminators folded. Escaping in the
+  # other order turns every folded newline into literal %250A text.
+  m="$(printf '%s' "$2" | sed -e 's/%/%25/g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/ | /g')"
+  printf '::%s::%s\n' "$1" "$m"
+}
+
 note() { checks=$((checks + 1)); printf '  ok: %s\n' "$1"; }
 
 fail() {
   printf '  FAIL: %s\n' "$1" >&2
+  annotate error "abi-authority-pin: $1"
   failures=$((failures + 1))
 }
 
@@ -668,6 +694,7 @@ expect_fail 'a fixture that is not the pinned file is rejected by its own digest
   validate_pinned_manifest_fixture "$rotted_fixture"
 
 if [ "$failures" -ne 0 ]; then
+  annotate error "abi-authority-pin: $failures assertion(s) FAILED, $checks passed -- see the per-assertion annotations above"
   printf 'ABI authority pin fixtures: %d FAILURES, %d assertions passed\n' "$failures" "$checks" >&2
   exit 1
 fi
