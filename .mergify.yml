@@ -91,3 +91,13 @@ merge_protections_settings:
     # add `#check-pending = 0` here together with a `checks_timeout` so a
     # stalled third party cannot wedge the queue forever. Adding one without the
     # other trades a loud failure for a silent one.
+    #
+    # ⚠ THIS FILE IS A MITIGATION, NOT THE FIX — see
+    # docs/decisions-pending/DR-0004-required-status-checks.adoc. These
+    # conditions constrain Mergify. They do not constrain a maintainer clicking
+    # "Merge", another automation, or an admin override. Only GitHub's own
+    # required-status-check list does that, and it is not readable with this
+    # repository's token (`GET /branches/main/protection` returns 403), so
+    # whether the lock-sync gate is on it is an open owner ruling. A green build
+    # here means the one merge path this repository controls is configured
+    # correctly; it does NOT mean the gate is enforced.
